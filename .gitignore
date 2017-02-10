@@ -1,0 +1,16 @@
+# temp
+~*
+\#*
+
+# coq
+*.vo
+*.glob
+*.d
+.deps
+
+cscope.*
+.dir-locals.el
+*.aux
+
+*~
+Makefile.coq
