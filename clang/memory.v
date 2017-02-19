@@ -5,7 +5,7 @@ Open Local Scope Z_scope.
 Require Import iris.base_logic.base_logic.
 
 Definition block : Set := positive.
-Definition offset := Z.
+Definition offset := nat.
 Definition addr : Set := prod block offset.
 
 Instance addr_eq_dec : EqDecision addr.

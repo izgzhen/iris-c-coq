@@ -1,6 +1,6 @@
 (** Language definition **)
 
-From iris.algebra Require Export cmra.
+From iris.algebra Require Export gmap.
 Require Import memory.
 Require Import lib.Integers.
 Open Scope Z_scope.
@@ -201,8 +201,83 @@ Inductive stmtsctx :=
 (* | SKcallel (lhs: addr) (fid: ident) (vargs: list val) (args: list expr) (args: list expr). *)
 
 Definition exprcont := list exprctx.
-Definition stmtcont := list stmtsctx.
-Definition cont : Set := (exprcont * stmtcont).
+Definition stmtscont := list stmtsctx.
+Definition cont : Set := (exprcont * stmtscont).
 Definition code : Set := (cureval * cont).
 
+Definition knil : cont := ([], []).
 
+Definition fill_expr (Ke : exprctx) (e : expr) : expr :=
+  match Ke with
+    | EKbinopr op re => Ebinop op e re
+    | EKbinopl op lv => Ebinop op (Evalue lv) e
+    | EKderef => Ederef e
+    | EKaddrof => Eaddrof e
+    | EKcast t => Ecast e t
+  end.
+
+Definition fill_stmts (Ks : stmtsctx) (e : expr) : stmts :=
+  match Ks with
+    | SKassignr rhs => Sassign e rhs
+    | SKassignl lhs => Sassign (Evalue (Vptr lhs)) e
+    | SKif s1 s2 => Sif e s1 s2
+    | SKwhile s => Swhile e s
+  end.
+
+Definition mem := gmap block (list byteval).
+
+Definition state := mem.
+
+Definition to_val (c: code) : option val :=
+  match c with
+    | (cure (Evalue v), knil) => Some v
+    | _ => None
+  end.
+
+Definition of_val (v: val) : code := (cure (Evalue v), knil).
+
+(* XXX: not precise *)
+Definition evalbop (op: bop) v1 v2 : option val :=
+  match op with
+    | oplus => (match v1, v2 with
+                  | Vint8 i1, Vint8 i2 => Some (Vint8 (Byte.add i1 i2))
+                  | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.add i1 i2))
+                  | _, _ => None
+               end)
+    | ominus => None
+  end.
+
+Inductive estep : cureval → exprcont → cureval → exprcont → state → Prop :=
+| ESbinop: ∀ lv rv op ke σ v',
+             evalbop op lv rv = Some v' →
+             estep (cure (Evalue rv))
+                   (EKbinopl op lv :: ke)
+                   (cure (Evalue v')) ke σ
+(* | EKderef *)
+(* | ekaddrof *)
+(* | EKcast (t: type). *)
+.
+
+Inductive sstep : cureval → stmtscont → state → cureval → stmtscont → state → Prop :=
+| SSassign:
+    ∀ t rv bytes bytes' σ b off ks,
+      typeof t rv →
+      encode_val t rv = bytes' →
+      σ !! b = Some bytes →
+      sstep (cure (Evalue rv))
+            (SKassignl (b, off) :: ks) σ
+            (curs Sskip) ks
+            (<[ b := take off bytes ++ take (length bytes - off) bytes' ]> σ)
+(* | SKif (s1 s2: stmts) *)
+(* | SKwhile (s: stmts). *)
+.
+
+Inductive head_step : code → state → code → state → Prop :=
+| head_estep:
+    ∀ c c' ke ke' ks σ,
+      estep c ke c' ke' σ →
+      head_step (c, (ke, ks)) σ (c', (ke', ks)) σ
+| head_sstep:
+    ∀ c c' ks ks' ke σ σ',
+      sstep c ks σ c' ks' σ' →
+      head_step (c, (ke, ks)) σ (c', (ke, ks')) σ'.
