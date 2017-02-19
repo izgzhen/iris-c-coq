@@ -1,7 +1,7 @@
 -R . iris_os
-clang/Integers.v
-clang/Coqlib.v
+clang/lib/Integers.v
+clang/lib/Coqlib.v
+clang/memory.v
 clang/lang.v
-clang/cont_lang.v
-
+clang/logic.v
 

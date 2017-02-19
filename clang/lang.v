@@ -1,369 +1,208 @@
-From iris_os.clang Require Export cont_lang.
-From iris.algebra Require Export ofe.
-From iris.prelude Require Export strings.
-From iris.prelude Require Import gmap.
-Set Default Proof Using "Type".
+(** Language definition **)
 
-Module heap_lang.
+From iris.algebra Require Export cmra.
+Require Import memory.
+Require Import lib.Integers.
 Open Scope Z_scope.
 
-(** Expressions and vals. *)
-Definition loc := positive. (* Really, any countable type. *)
+(* High-level value *)
+Inductive val : Set :=
+| Vnull
+| Vint8 (i: int8)
+| Vint32 (i: int32)
+| Vptr (p: addr).
 
-Inductive base_lit : Set :=
-  | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitLoc (l : loc).
-Inductive un_op : Set :=
-  | NegOp | MinusUnOp.
-Inductive bin_op : Set :=
-  | PlusOp | MinusOp | LeOp | LtOp | EqOp.
+Inductive type : Set :=
+| Tnull
+| Tvoid
+| Tint8
+| Tint32
+| Tptr (t: type).
 
-Inductive binder := BAnon | BNamed : string → binder.
-Delimit Scope binder_scope with bind.
-Bind Scope binder_scope with binder.
-Definition cons_binder (mx : binder) (X : list string) : list string :=
-  match mx with BAnon => X | BNamed x => x :: X end.
-Infix ":b:" := cons_binder (at level 60, right associativity).
-Instance binder_eq_dec_eq : EqDecision binder.
-Proof. solve_decision. Defined.
+Fixpoint sizeof (t : type) : nat :=
+  match t with
+    | Tnull => 4 %nat
+    | Tvoid => 0 % nat
+    | Tint8 => 1 % nat
+    | Tint32 => 4 % nat
+    | Tptr _ => 4 % nat
+  end.
 
-Instance set_unfold_cons_binder x mx X P :
-  SetUnfold (x ∈ X) P → SetUnfold (x ∈ mx :b: X) (BNamed x = mx ∨ P).
+Inductive typeof : type → val → Prop :=
+| typeof_null: typeof Tnull Vnull
+| typeof_int8_to_int32:
+    ∀ v: int32, (Int.unsigned v) <=? Byte.max_unsigned → typeof Tint8 (Vint32 v)
+| typeof_int8: ∀ i, typeof Tint8 (Vint8 i)
+| typeof_int32: ∀ i, typeof Tint32 (Vint32 i)
+| typeof_ptr: ∀ t l, typeof (Tptr t) (Vptr l).
+
+Inductive bop:=
+| oplus
+| ominus.
+
+(* Encoding and decoding for values *)
+Fixpoint encode_int (n: nat) (x: Z): list byte :=
+  match n with
+    | O => nil
+    | S m => Byte.repr x :: encode_int m (x / 256)
+  end.
+
+Fixpoint decode_int (l: list byte): Z :=
+  match l with
+    | nil => 0
+    | b :: l' => Byte.unsigned b + decode_int l' * 256
+  end.
+
+Lemma encode_int_length:
+  forall sz x, length(encode_int sz x) = sz.
 Proof.
-  constructor. rewrite -(set_unfold (x ∈ X) P).
-  destruct mx; rewrite /= ?elem_of_cons; naive_solver.
+  induction sz; simpl; intros. auto. decEq. auto.
 Qed.
 
-(* First-order language *)
+Definition inj_bytes (bl: list byte) : list byteval := List.map BVint8 bl.
 
-Inductive val :=
-| LitV (l : base_lit).
+Fixpoint proj_bytes (vl: list byteval) : option (list byte) :=
+  match vl with
+    | nil => Some nil
+    | BVint8 b :: vl' =>
+      match proj_bytes vl' with None => None | Some bl => Some (b :: bl) end
+    | _ => None
+  end.
 
-Bind Scope val_scope with val.
+Lemma length_inj_bytes:
+  forall bl, length (inj_bytes bl) = length bl.
+Proof.
+  intros. apply List.map_length.
+Qed.
+
+Lemma proj_inj_bytes:
+  forall bl, proj_bytes (inj_bytes bl) = Some bl.
+Proof.
+  induction bl; simpl. auto. rewrite IHbl. auto.
+Qed.
+
+Lemma inj_proj_bytes:
+  forall cl bl, proj_bytes cl = Some bl -> cl = inj_bytes bl.
+Proof.
+  induction cl; simpl; intros.
+  inv H; auto.
+  destruct a; try congruence. destruct (proj_bytes cl); inv H.
+  simpl. decEq. auto.
+Qed.
+
+Fixpoint inj_pointer (n: nat) (p: addr): list byteval :=
+  match n with
+    | O => nil
+    | S n => BVaddr p n :: inj_pointer n p
+  end.
+
+Fixpoint check_pointer (n: nat) (p: addr) (vl: list byteval) : bool :=
+  match n, vl with
+    | O, nil => true
+    | S m, BVaddr p' m' :: vl' =>
+       bool_decide (p = p') && beq_nat m m' && check_pointer m p vl'
+    | _, _ => false
+  end.
+
+Definition proj_pointer (vl: list byteval) : option val :=
+  match vl with
+    | BVaddr p n :: vl' =>
+      if check_pointer 4%nat p vl then Some (Vptr p) else None
+    | _ => None
+  end.
+
+Definition encode_val (t: type) (v: val) : list byteval :=
+  match v, t with
+  | Vint32 n, Tint8  => inj_bytes (encode_int 1%nat (Int.unsigned n))
+  | Vint32 n, Tint32 => inj_bytes (encode_int 4%nat (Int.unsigned n))
+  | Vptr p, Tptr _ => inj_pointer 4%nat p
+  | Vnull, Tnull => list_repeat 4 BVnull
+  | Vnull, Tptr _ => list_repeat 4 BVnull
+  | _, _ => list_repeat (sizeof t) BVundef
+  end.
+
+Definition decode_val (t: type) (vl: list byteval) : option val :=
+  match proj_bytes vl with
+  | Some bl =>
+      match t with
+      | Tint8  => Some (Vint32 (Int.zero_ext 8 (Int.repr (decode_int bl))))
+      | Tint32 => Some (Vint32 (Int.repr (decode_int bl)))
+      | _ => None
+      end
+  | None =>
+    match vl with
+      | BVnull :: BVnull ::BVnull :: BVnull :: nil =>
+        match t with
+          | Tnull => Some Vnull
+          | Tptr _ => Some Vnull
+          | _ => None
+        end
+      | _ =>
+        match t with
+          | Tptr _ => proj_pointer vl
+          | _ => None
+        end
+    end
+  end.
+
+Definition ident := Z.
 
 Inductive expr :=
-  | Var (x : string)
-  | Let (x: string) (e1 e2: expr)
-  (* Base types and their operations *)
-  | Lit (l : base_lit)
-  | UnOp (op : un_op) (e : expr)
-  | BinOp (op : bin_op) (e1 e2 : expr)
-  | If (e0 e1 e2 : expr)
-  (* Concurrency *)
-  | Fork (e : expr)
-  (* Heap *)
-  | Alloc (e : expr)
-  | Load (e : expr)
-  | Store (e1 : expr) (e2 : expr)
-  | CAS (e0 : expr) (e1 : expr) (e2 : expr)
-  (* Procedure *)
-  | Ret (e: expr)
-  | Call (f: string) (vs: list val).
+ | Evalue (v: val)
+ | Evar (x: ident)
+ | Ebinop (op: bop) (e1: expr) (e2: expr)
+ | Ederef (e: expr)
+ | Eaddrof (e: expr)
+ (* | Efield (e: expr) *)
+ | Ecast (e: expr) (t: type).
+ (* | Eindex (e: expr) (e: expr). *)
 
-Bind Scope expr_scope with expr.
+Inductive stmts :=
+| Sskip
+| Sassign (lhs: expr) (rhs: expr)
+| Sif (cond: expr) (s1 s2: stmts)
+| Swhile (cond: expr) (s: stmts)
+(* | Sret *)
+(* | Srete (e: expr) *)
+(* | Scall (fid: ident) (args: list expr) *)
+(* | Scalle (lhs: expr) (fid: ident) (args: list expr) *)
+| sseq (s1 s2: stmts).
+(* | Sprint (e: expr) *)
+(* | Sfree *)
+(* | Salloc *)
 
-Fixpoint is_closed (X : list string) (e : expr) : bool :=
-  match e with
-  | Var x => bool_decide (x ∈ X)
-  | Let x e1 e2 => is_closed ((BNamed x) :b: X) e2
-  | Lit _ => true
-  | UnOp _ e | Fork e | Alloc e | Load e =>
-     is_closed X e
-  | BinOp _ e1 e2 | Store e1 e2 =>
-     is_closed X e1 && is_closed X e2
-  | If e0 e1 e2 | CAS e0 e1 e2 =>
-     is_closed X e0 && is_closed X e1 && is_closed X e2
-  | Ret e => is_closed X e
-  | Call _ _ => true
-  end.
+(* Definition decls := list (ident * type). *)
 
-Class Closed (X : list string) (e : expr) := closed : is_closed X e.
-Instance closed_proof_irrel env e : ProofIrrel (Closed env e).
-Proof. rewrite /Closed. apply _. Qed.
-Instance closed_decision env e : Decision (Closed env e).
-Proof. rewrite /Closed. apply _. Qed.
+(* Definition function : Set := (type * decls * decls * stmts). *)
 
-Fixpoint of_val (v : val) : expr :=
-  match v with
-  | LitV l => Lit l
-  end.
+(* Definition program := ident → option function. *)
 
-Fixpoint to_val (e : expr) : option val :=
-  match e with
-  | Lit l => Some (LitV l)
-  | _ => None
-  end.
+(* Operational Semantics *)
 
-(** The state: heaps of vals. *)
-Definition state := gmap loc val.
+Inductive cureval :=
+| cure (e: expr)
+| curs (s: stmts).
 
-(** Equality and other typeclass stuff *)
-Lemma to_of_val v : to_val (of_val v) = Some v.
-Proof.
-  by induction v; simplify_option_eq; repeat f_equal; try apply (proof_irrel _).
-Qed.
+Inductive exprctx :=
+| EKbinopr (op: bop) (re: expr)
+| EKbinopl (op: bop) (lv: val)
+| EKderef
+| EKaddrof
+| EKcast (t: type).
 
-Lemma of_to_val e v : to_val e = Some v → of_val v = e.
-Proof.
-  revert v; induction e; intros v ?; simplify_option_eq; auto with f_equal.
-Qed.
+Inductive stmtsctx :=
+| SKassignr (rhs: expr)
+| SKassignl (lhs: addr)
+| SKif (s1 s2: stmts)
+| SKwhile (s: stmts).
+(* | SKrete *)
+(* | SKcall (fid: ident) (vargs: list val) (args: list expr) *)
+(* | SKcaller (fid: ident) (args: list expr) *)
+(* | SKcallel (lhs: addr) (fid: ident) (vargs: list val) (args: list expr) (args: list expr). *)
 
-Instance of_val_inj : Inj (=) (=) of_val.
-Proof. by intros ?? Hv; apply (inj Some); rewrite -!to_of_val Hv. Qed.
+Definition exprcont := list exprctx.
+Definition stmtcont := list stmtsctx.
+Definition cont : Set := (exprcont * stmtcont).
+Definition code : Set := (cureval * cont).
 
-Instance base_lit_eq_dec : EqDecision base_lit.
-Proof. solve_decision. Defined.
-Instance un_op_eq_dec : EqDecision un_op.
-Proof. solve_decision. Defined.
-Instance bin_op_eq_dec : EqDecision bin_op.
-Proof. solve_decision. Defined.
-Instance val_eq_dec : EqDecision val.
-Proof. solve_decision. Defined.
-Instance expr_eq_dec : EqDecision expr.
-Proof. solve_decision. Defined.
 
-Instance expr_inhabited : Inhabited expr := populate (Lit LitUnit).
-Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
-
-Canonical Structure stateC := leibnizC state.
-Canonical Structure valC := leibnizC val.
-Canonical Structure exprC := leibnizC expr.
-
-(** Evaluation contexts *)
-Inductive ectx_item :=
-  | LetCtx (x: string) (e2 : expr)
-  | UnOpCtx (op : un_op)
-  | BinOpLCtx (op : bin_op) (e2 : expr)
-  | BinOpRCtx (op : bin_op) (v1 : val)
-  | IfCtx (e1 e2 : expr)
-  | AllocCtx
-  | LoadCtx
-  | StoreLCtx (e2 : expr)
-  | StoreRCtx (v1 : val)
-  | CasLCtx (e1 : expr) (e2 : expr)
-  | CasMCtx (v0 : val) (e2 : expr)
-  | CasRCtx (v0 : val) (v1 : val).
-
-Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
-  match Ki with
-  | LetCtx x e2 => Let x e e2
-  | UnOpCtx op => UnOp op e
-  | BinOpLCtx op e2 => BinOp op e e2
-  | BinOpRCtx op v1 => BinOp op (of_val v1) e
-  | IfCtx e1 e2 => If e e1 e2
-  | AllocCtx => Alloc e
-  | LoadCtx => Load e
-  | StoreLCtx e2 => Store e e2 
-  | StoreRCtx v1 => Store (of_val v1) e
-  | CasLCtx e1 e2 => CAS e e1 e2
-  | CasMCtx v0 e2 => CAS (of_val v0) e e2
-  | CasRCtx v0 v1 => CAS (of_val v0) (of_val v1) e
-  end.
-
-(** Substitution *)
-Fixpoint subst (x : string) (es : expr) (e : expr)  : expr :=
-  match e with
-  | Var y => if decide (x = y) then es else Var y
-  | Let y e1 e2 =>
-     Let y e1 $ if decide (x ≠ y) then subst x es e2 else e2
-  | Lit l => Lit l
-  | UnOp op e => UnOp op (subst x es e)
-  | BinOp op e1 e2 => BinOp op (subst x es e1) (subst x es e2)
-  | If e0 e1 e2 => If (subst x es e0) (subst x es e1) (subst x es e2)
-  | Fork e => Fork (subst x es e)
-  | Alloc e => Alloc (subst x es e)
-  | Load e => Load (subst x es e)
-  | Store e1 e2 => Store (subst x es e1) (subst x es e2)
-  | CAS e0 e1 e2 => CAS (subst x es e0) (subst x es e1) (subst x es e2)
-  | Ret e => Ret (subst x es e)
-  | Call f vs => Call f vs (* Should we substitute f? ... useful? *)
-  end.
-
-Definition subst' (mx : binder) (es : expr) : expr → expr :=
-  match mx with BNamed x => subst x es | BAnon => id end.
-
-(** The stepping relation *)
-Definition un_op_eval (op : un_op) (v : val) : option val :=
-  match op, v with
-  | NegOp, LitV (LitBool b) => Some $ LitV $ LitBool (negb b)
-  | MinusUnOp, LitV (LitInt n) => Some $ LitV $ LitInt (- n)
-  | _, _ => None
-  end.
-
-Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
-  match op, v1, v2 with
-  | PlusOp, LitV (LitInt n1), LitV (LitInt n2) => Some $ LitV $ LitInt (n1 + n2)
-  | MinusOp, LitV (LitInt n1), LitV (LitInt n2) => Some $ LitV $ LitInt (n1 - n2)
-  | LeOp, LitV (LitInt n1), LitV (LitInt n2) => Some $ LitV $ LitBool $ bool_decide (n1 ≤ n2)
-  | LtOp, LitV (LitInt n1), LitV (LitInt n2) => Some $ LitV $ LitBool $ bool_decide (n1 < n2)
-  | EqOp, v1, v2 => Some $ LitV $ LitBool $ bool_decide (v1 = v2)
-  | _, _, _ => None
-  end.
-
-Inductive head_step : expr → state → expr → state → list (expr) → Prop :=
-  | LetS x e1 e2 v1 σ e' :
-     to_val e1 = Some v1 →
-     Closed (BNamed x :b: []) e2 →
-     e' = subst' (BNamed x) (of_val v1) e2 →
-     head_step (Let x e1 e2) σ e' σ []
-  | UnOpS op e v v' σ :
-     to_val e = Some v →
-     un_op_eval op v = Some v' → 
-     head_step (UnOp op e) σ (of_val v') σ []
-  | BinOpS op e1 e2 v1 v2 v' σ :
-     to_val e1 = Some v1 → to_val e2 = Some v2 →
-     bin_op_eval op v1 v2 = Some v' → 
-     head_step (BinOp op e1 e2) σ (of_val v') σ []
-  | IfTrueS e1 e2 σ :
-     head_step (If (Lit $ LitBool true) e1 e2) σ e1 σ []
-  | IfFalseS e1 e2 σ :
-     head_step (If (Lit $ LitBool false) e1 e2) σ e2 σ []
-  | ForkS e σ:
-     head_step (Fork e) σ (Lit LitUnit) σ [e]
-  | AllocS e v σ l :
-     to_val e = Some v → σ !! l = None →
-     head_step (Alloc e) σ (Lit $ LitLoc l) (<[l:=v]>σ) []
-  | LoadS l v σ :
-     σ !! l = Some v →
-     head_step (Load (Lit $ LitLoc l)) σ (of_val v) σ []
-  | StoreS l e v σ :
-     to_val e = Some v → is_Some (σ !! l) →
-     head_step (Store (Lit $ LitLoc l) e) σ (Lit LitUnit) (<[l:=v]>σ) []
-  | CasFailS l e1 v1 e2 v2 vl σ :
-     to_val e1 = Some v1 → to_val e2 = Some v2 →
-     σ !! l = Some vl → vl ≠ v1 →
-     head_step (CAS (Lit $ LitLoc l) e1 e2) σ (Lit $ LitBool false) σ []
-  | CasSucS l e1 v1 e2 v2 σ :
-     to_val e1 = Some v1 → to_val e2 = Some v2 →
-     σ !! l = Some v1 →
-     head_step (CAS (Lit $ LitLoc l) e1 e2) σ (Lit $ LitBool true) (<[l:=v2]>σ) [].
-
-Fixpoint substs' xs vs e :=
-  match xs, vs with
-    | x::xs, v::vs => subst' (BNamed x) (of_val v) (substs' xs vs e)
-    | _, _ => e
-  end.
-
-Definition fundecls : Type := string → (list string * expr).
-
-Definition cont : Type := list ectx_item.
-
-Inductive cont_step : fundecls → expr → ectx_item → cont → expr → cont → Prop :=
-| CallK:
-    ∀ decls f xs vs K ks e e',
-      decls f = (xs, e) →
-      length xs = length vs →
-      e' = substs' xs vs e →
-      cont_step decls (Call f vs) K ks e' (K::ks)
-| RetK:
-    ∀ decls e v K k ks,
-      to_val e = Some v →
-      cont_step decls (Ret e) K (k::ks) (fill_item k e) ks.
-
-(** Basic properties about the language *)
-Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
-Proof. destruct Ki; intros ???; simplify_eq/=; auto with f_equal. Qed.
-
-Lemma fill_item_val Ki e :
-  is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
-Proof. intros [v ?]. destruct Ki; simplify_option_eq; eauto. Qed.
-
-Lemma val_stuck e1 σ1 e2 σ2 efs : head_step e1 σ1 e2 σ2 efs → to_val e1 = None.
-Proof. destruct 1; naive_solver. Qed.
-
-Lemma head_ctx_step_val Ki e σ1 e2 σ2 efs :
-  head_step (fill_item Ki e) σ1 e2 σ2 efs → is_Some (to_val e).
-Proof. destruct Ki; inversion_clear 1; simplify_option_eq; by eauto. Qed.
-
-Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
-  to_val e1 = None → to_val e2 = None →
-  fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
-Proof.
-  destruct Ki1, Ki2; intros; try discriminate; simplify_eq/=;
-    repeat match goal with
-    | H : to_val (of_val _) = None |- _ => by rewrite to_of_val in H
-    end; auto.
-Qed.
-
-Lemma alloc_fresh e v σ :
-  let l := fresh (dom _ σ) in
-  to_val e = Some v → head_step (Alloc e) σ (Lit (LitLoc l)) (<[l:=v]>σ) [].
-Proof. by intros; apply AllocS, (not_elem_of_dom (D:=gset _)), is_fresh. Qed.
-
-(* Misc *)
-
-(** Closed expressions *)
-Lemma is_closed_weaken X Y e : is_closed X e → X ⊆ Y → is_closed Y e.
-Proof. revert X Y; induction e; naive_solver (eauto; set_solver). Qed.
-
-Lemma is_closed_weaken_nil X e : is_closed [] e → is_closed X e.
-Proof. intros. by apply is_closed_weaken with [], list_subseteq_nil. Qed.
-
-Lemma is_closed_of_val X v : is_closed X (of_val v).
-Proof. apply is_closed_weaken_nil. induction v; simpl; auto. Qed.
-
-Lemma is_closed_subst X e x es :
-  is_closed [] es → is_closed (x :: X) e → is_closed X (subst x es e).
-Proof.
-  intros ?. revert X.
-  induction e=> X /= ?; destruct_and?; split_and?; simplify_option_eq;
-    try match goal with
-    | H : ¬(_ ∧ _) |- _ => apply not_and_l in H as [?%dec_stable|?%dec_stable]
-    end; eauto using is_closed_weaken with set_solver.
-Qed.
-Lemma is_closed_do_subst' X e x es :
-  is_closed [] es → is_closed (x :b: X) e → is_closed X (subst' x es e).
-Proof. destruct x; eauto using is_closed_subst. Qed.
-
-(* Substitution *)
-Lemma subst_is_closed X e x es : is_closed X e → x ∉ X → subst x es e = e.
-Proof.
-  revert X. induction e=> X /=; rewrite ?bool_decide_spec ?andb_True=> ??;
-    repeat case_decide; simplify_eq/=; f_equal; intuition eauto with set_solver.
-Qed.
-
-Lemma subst_is_closed_nil e x es : is_closed [] e → subst x es e = e.
-Proof. intros. apply subst_is_closed with []; set_solver. Qed.
-
-Lemma subst_subst e x es es' :
-  Closed [] es' → subst x es (subst x es' e) = subst x es' e.
-Proof.
-  intros. induction e; simpl; try (f_equal; by auto);
-    simplify_option_eq; auto using subst_is_closed_nil with f_equal.
-Qed.
-Lemma subst_subst' e x es es' :
-  Closed [] es' → subst' x es (subst' x es' e) = subst' x es' e.
-Proof. destruct x; simpl; auto using subst_subst. Qed.
-
-Lemma subst_subst_ne e x y es es' :
-  Closed [] es → Closed [] es' → x ≠ y →
-  subst x es (subst y es' e) = subst y es' (subst x es e).
-Proof.
-  intros. induction e; simpl; try (f_equal; by auto);
-    simplify_option_eq; auto using eq_sym, subst_is_closed_nil with f_equal.
-Qed.
-Lemma subst_subst_ne' e x y es es' :
-  Closed [] es → Closed [] es' → x ≠ y →
-  subst' x es (subst' y es' e) = subst' y es' (subst' x es e).
-Proof. destruct x, y; simpl; auto using subst_subst_ne with congruence. Qed.
-
-End heap_lang.
-
-(** Language *)
-Program Instance heap_cont_lang :
-  ContLanguage
-    (heap_lang.expr) heap_lang.val heap_lang.ectx_item
-    heap_lang.state heap_lang.fundecls heap_lang.cont := {|
-  of_val := heap_lang.of_val; to_val := heap_lang.to_val;
-  fill := heap_lang.fill_item; head_step := heap_lang.head_step;
-  cont_step := heap_lang.cont_step
-|}.
-Solve Obligations with eauto using heap_lang.to_of_val, heap_lang.of_to_val,
-  heap_lang.val_stuck, heap_lang.fill_item_val, heap_lang.fill_item_no_val_inj,
-  heap_lang.head_ctx_step_val.
-
-(* Prefer heap_lang names over ectx_language names. *)
-Export heap_lang.
-
-(** Define some derived forms *)
-Notation Seq e1 e2 := (Let BAnon e1 e2).
-Notation Skip := (Seq (Lit LitUnit) (Lit LitUnit)).
