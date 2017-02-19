@@ -1,8 +1,8 @@
 (** Language definition **)
 
 From iris.algebra Require Export gmap.
-Require Import memory.
-Require Import lib.Integers.
+Require Export memory.
+Require Export lib.Integers.
 Open Scope Z_scope.
 
 (* High-level value *)
@@ -235,6 +235,13 @@ Definition to_val (c: code) : option val :=
   end.
 
 Definition of_val (v: val) : code := (cure (Evalue v), knil).
+
+Definition reducible (c: code) : Prop :=
+  match c with
+    | (cure (Evalue v), knil) => True
+    | (curs Sskip, knil) => True
+    | _ => False
+  end.
 
 (* XXX: not precise *)
 Definition evalbop (op: bop) v1 v2 : option val :=
