@@ -163,8 +163,8 @@ Inductive stmts :=
 | Sif (cond: expr) (s1 s2: stmts)
 | Swhile (cond: expr) (s: stmts)
 (* | Sret *)
-(* | Srete (e: expr) *)
-(* | Scall (fid: ident) (args: list expr) *)
+| Srete (e: expr)
+| Scall (fid: ident) (args: list expr)
 (* | Scalle (lhs: expr) (fid: ident) (args: list expr) *)
 | Sseq (s1 s2: stmts).
 (* | Sprint (e: expr) *)
@@ -196,9 +196,9 @@ Inductive stmtsctx :=
 | SKassignr (rhs: expr)
 | SKassignl (lhs: addr)
 | SKif (s1 s2: stmts)
-| SKwhile (s: stmts).
-(* | SKrete *)
-(* | SKcall (fid: ident) (vargs: list val) (args: list expr) *)
+| SKwhile (s: stmts)
+| SKrete
+| SKcall (fid: ident) (vargs: list val) (args: list expr).
 (* | SKcaller (fid: ident) (args: list expr) *)
 (* | SKcallel (lhs: addr) (fid: ident) (vargs: list val) (args: list expr) (args: list expr). *)
 
@@ -224,6 +224,8 @@ Definition fill_stmts (Ks : stmtsctx) (e : expr) : stmts :=
     | SKassignl lhs => Sassign (Evalue (Vptr lhs)) e
     | SKif s1 s2 => Sif e s1 s2
     | SKwhile s => Swhile e s
+    | SKcall f vargs args => Scall f (map Evalue vargs ++ e :: args)
+    | SKrete => Srete e
   end.
 
 Definition mem := gmap block (list byteval).
@@ -240,9 +242,10 @@ Definition of_val (v: val) : code := (cure (Evalue v), knil).
 
 Definition reducible (c: code) : Prop :=
   match c with
-    | (cure (Evalue v), knil) => True
-    | (curs Sskip, knil) => True
-    | _ => False
+    | (cure (Evalue v), knil) => False
+    | (curs Sskip, knil) => False
+    | (curs (Srete (Evalue v)), knil) => False
+    | _ => True
   end.
 
 (* XXX: not precise *)
