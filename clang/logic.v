@@ -235,7 +235,7 @@ Section rules.
 
   Fixpoint subst_e (x: ident) (es: expr) (e: expr) : expr :=
     match e with
-      | Evar x' => if bool_decide (x' = x) then es else e
+      | Evar x' => if decide (x' = x) then es else e
       | Ebinop op e1 e2 => Ebinop op (subst_e x es e1) (subst_e x es e2)
       | Ederef e => Ederef (subst_e x es e)
       | Eaddrof e => Eaddrof (subst_e x es e)
@@ -243,50 +243,64 @@ Section rules.
       | _ => e
     end.
   
-  Fixpoint subst_s (x: ident) (e: expr) (s: stmts) : stmts :=
+  Fixpoint subst_s (x: ident) (l: addr) (s: stmts) : stmts :=
     match s with
       | Sskip => Sskip
-      | Sassign e1 e2 => Sassign (subst_e x e e1) (subst_e x e e2)
-      | Sif e s1 s2 => Sif (subst_e x e e) (subst_s x e s1) (subst_s x e s2)
-      | Swhile e s => Swhile (subst_e x e e) (subst_s x e s)
-      | Srete e => Srete (subst_e x e e)
-      | Scall f es => Scall f (map (subst_e x e) es)
-      | Sseq s1 s2 => Sseq (subst_s x e s2) (subst_s x e s2)
+      | Sassign e1 e2 => Sassign (subst_e x (Evalue (Vptr l)) e1)
+                                 (subst_e x (Ederef (Evalue (Vptr l))) e2)
+      | Sif e s1 s2 => Sif (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s1) (subst_s x l s2)
+      | Swhile e s => Swhile (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s)
+      | Srete e => Srete (subst_e x (Ederef (Evalue (Vptr l))) e)
+      | Scall f es => Scall f (map (subst_e x (Ederef (Evalue (Vptr l)))) es)
+      | Sseq s1 s2 => Sseq (subst_s x l s1) (subst_s x l s2)
     end.
 
-  Fixpoint substs (m: list (ident * expr)) (s: stmts) : stmts :=
+  Fixpoint substs (m: list (ident * addr)) (s: stmts) : stmts :=
     match m with
-      | (i, e)::m => substs m (subst_s i e s)
+      | (i, l)::m => substs m (subst_s i l s)
       | [] => s
     end.
 
-  Lemma wp_call (p: program) vs params f_body f retty k Φ Φret:
-    ∃ ls: list addr,
-      p f = Some (retty, params, f_body) →
-      params_match params vs →
-      alloc_params (zip ls (params.*2)) vs ∗
-      WP (curs (substs (zip (params.*1) (map (fun l => Evalue (Vptr l)) ls)) f_body), knil)
-         {{ _, True; fun v => WP (curs Sskip, k) {{ Φ; Φret }} }}
-      ⊢ WP (curs (Scall f (map Evalue vs)), k) {{ Φ; Φret }}.
+  Lemma wp_call (p: program) es vs params f_body f retty k Φ Φret: 
+    p f = Some (retty, params, f_body) →
+    es = map Evalue vs →
+    params_match params vs →
+    (∀ ls,
+       ⌜ length ls = length vs ⌝ -∗
+       alloc_params (zip ls (params.*2)) vs -∗
+       WP (curs (substs (zip (params.*1) ls) f_body), knil)
+          {{ _, True; fun v => WP (curs Sskip, k) {{ Φ; Φret }} }})
+    ⊢ WP (curs (Scall f es), k) {{ Φ; Φret }}.
   Admitted.
+
+  Lemma wp_skip Φ E Φret : Φ ⊢ WP (curs Sskip, knil) @ E {{ _, Φ ; Φret}}.
+  Admitted.
+  
 End rules.
 
 Section example.
   Context `{clangG Σ}.
   
-  Parameter px py: addr.
+  Parameter py: addr.
   Parameter Y lock unlock: ident.
 
-  Definition x := Evalue (Vptr px).
   Definition y := Evalue (Vptr py).
   
-  Definition f_body : stmts :=
+  Definition f_body (px: addr) : stmts :=
     Scall lock [] ;;;
-    Sassign y (Ebinop oplus (Ederef y) (Ederef x)) ;;;
-    Sassign x (Ederef y) ;;;
+    Sassign y (Ebinop oplus (Ederef y) (Ederef (Evalue (Vptr px)))) ;;;
+    Sassign (Evalue (Vptr px)) (Ederef y) ;;;
     Scall unlock [] ;;;
-    Srete (Ederef x).
+    Srete (Ederef (Evalue (Vptr px))).
 
+  Definition f_body' (x: ident) : stmts :=
+    Scall lock [] ;;;
+    Sassign y (Ebinop oplus (Ederef y) (Evar x)) ;;;
+
+    Sassign (Evar x) (Ederef y) ;;;
+    Scall unlock [] ;;;
+    Srete (Evar x).
+  
   Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
     ∃ vy:int, s !! Y = Some (Vint32 vy) ∧
               r = Some (Vint32 (Int.add vx vy)) ∧
@@ -308,10 +322,10 @@ Section example.
     l S↦ v ⊣⊢ sstate {[ l := v ]}.
   Proof. by rewrite /sstate big_sepM_singleton. Qed.
   
-  Lemma f_spec vx Φ Φret:
+  Lemma f_spec px vx Φ Φret:
     px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗
     (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ Φret (Some v))
-    ⊢ WP (curs f_body, knil) {{ Φ ; Φret }}.
+    ⊢ WP (curs (f_body px), knil) {{ Φ ; Φret }}.
   Proof.
     iIntros "(Hx & Hsc & HΦret)".
     iApply wp_seq. iApply lock_spec. iIntros "HI".
@@ -326,7 +340,7 @@ Section example.
     simpl. iSplit; first done.
     iIntros "Hss HSc".
     iApply wp_seq.
-    rewrite /example.x /example.y.
+    rewrite /example.y.
     iApply (wp_bind_s _ (SKassignl _)).
     iApply (wp_bind _ (EKbinopr _ _)).
     iApply wp_conte.
@@ -363,6 +377,26 @@ Section example.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
     by iApply "HΦret".
   Admitted.
-    
+  
+  Lemma f_spec' (p: program) (x: ident) f vx Φ Φret:
+    p f = Some (Tint32, [(x, Tint32)], f_body' x) →
+    scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ Φ)
+    ⊢ WP (curs (Scall f [Evalue (Vint32 vx)]), knil) {{ _, Φ ; Φret }}.
+  Proof.
+    iIntros (Hpf) "(Hsc & HΦ)".
+    iApply (wp_call _ _ [Vint32 vx])=>//.
+    { simpl. split=>//. apply typeof_int32. }
+    iIntros (ls) "% Hls".
+    destruct ls as [|a [|b ls]].
+    - simpl. iDestruct "Hls" as "%"=>//.
+    - simpl. destruct (decide (x = x))=>//.
+      iDestruct "Hls" as "[Hx _]".
+      iApply f_spec. iFrame.
+      iIntros (v) "_ Hsc". (* XXX: free *)
+      iApply wp_skip.
+      by iApply "HΦ".
+    - inversion H0.
+  Qed.
+
 End example.
 
