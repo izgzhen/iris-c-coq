@@ -11,7 +11,7 @@ Class clangG Σ := ClangG {
   clangG_memG :> gen_heapG block (list byteval) Σ
 }.
 
-Section definitions.
+Section wp.
   Context `{clangG Σ}.
   
   Definition wp_pre
@@ -34,26 +34,44 @@ Section definitions.
     repeat (f_contractive || f_equiv); apply Hwp.
   Qed.
 
+  Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
+    (∃ bytes bytes',
+       mapsto (l.1) q bytes ∗
+       ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.
+  
   Definition wp_def :
     coPset → code → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
   Definition wp_aux : { x | x = @wp_def }. by eexists. Qed.
   Definition wp := proj1_sig wp_aux.
   Definition wp_eq : @wp = @wp_def := proj2_sig wp_aux.
 
-  Notation "'WP' c @ E {{ Φ } }" := (wp E c Φ)
-    (at level 20, c, Φ at level 200,
-     format "'WP'  c  @  E  {{  Φ  } }") : uPred_scope.
-  Notation "'WP' c {{ Φ } }" := (wp ⊤ c Φ)
-    (at level 20, c, Φ at level 200,
-     format "'WP'  c  {{  Φ  } }") : uPred_scope.
+End wp.
 
-  Notation "'WP' c @ E {{ v , Q } }" := (wp E c (λ v, Q))
-    (at level 20, c, Q at level 200,
-     format "'WP'  c  @  E  {{  v ,  Q  } }") : uPred_scope.
-  Notation "'WP' c {{ v , Q } }" := (wp ⊤ c (λ v, Q))
-    (at level 20, c, Q at level 200,
-     format "'WP'  c  {{  v ,  Q  } }") : uPred_scope.
+Notation "'WP' c @ E {{ Φ } }" := (wp E c Φ)
+  (at level 20, c, Φ at level 200,
+   format "'WP'  c  @  E  {{  Φ  } }") : uPred_scope.
+Notation "'WP' c {{ Φ } }" := (wp ⊤ c Φ)
+  (at level 20, c, Φ at level 200,
+   format "'WP'  c  {{  Φ  } }") : uPred_scope.
 
+Notation "'WP' c @ E {{ v , Q } }" := (wp E c (λ v, Q))
+  (at level 20, c, Q at level 200,
+   format "'WP'  c  @  E  {{  v ,  Q  } }") : uPred_scope.
+Notation "'WP' c {{ v , Q } }" := (wp ⊤ c (λ v, Q))
+  (at level 20, c, Q at level 200,
+   format "'WP'  c  {{  v ,  Q  } }") : uPred_scope.
+
+Notation "l ↦{ q } v @ t" := (mapstoval l q v t)
+  (at level 20, q at level 50, format "l  ↦{ q }  v  @  t") : uPred_scope.
+Notation "l ↦ v @ t" :=
+  (mapstoval l 1%Qp v t) (at level 20) : uPred_scope.
+Notation "l ↦{ q } -" := (∃ v t, l ↦{q} v @ t)%I
+  (at level 20, q at level 50, format "l  ↦{ q }  -") : uPred_scope.
+Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : uPred_scope.
+
+Section rules.
+  Context `{clangG Σ}.
+  
   Lemma wp_unfold E c Φ : WP c @ E {{ Φ }} ⊣⊢ wp_pre wp E c Φ.
   Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
 
@@ -63,7 +81,6 @@ Section definitions.
     rewrite wp_unfold /wp_pre.
     iLeft. iExists v. auto.
   Qed.
-
 
   Lemma wp_strong_mono E1 E2 c Φ Ψ :
     E1 ⊆ E2 → (∀ v, Φ v ={E2}=∗ Ψ v) ∗ WP c @ E1 {{ Φ }} ⊢ WP c @ E2 {{ Ψ }}.
@@ -90,6 +107,7 @@ Section definitions.
     iMod "H" as "[H|[% H]]"; last by iApply "H".
     iDestruct "H" as (v') "[% ?]"; simplify_eq.
   Qed.
+
   Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}.
   Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed.
 
@@ -98,7 +116,7 @@ Section definitions.
     ∃ e2', e2 = (e2', K) ∧ head_step (e1', knil) σ1 (e2', knil) σ2.
   Admitted.
 
-  Lemma wp_contΦ E k s Φ:
+  Lemma wp_cont E k s Φ:
     WP (curs s, knil) @ E {{ v, WP (curs Sskip, k) @ E {{ Φ }} }}
        ⊢ WP (curs s, k) @ E {{ Φ }}.
   Admitted.
@@ -110,7 +128,12 @@ Section definitions.
 
   Lemma wp_bind e Ke ke ks E Φ:
     WP (cure e, (Ke::ke, ks)) @ E {{ Φ }}
-       ⊢ WP (cure (fill_expr Ke e), (ke, ks)) @ E {{ Φ }}.
+    ⊢ WP (cure (fill_expr Ke e), (ke, ks)) @ E {{ Φ }}.
+  Admitted.
+
+  Lemma wp_unbind e Ke ke ks E Φ:
+    WP (cure (fill_expr Ke e), (ke, ks)) @ E {{ Φ }}
+    ⊢ WP (cure e, (Ke::ke, ks)) @ E {{ Φ }}.
   Admitted.
 
   Lemma wp_bind_s e Ks ks E Φ:
@@ -118,7 +141,85 @@ Section definitions.
        ⊢ WP (curs (fill_stmts Ks e), ([], ks)) @ E {{ Φ }}.
   Admitted.
 
-End definitions.
+  Lemma wp_unbind_s e Ks ks E Φ:
+    WP (curs (fill_stmts Ks e), ([], ks)) @ E {{ Φ }}
+    ⊢ WP (cure e, ([], Ks::ks)) @ E {{ Φ }}.
+  Admitted.
+
+  
+  (* High-level Assertions *)
+  
+  Lemma wp_assign E l t v Φ:
+    typeof t v →
+    l ↦ - ∗ (l ↦ v @ t -∗ Φ)
+    ⊢ WP (curs (Sassign (Evalue (Vptr l)) (Evalue v)), knil) @ E {{ _, Φ }}.
+  Admitted.
+
+  Lemma wp_seq E s1 s2 Φ:
+    WP (curs s1, knil) @ E {{ _, WP (curs s2, knil) @ E {{ Φ }} }}
+    ⊢ WP (curs (Sseq s1 s2), knil) @ E {{ Φ }}.
+  Admitted.
+
+  Lemma wp_load E Φ p v t q:
+    p ↦{q} v @ t ∗ (p ↦{q} v @ t -∗ Φ v)
+    ⊢ WP (cure (Ederef (Evalue (Vptr p))), knil) @ E {{ Φ }}.
+  Admitted.
+
+  Lemma wp_op E op v1 v2 v' Φ:
+    evalbop op v1 v2 = Some v' →
+    Φ v' ⊢ WP (cure (Ebinop op (Evalue v1) (Evalue v2)), knil) @ E {{ Φ }}.
+  Admitted.
+
+End rules.
+ 
+Section example.
+  Context `{clangG Σ}.
+  
+  Parameter px py: addr.
+
+  Definition x := Evalue (Vptr px).
+  Definition y := Evalue (Vptr py).
+  
+  Definition f_body : stmts :=
+    Sassign x (Ebinop oplus (Ederef y) (Ederef x)) ;;;
+    Sassign y (Ederef x).
+
+  Lemma f_spec vx vy Φ:
+    px ↦ Vint32 vx @ Tint32 ∗ py ↦ Vint32 vy @ Tint32 ∗
+    (px ↦ Vint32 (Int.add vx vy) @ Tint32 -∗ py ↦ Vint32 (Int.add vx vy) @ Tint32 -∗ Φ)
+    ⊢ WP (curs f_body, knil) {{ _, Φ }}.
+  Proof.
+    iIntros "(Hx & Hy & HΦ)".
+    iApply wp_seq.
+    rewrite /example.x /example.y.
+    iApply (wp_bind_s _ (SKassignl _)).
+    iApply (wp_bind _ (EKbinopr _ _)).
+    iApply wp_conte.
+    iApply wp_load. iFrame "Hy". iIntros "Hy". (* XXX: use wp_load tactic *)
+    iApply (wp_unbind _ (EKbinopr _ _)).
+    simpl. iApply (wp_bind _ (EKbinopl _ _)).
+    iApply wp_conte.
+    iApply wp_load. iFrame "Hx". iIntros "Hx".
+    iApply (wp_unbind _ (EKbinopl _ _)).
+    simpl.
+    iApply wp_conte.
+    iApply wp_op=>//.
+    iApply (wp_unbind_s _ (SKassignl _)).
+    simpl.
+    iApply wp_assign; first by apply typeof_int32.
+    iSplitL "Hx"; first eauto.
+    iIntros "Hx".
+    iApply (wp_bind_s _ (SKassignl _)).
+    iApply wp_conte.
+    iApply wp_load. iFrame "Hx". iIntros "Hx".
+    iApply (wp_unbind_s _ (SKassignl _)).
+    simpl. iApply wp_assign; first by apply typeof_int32.
+    iSplitL "Hy"; first eauto.
+    rewrite (Int.add_commut vx vy).
+    by iApply "HΦ".
+  Qed.
+    
+End example.
 
 Definition spec_state := nat. (* XXX: should be parameterized *)
 

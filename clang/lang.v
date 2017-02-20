@@ -166,10 +166,12 @@ Inductive stmts :=
 (* | Srete (e: expr) *)
 (* | Scall (fid: ident) (args: list expr) *)
 (* | Scalle (lhs: expr) (fid: ident) (args: list expr) *)
-| sseq (s1 s2: stmts).
+| Sseq (s1 s2: stmts).
 (* | Sprint (e: expr) *)
 (* | Sfree *)
 (* | Salloc *)
+
+Notation "S1 ';;;' S2" := (Sseq S1 S2) (at level 97, right associativity, format "S1 ';;;' S2").
 
 (* Definition decls := list (ident * type). *)
 
@@ -265,6 +267,7 @@ Inductive estep : cureval → exprcont → cureval → exprcont → state → Pr
 (* | EKcast (t: type). *)
 .
 
+(* Offset is ignored *)
 Inductive sstep : cureval → stmtscont → state → cureval → stmtscont → state → Prop :=
 | SSassign:
     ∀ t rv bytes bytes' σ b off ks,
