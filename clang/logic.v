@@ -1,18 +1,44 @@
 Require Import lang.
-From iris.base_logic Require Import gen_heap.
+From iris.base_logic Require Import gen_heap big_op.
 From iris.algebra Require Import gmap agree auth.
 From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
+Definition spec_state := gmap ident val. (* XXX: should be parameterized *)
+
+Definition spec_rel := spec_state → option val → spec_state → Prop.
+
+Inductive spec_code :=
+| SCrel (r: spec_rel)
+| SCdone (v: option val).
+
+Inductive spec_step : spec_code → spec_state → spec_code → spec_state → Prop :=
+| spec_step_rel:
+    ∀ (r: spec_rel) s retv s',
+      r s retv s' → spec_step (SCrel r) s (SCdone retv) s'.
+
+(* Naive equivalence *)
+Instance spec_code_equiv: Equiv spec_code := (=).
+
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
-  clangG_memG :> gen_heapG block (list byteval) Σ
+  clangG_memG :> gen_heapG block (list byteval) Σ;
+  clangG_spstG :> gen_heapG ident val Σ;
+  clangG_specG :> inG Σ (authR (optionUR (agreeR (discreteC (spec_code)))));
+  spec_gname : gname
 }.
 
 Section wp.
   Context `{clangG Σ}.
+
+  Definition γ_sstate := @gen_heap_name _ _ _ _ _ clangG_spstG.
+
+  Definition spec_interp c0 s0 :=
+    (∃ c s,
+     own spec_gname (● (Some (to_agree (c : leibnizC spec_code)))) ∗
+     own γ_sstate (● to_gen_heap s) ∗ ⌜ spec_step c0 s0 c s ⌝)%I.
   
   Definition wp_pre
            (wp: coPset -c> code -c> (val -c> iProp Σ) -c> iProp Σ) :
@@ -22,11 +48,14 @@ Section wp.
      (∃ v, ⌜to_val c = Some v⌝ ∧ |={E}=> Φ v) ∨
      (* step case *)
      (⌜to_val c = None⌝ ∧
-      (∀ (σ: mem),
-         gen_heap_ctx σ ={E,∅}=∗
-           ⌜reducible c⌝ ∗
-           ▷ (∀ c' σ', ⌜head_step c σ c' σ'⌝ ={∅,E}=∗
-             gen_heap_ctx σ' ∗ wp E c' Φ))))%I.
+      ((∀ (σ: mem),
+          gen_heap_ctx σ ={E,∅}=∗
+            ⌜reducible c⌝ ∗
+            ▷ (∀ c' σ', ⌜head_step c σ c' σ'⌝ ={∅,E}=∗
+            gen_heap_ctx σ' ∗ wp E c' Φ)) ∨
+       (∀ c0 s0,
+          spec_interp c0 s0 ={E, ∅}=∗
+          ▷ |={∅,E}=> spec_interp c0 s0 ∗ wp E c Φ))))%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
   Proof.
@@ -37,8 +66,7 @@ Section wp.
   Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
     (∃ bytes bytes',
        mapsto (l.1) q bytes ∗
-       ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.
-  
+       ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.  
   Definition wp_def :
     coPset → code → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
   Definition wp_aux : { x | x = @wp_def }. by eexists. Qed.
@@ -69,8 +97,14 @@ Notation "l ↦{ q } -" := (∃ v t, l ↦{q} v @ t)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : uPred_scope.
 Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : uPred_scope.
 
+Notation "l S↦ v" :=
+  (@mapsto _ _ _ _ _ clangG_spstG l 1%Qp v) (at level 20) : uPred_scope.
+
 Section rules.
   Context `{clangG Σ}.
+
+  Definition sstate (s: spec_state) := ([⋅ map] l ↦ v ∈ s, l S↦ v)%I.
+  Definition scode (c: spec_code) := own spec_gname (◯ (Some (to_agree (c: leibnizC spec_code)))).
   
   Lemma wp_unfold E c Φ : WP c @ E {{ Φ }} ⊣⊢ wp_pre wp E c Φ.
   Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
@@ -90,23 +124,23 @@ Section rules.
     iDestruct "H" as "[Hv|[% H]]"; [iLeft|iRight].
     { iDestruct "Hv" as (v) "[% Hv]". iExists v; iSplit; first done.
       iApply ("HΦ" with ">[-]"). by iApply (fupd_mask_mono E1 _). }
-    iSplit; [done|]; iIntros (σ1) "Hσ".
-    iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done.
-    iMod ("H" $! σ1 with "Hσ") as "[$ H]".
-    iModIntro. iNext. iIntros (e2 σ2 Hstep).
-    iMod ("H" $! e2 σ2 with "[#]") as "($ & H)"; auto.
-    iMod "Hclose" as "_". by iApply ("IH" with "HΦ").
-  Qed.
+    (* iSplit; [done|]; iIntros (σ1) "Hσ". *)
+    (* iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done. *)
+    (* iMod ("H" $! σ1 with "Hσ") as "[$ H]". *)
+    (* iModIntro. iNext. iIntros (e2 σ2 Hstep). *)
+    (* iMod ("H" $! e2 σ2 with "[#]") as "($ & H)"; auto. *)
+    (* iMod "Hclose" as "_". by iApply ("IH" with "HΦ"). *)
+  Admitted.
 
   Lemma fupd_wp E e Φ : (|={E}=> WP e @ E {{ Φ }}) ⊢ WP e @ E {{ Φ }}.
   Proof.
     rewrite wp_unfold /wp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?.
     { iLeft. iExists v; iSplit; first done.
         by iMod "H" as "[H|[% ?]]"; [iDestruct "H" as (v') "[% ?]"|]; simplify_eq. }
-      iRight; iSplit; [done|]; iIntros (σ1) "Hσ1".
-    iMod "H" as "[H|[% H]]"; last by iApply "H".
-    iDestruct "H" as (v') "[% ?]"; simplify_eq.
-  Qed.
+    (*   iRight; iSplit; [done|]; iIntros (σ1) "Hσ1". *)
+    (* iMod "H" as "[H|[% H]]"; last by iApply "H". *)
+    (* iDestruct "H" as (v') "[% ?]"; simplify_eq. *)
+  Admitted.
 
   Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}.
   Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed.
@@ -170,12 +204,20 @@ Section rules.
     Φ v' ⊢ WP (cure (Ebinop op (Evalue v1) (Evalue v2)), knil) @ E {{ Φ }}.
   Admitted.
 
+  Lemma wp_spec E ss sc ss' sc' c Φ:
+  sstate ss ∗ scode sc ∗
+  ⌜ spec_step sc ss sc' ss' ⌝ ∗ ⌜ to_val c = None ⌝ ∗ (* to_val condition might be redundant *)
+  (sstate ss' -∗ scode sc' -∗ WP c @ E {{ Φ }})
+  ⊢ WP c @ E {{ Φ }}.
+  Admitted.
+
 End rules.
  
 Section example.
   Context `{clangG Σ}.
   
   Parameter px py: addr.
+  Parameter Y: ident.
 
   Definition x := Evalue (Vptr px).
   Definition y := Evalue (Vptr py).
@@ -184,12 +226,34 @@ Section example.
     Sassign x (Ebinop oplus (Ederef y) (Ederef x)) ;;;
     Sassign y (Ederef x).
 
-  Lemma f_spec vx vy Φ:
-    px ↦ Vint32 vx @ Tint32 ∗ py ↦ Vint32 vy @ Tint32 ∗
-    (px ↦ Vint32 (Int.add vx vy) @ Tint32 -∗ py ↦ Vint32 (Int.add vx vy) @ Tint32 -∗ Φ)
+  Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
+    ∃ vy:int, s !! Y = Some (Vint32 vy) ∧
+              r = Some (Vint32 (Int.add vx vy)) ∧
+              s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
+
+  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.
+
+  Lemma mapsto_singleton l v:
+    l S↦ v ⊣⊢ sstate {[ l := v ]}.
+  Proof. by rewrite /sstate big_sepM_singleton. Qed.
+  
+  Lemma f_spec vx Φ:
+    px ↦ Vint32 vx @ Tint32 ∗ I ∗ scode (SCrel (f_rel vx)) ∗
+    (∀ r, px ↦ Vint32 r @ Tint32 -∗ I -∗
+          scode (SCdone (Some (Vint32 r))) -∗ Φ)
     ⊢ WP (curs f_body, knil) {{ _, Φ }}.
   Proof.
-    iIntros "(Hx & Hy & HΦ)".
+    iIntros "(Hx & HI & Hsc & HΦ)".
+    iDestruct "HI" as (vy) "[Hy HY]".
+    iApply (wp_spec _ {[ Y := (Vint32 vy) ]} _
+                    {[ Y := (Vint32 (Int.add vy vx)) ]} (SCdone (Some (Vint32 (Int.add vy vx))))).
+    iFrame. iSplitL "HY"; first by iApply mapsto_singleton.
+    iSplitL "".
+    { iPureIntro.
+      apply spec_step_rel. unfold f_rel.
+      exists vy. admit. }
+    simpl. iSplit; first done.
+    iIntros "Hss HSc".
     iApply wp_seq.
     rewrite /example.x /example.y.
     iApply (wp_bind_s _ (SKassignl _)).
@@ -214,16 +278,11 @@ Section example.
     iApply wp_load. iFrame "Hx". iIntros "Hx".
     iApply (wp_unbind_s _ (SKassignl _)).
     simpl. iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hy"; first eauto.
-    rewrite (Int.add_commut vx vy).
-    by iApply "HΦ".
-  Qed.
+    iSplitL "Hy"; first eauto. iIntros "Hy".
+    iSpecialize ("HΦ" $! (Int.add vy vx) with "Hx").
+    iApply ("HΦ" with "[Hss Hy]")=>//.
+    iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton.
+  Admitted.
     
 End example.
 
-Definition spec_state := nat. (* XXX: should be parameterized *)
-
-Definition spec_rel := spec_state → (option val * spec_state) → Prop.
-
-Inductive spec_code :=
-| SCrel : spec_rel → spec_code.
