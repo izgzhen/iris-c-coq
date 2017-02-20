@@ -1,6 +1,6 @@
 (* Program Logic *)
 
-Require Import lang.
+Require Export lang.
 From iris.base_logic Require Import gen_heap big_op.
 From iris.algebra Require Import gmap agree auth.
 From iris.base_logic.lib Require Import wsat fancy_updates.
@@ -8,39 +8,13 @@ From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
-Definition spec_state := gmap ident val. (* XXX: should be parameterized *)
-
-Definition spec_rel := spec_state → option val → spec_state → Prop.
-
-Inductive spec_code :=
-| SCrel (r: spec_rel)
-| SCdone (v: option val).
-
-Inductive spec_step : spec_code → spec_state → spec_code → spec_state → Prop :=
-| spec_step_rel:
-    ∀ (r: spec_rel) s retv s',
-      r s retv s' → spec_step (SCrel r) s (SCdone retv) s'.
-
-(* Naive equivalence *)
-Instance spec_code_equiv: Equiv spec_code := (=).
-
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
-  clangG_memG :> gen_heapG block (list byteval) Σ;
-  clangG_spstG :> gen_heapG ident val Σ;
-  clangG_specG :> inG Σ (authR (optionUR (agreeR (discreteC (spec_code)))));
-  spec_gname : gname
+  clangG_memG :> gen_heapG block (list byteval) Σ
 }.
 
 Section wp.
   Context `{clangG Σ}.
-
-  Definition γ_sstate := @gen_heap_name _ _ _ _ _ clangG_spstG.
-
-  Definition spec_interp c0 s0 :=
-    (∃ c s,
-     own spec_gname (● (Some (to_agree (c : leibnizC spec_code)))) ∗
-     own γ_sstate (● to_gen_heap s) ∗ ⌜ spec_step c0 s0 c s ⌝)%I.
 
   Definition wp_pre
            (wp: coPset -c> code -c> (val -c> iProp Σ) -c> (option val -c> iProp Σ) -c> iProp Σ) :
@@ -52,14 +26,11 @@ Section wp.
      (∃ v k, ⌜ c = (curs (Srete (Evalue v)), k) ⌝ ∧ |={E}=> Φret (Some v) ) ∨
      (* step case *)
      (⌜to_val c = None⌝ ∧
-      ((∀ (σ: mem),
+      (∀ (σ: mem),
           gen_heap_ctx σ ={E,∅}=∗
             ⌜reducible c⌝ ∗
             ▷ (∀ c' σ', ⌜head_step c σ c' σ'⌝ ={∅,E}=∗
-            gen_heap_ctx σ' ∗ wp E c' Φ Φret)) ∨
-       (∀ c0 s0,
-          spec_interp c0 s0 ={E, ∅}=∗
-          ▷ |={∅,E}=> spec_interp c0 s0 ∗ wp E c Φ Φret))))%I.
+            gen_heap_ctx σ' ∗ wp E c' Φ Φret))))%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
   Proof.
@@ -101,14 +72,8 @@ Notation "l ↦{ q } -" := (∃ v t, l ↦{q} v @ t)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : uPred_scope.
 Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : uPred_scope.
 
-Notation "l S↦ v" :=
-  (@mapsto _ _ _ _ _ clangG_spstG l 1%Qp v) (at level 20) : uPred_scope.
-
 Section rules.
   Context `{clangG Σ}.
-
-  Definition sstate (s: spec_state) := ([⋅ map] l ↦ v ∈ s, l S↦ v)%I.
-  Definition scode (c: spec_code) := own spec_gname (◯ (Some (to_agree (c: leibnizC spec_code)))).
   
   Lemma wp_unfold E c Φ Φret: WP c @ E {{ Φ; Φret }} ⊣⊢ wp_pre wp E c Φ Φret.
   Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
@@ -212,13 +177,6 @@ Section rules.
     ⊢ WP (curs (Srete (Evalue v)), k) @ E {{ Φ; Φret }}.
   Admitted.
 
-  Lemma wp_spec E ss sc ss' sc' c Φ Φret:
-  sstate ss ∗ scode sc ∗
-  ⌜ spec_step sc ss sc' ss' ⌝ ∗ ⌜ to_val c = None ⌝ ∗ (* to_val condition might be redundant *)
-  (sstate ss' -∗ scode sc' -∗ WP c @ E {{ Φ; Φret }})
-  ⊢ WP c @ E {{ Φ; Φret }}.
-  Admitted.
-
   Fixpoint params_match (params: decls) (vs: list val) :=
     match params, vs with
       | (_, t)::params, v::vs => typeof t v ∧ params_match params vs
@@ -278,125 +236,125 @@ Section rules.
   
 End rules.
 
-Section example.
-  Context `{clangG Σ}.
+(* Section example. *)
+(*   Context `{clangG Σ}. *)
   
-  Parameter py: addr.
-  Parameter Y lock unlock: ident.
+(*   Parameter py: addr. *)
+(*   Parameter Y lock unlock: ident. *)
 
-  Definition y := Evalue (Vptr py).
+(*   Definition y := Evalue (Vptr py). *)
   
-  Definition f_body (px: addr) : stmts :=
-    Scall lock [] ;;;
-    Sassign y (Ebinop oplus (Ederef y) (Ederef (Evalue (Vptr px)))) ;;;
-    Sassign (Evalue (Vptr px)) (Ederef y) ;;;
-    Scall unlock [] ;;;
-    Srete (Ederef (Evalue (Vptr px))).
+(*   Definition f_body (px: addr) : stmts := *)
+(*     Scall lock [] ;;; *)
+(*     Sassign y (Ebinop oplus (Ederef y) (Ederef (Evalue (Vptr px)))) ;;; *)
+(*     Sassign (Evalue (Vptr px)) (Ederef y) ;;; *)
+(*     Scall unlock [] ;;; *)
+(*     Srete (Ederef (Evalue (Vptr px))). *)
 
-  Definition f_body' (x: ident) : stmts :=
-    Scall lock [] ;;;
-    Sassign y (Ebinop oplus (Ederef y) (Evar x)) ;;;
+(*   Definition f_body' (x: ident) : stmts := *)
+(*     Scall lock [] ;;; *)
+(*     Sassign y (Ebinop oplus (Ederef y) (Evar x)) ;;; *)
 
-    Sassign (Evar x) (Ederef y) ;;;
-    Scall unlock [] ;;;
-    Srete (Evar x).
+(*     Sassign (Evar x) (Ederef y) ;;; *)
+(*     Scall unlock [] ;;; *)
+(*     Srete (Evar x). *)
   
-  Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
-    ∃ vy:int, s !! Y = Some (Vint32 vy) ∧
-              r = Some (Vint32 (Int.add vx vy)) ∧
-              s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
+(*   Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) := *)
+(*     ∃ vy:int, s !! Y = Some (Vint32 vy) ∧ *)
+(*               r = Some (Vint32 (Int.add vx vy)) ∧ *)
+(*               s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s. *)
 
-  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.
+(*   Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I. *)
 
-  (* XXX: very naive *)
+(*   (* XXX: very naive *) *)
   
-  Lemma lock_spec Φ Φret:
-    (I -∗ Φ) ⊢ WP (curs (Scall lock []), knil) {{ _, Φ; Φret }}.
-  Admitted.
+(*   Lemma lock_spec Φ Φret: *)
+(*     (I -∗ Φ) ⊢ WP (curs (Scall lock []), knil) {{ _, Φ; Φret }}. *)
+(*   Admitted. *)
 
-  Lemma unlock_spec Φ Φret:
-    I ∗ (True -∗ Φ) ⊢ WP (curs (Scall unlock []), knil) {{ _, Φ; Φret }}.
-  Admitted.
+(*   Lemma unlock_spec Φ Φret: *)
+(*     I ∗ (True -∗ Φ) ⊢ WP (curs (Scall unlock []), knil) {{ _, Φ; Φret }}. *)
+(*   Admitted. *)
 
-  Lemma mapsto_singleton l v:
-    l S↦ v ⊣⊢ sstate {[ l := v ]}.
-  Proof. by rewrite /sstate big_sepM_singleton. Qed.
+(*   Lemma mapsto_singleton l v: *)
+(*     l S↦ v ⊣⊢ sstate {[ l := v ]}. *)
+(*   Proof. by rewrite /sstate big_sepM_singleton. Qed. *)
   
-  Lemma f_spec px vx Φ Φret:
-    px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗
-    (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ Φret (Some v))
-    ⊢ WP (curs (f_body px), knil) {{ Φ ; Φret }}.
-  Proof.
-    iIntros "(Hx & Hsc & HΦret)".
-    iApply wp_seq. iApply lock_spec. iIntros "HI".
-    iDestruct "HI" as (vy) "[Hy HY]".
-    iApply (wp_spec _ {[ Y := (Vint32 vy) ]} _
-                    {[ Y := (Vint32 (Int.add vy vx)) ]} (SCdone (Some (Vint32 (Int.add vy vx))))).
-    iFrame. iSplitL "HY"; first by iApply mapsto_singleton.
-    iSplitL "".
-    { iPureIntro.
-      apply spec_step_rel. unfold f_rel.
-      exists vy. admit. }
-    simpl. iSplit; first done.
-    iIntros "Hss HSc".
-    iApply wp_seq.
-    rewrite /example.y.
-    iApply (wp_bind_s _ (SKassignl _)).
-    iApply (wp_bind _ (EKbinopr _ _)).
-    iApply wp_conte.
-    iApply wp_load. iFrame "Hy". iIntros "Hy". (* XXX: use wp_load tactic *)
-    iApply (wp_unbind _ (EKbinopr _ _)).
-    simpl. iApply (wp_bind _ (EKbinopl _ _)).
-    iApply wp_conte.
-    iApply wp_load. iFrame "Hx". iIntros "Hx".
-    iApply (wp_unbind _ (EKbinopl _ _)).
-    simpl.
-    iApply wp_conte.
-    iApply wp_op=>//.
-    iApply (wp_unbind_s _ (SKassignl _)).
-    simpl.
-    iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hy"; first eauto.
-    iIntros "Hy".
-    iApply wp_seq.
-    iApply (wp_bind_s _ (SKassignl _)).
-    iApply wp_conte.
-    iApply wp_load. iFrame "Hy". iIntros "Hy".
-    iApply (wp_unbind_s _ (SKassignl _)).
-    simpl. iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hx"; first eauto. iIntros "Hx".
-    iApply wp_seq. iApply unlock_spec.
-    iSplitL "Hss Hy".
-    { iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton. }
-    iIntros "_".
-    iApply (wp_bind_s _ SKrete).
-    iApply wp_conte. iApply wp_load.
-    iFrame "Hx". iIntros "Hx".
-    iApply (wp_unbind_s _ SKrete). simpl.
-    iApply wp_ret.
-    iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
-    by iApply "HΦret".
-  Admitted.
+(*   Lemma f_spec px vx Φ Φret: *)
+(*     px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗ *)
+(*     (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ Φret (Some v)) *)
+(*     ⊢ WP (curs (f_body px), knil) {{ Φ ; Φret }}. *)
+(*   Proof. *)
+(*     iIntros "(Hx & Hsc & HΦret)". *)
+(*     iApply wp_seq. iApply lock_spec. iIntros "HI". *)
+(*     iDestruct "HI" as (vy) "[Hy HY]". *)
+(*     iApply (wp_spec _ {[ Y := (Vint32 vy) ]} _ *)
+(*                     {[ Y := (Vint32 (Int.add vy vx)) ]} (SCdone (Some (Vint32 (Int.add vy vx))))). *)
+(*     iFrame. iSplitL "HY"; first by iApply mapsto_singleton. *)
+(*     iSplitL "". *)
+(*     { iPureIntro. *)
+(*       apply spec_step_rel. unfold f_rel. *)
+(*       exists vy. admit. } *)
+(*     simpl. iSplit; first done. *)
+(*     iIntros "Hss HSc". *)
+(*     iApply wp_seq. *)
+(*     rewrite /example.y. *)
+(*     iApply (wp_bind_s _ (SKassignl _)). *)
+(*     iApply (wp_bind _ (EKbinopr _ _)). *)
+(*     iApply wp_conte. *)
+(*     iApply wp_load. iFrame "Hy". iIntros "Hy". (* XXX: use wp_load tactic *) *)
+(*     iApply (wp_unbind _ (EKbinopr _ _)). *)
+(*     simpl. iApply (wp_bind _ (EKbinopl _ _)). *)
+(*     iApply wp_conte. *)
+(*     iApply wp_load. iFrame "Hx". iIntros "Hx". *)
+(*     iApply (wp_unbind _ (EKbinopl _ _)). *)
+(*     simpl. *)
+(*     iApply wp_conte. *)
+(*     iApply wp_op=>//. *)
+(*     iApply (wp_unbind_s _ (SKassignl _)). *)
+(*     simpl. *)
+(*     iApply wp_assign; first by apply typeof_int32. *)
+(*     iSplitL "Hy"; first eauto. *)
+(*     iIntros "Hy". *)
+(*     iApply wp_seq. *)
+(*     iApply (wp_bind_s _ (SKassignl _)). *)
+(*     iApply wp_conte. *)
+(*     iApply wp_load. iFrame "Hy". iIntros "Hy". *)
+(*     iApply (wp_unbind_s _ (SKassignl _)). *)
+(*     simpl. iApply wp_assign; first by apply typeof_int32. *)
+(*     iSplitL "Hx"; first eauto. iIntros "Hx". *)
+(*     iApply wp_seq. iApply unlock_spec. *)
+(*     iSplitL "Hss Hy". *)
+(*     { iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton. } *)
+(*     iIntros "_". *)
+(*     iApply (wp_bind_s _ SKrete). *)
+(*     iApply wp_conte. iApply wp_load. *)
+(*     iFrame "Hx". iIntros "Hx". *)
+(*     iApply (wp_unbind_s _ SKrete). simpl. *)
+(*     iApply wp_ret. *)
+(*     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx"). *)
+(*     by iApply "HΦret". *)
+(*   Admitted. *)
   
-  Lemma f_spec' (p: program) (x: ident) f vx Φ Φret:
-    p f = Some (Tint32, [(x, Tint32)], f_body' x) →
-    scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ Φ)
-    ⊢ WP (curs (Scall f [Evalue (Vint32 vx)]), knil) {{ _, Φ ; Φret }}.
-  Proof.
-    iIntros (Hpf) "(Hsc & HΦ)".
-    iApply (wp_call _ _ [Vint32 vx])=>//.
-    { simpl. split=>//. apply typeof_int32. }
-    iIntros (ls) "% Hls".
-    destruct ls as [|a [|b ls]].
-    - simpl. iDestruct "Hls" as "%"=>//.
-    - simpl. destruct (decide (x = x))=>//.
-      iDestruct "Hls" as "[Hx _]".
-      iApply f_spec. iFrame.
-      iIntros (v) "_ Hsc". (* XXX: free *)
-      iApply wp_skip.
-      by iApply "HΦ".
-    - inversion H0.
-  Qed.
+(*   Lemma f_spec' (p: program) (x: ident) f vx Φ Φret: *)
+(*     p f = Some (Tint32, [(x, Tint32)], f_body' x) → *)
+(*     scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ Φ) *)
+(*     ⊢ WP (curs (Scall f [Evalue (Vint32 vx)]), knil) {{ _, Φ ; Φret }}. *)
+(*   Proof. *)
+(*     iIntros (Hpf) "(Hsc & HΦ)". *)
+(*     iApply (wp_call _ _ [Vint32 vx])=>//. *)
+(*     { simpl. split=>//. apply typeof_int32. } *)
+(*     iIntros (ls) "% Hls". *)
+(*     destruct ls as [|a [|b ls]]. *)
+(*     - simpl. iDestruct "Hls" as "%"=>//. *)
+(*     - simpl. destruct (decide (x = x))=>//. *)
+(*       iDestruct "Hls" as "[Hx _]". *)
+(*       iApply f_spec. iFrame. *)
+(*       iIntros (v) "_ Hsc". (* XXX: free *) *)
+(*       iApply wp_skip. *)
+(*       by iApply "HΦ". *)
+(*     - inversion H0. *)
+(*   Qed. *)
 
-End example.
+(* End example. *)
 
