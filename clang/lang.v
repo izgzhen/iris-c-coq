@@ -173,11 +173,11 @@ Inductive stmts :=
 
 Notation "S1 ';;;' S2" := (Sseq S1 S2) (at level 97, right associativity, format "S1 ';;;' S2").
 
-(* Definition decls := list (ident * type). *)
+Definition decls := list (ident * type).
 
-(* Definition function : Set := (type * decls * decls * stmts). *)
+Definition function : Set := (type * decls * stmts). (* (type * decls * decls * stmts). *) (* no local vars *)
 
-(* Definition program := ident → option function. *)
+Definition program := ident → option function.
 
 (* Operational Semantics *)
 

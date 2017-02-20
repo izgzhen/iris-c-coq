@@ -219,20 +219,72 @@ Section rules.
   ⊢ WP c @ E {{ Φ; Φret }}.
   Admitted.
 
+  Fixpoint params_match (params: decls) (vs: list val) :=
+    match params, vs with
+      | (_, t)::params, v::vs => typeof t v ∧ params_match params vs
+      | [], [] => True
+      | _, _ => False
+    end.
+
+  Fixpoint alloc_params (addrs: list (addr * type)) (vs: list val) :=
+    (match addrs, vs with
+       | (l, t)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
+       | [], [] => True
+       | _, _ => False
+     end)%I.
+
+  Fixpoint subst_e (x: ident) (es: expr) (e: expr) : expr :=
+    match e with
+      | Evar x' => if bool_decide (x' = x) then es else e
+      | Ebinop op e1 e2 => Ebinop op (subst_e x es e1) (subst_e x es e2)
+      | Ederef e => Ederef (subst_e x es e)
+      | Eaddrof e => Eaddrof (subst_e x es e)
+      | Ecast e t => Ecast (subst_e x es e) t
+      | _ => e
+    end.
+  
+  Fixpoint subst_s (x: ident) (e: expr) (s: stmts) : stmts :=
+    match s with
+      | Sskip => Sskip
+      | Sassign e1 e2 => Sassign (subst_e x e e1) (subst_e x e e2)
+      | Sif e s1 s2 => Sif (subst_e x e e) (subst_s x e s1) (subst_s x e s2)
+      | Swhile e s => Swhile (subst_e x e e) (subst_s x e s)
+      | Srete e => Srete (subst_e x e e)
+      | Scall f es => Scall f (map (subst_e x e) es)
+      | Sseq s1 s2 => Sseq (subst_s x e s2) (subst_s x e s2)
+    end.
+
+  Fixpoint substs (m: list (ident * expr)) (s: stmts) : stmts :=
+    match m with
+      | (i, e)::m => substs m (subst_s i e s)
+      | [] => s
+    end.
+
+  Lemma wp_call (p: program) vs params f_body f retty k Φ Φret:
+    ∃ ls: list addr,
+      p f = Some (retty, params, f_body) →
+      params_match params vs →
+      alloc_params (zip ls (params.*2)) vs ∗
+      WP (curs (substs (zip (params.*1) (map (fun l => Evalue (Vptr l)) ls)) f_body), knil)
+         {{ _, True; fun v => WP (curs Sskip, k) {{ Φ; Φret }} }}
+      ⊢ WP (curs (Scall f (map Evalue vs)), k) {{ Φ; Φret }}.
+  Admitted.
 End rules.
 
 Section example.
   Context `{clangG Σ}.
   
   Parameter px py: addr.
-  Parameter Y: ident.
+  Parameter Y lock unlock: ident.
 
   Definition x := Evalue (Vptr px).
   Definition y := Evalue (Vptr py).
   
   Definition f_body : stmts :=
-    Sassign x (Ebinop oplus (Ederef y) (Ederef x)) ;;;
-    Sassign y (Ederef x) ;;;
+    Scall lock [] ;;;
+    Sassign y (Ebinop oplus (Ederef y) (Ederef x)) ;;;
+    Sassign x (Ederef y) ;;;
+    Scall unlock [] ;;;
     Srete (Ederef x).
 
   Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
@@ -242,17 +294,27 @@ Section example.
 
   Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.
 
+  (* XXX: very naive *)
+  
+  Lemma lock_spec Φ Φret:
+    (I -∗ Φ) ⊢ WP (curs (Scall lock []), knil) {{ _, Φ; Φret }}.
+  Admitted.
+
+  Lemma unlock_spec Φ Φret:
+    I ∗ (True -∗ Φ) ⊢ WP (curs (Scall unlock []), knil) {{ _, Φ; Φret }}.
+  Admitted.
+
   Lemma mapsto_singleton l v:
     l S↦ v ⊣⊢ sstate {[ l := v ]}.
   Proof. by rewrite /sstate big_sepM_singleton. Qed.
   
   Lemma f_spec vx Φ Φret:
-    px ↦ Vint32 vx @ Tint32 ∗ I ∗ scode (SCrel (f_rel vx)) ∗
-    (∀ v, px ↦ v @ Tint32 -∗ I -∗
-          scode (SCdone (Some v)) -∗ Φret (Some v))
+    px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗
+    (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ Φret (Some v))
     ⊢ WP (curs f_body, knil) {{ Φ ; Φret }}.
   Proof.
-    iIntros "(Hx & HI & Hsc & HΦret)".
+    iIntros "(Hx & Hsc & HΦret)".
+    iApply wp_seq. iApply lock_spec. iIntros "HI".
     iDestruct "HI" as (vy) "[Hy HY]".
     iApply (wp_spec _ {[ Y := (Vint32 vy) ]} _
                     {[ Y := (Vint32 (Int.add vy vx)) ]} (SCdone (Some (Vint32 (Int.add vy vx))))).
@@ -280,23 +342,26 @@ Section example.
     iApply (wp_unbind_s _ (SKassignl _)).
     simpl.
     iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hx"; first eauto.
-    iIntros "Hx".
+    iSplitL "Hy"; first eauto.
+    iIntros "Hy".
     iApply wp_seq.
     iApply (wp_bind_s _ (SKassignl _)).
     iApply wp_conte.
-    iApply wp_load. iFrame "Hx". iIntros "Hx".
+    iApply wp_load. iFrame "Hy". iIntros "Hy".
     iApply (wp_unbind_s _ (SKassignl _)).
     simpl. iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hy"; first eauto. iIntros "Hy".
+    iSplitL "Hx"; first eauto. iIntros "Hx".
+    iApply wp_seq. iApply unlock_spec.
+    iSplitL "Hss Hy".
+    { iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton. }
+    iIntros "_".
     iApply (wp_bind_s _ SKrete).
     iApply wp_conte. iApply wp_load.
     iFrame "Hx". iIntros "Hx".
     iApply (wp_unbind_s _ SKrete). simpl.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
-    iApply ("HΦret" with "[Hss Hy]")=>//.
-    iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton.
+    by iApply "HΦret".
   Admitted.
     
 End example.
