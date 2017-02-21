@@ -31,17 +31,27 @@ Section definitions.
   Structure interrupt := Interrupt {
     (* -- predicates -- *)
     name : Type;
-    hpri (γ: name) (i: nat) : iProp Σ;
+    hpri (γp: name) (i: nat) : iProp Σ;
     closed (γ: name): iProp Σ;
-    (* -- TODO: general properties -- *)
+    int_ctx (N: namespace) (γ γp: name): iProp Σ;
+    (* -- general properties -- *)
+    (* int_ctx_ne N γ γp n: Proper (dist n ==> dist n) (int_ctx N γ γp); *) (* FIXME *)
+    int_ctx_persistent N γ γp : PersistentP (int_ctx N γ γp);
     closed_timeless γ : TimelessP (closed γ);
     closed_exclusive γ : closed γ -∗ closed γ -∗ False;
     (* -- operation specs -- *)
-    sti_spec prio γ Φ Φret :
-      INVS_up prio ∗ closed γ ∗ (True -∗ Φ)
+    sti_spec N prio γ γp Φ Φret :
+      int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ)
       ⊢ WP (curs (Sprim Psti), knil) {{ _, Φ; Φret }};
-    cli_spec prio γ Φ Φret :
-      (INVS_up prio -∗ closed γ -∗ Φ)
+    cli_spec N prio γ γp Φ Φret :
+      int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ)
       ⊢ WP (curs (Sprim Pcli), knil) {{ _, Φ; Φret }}
   }.
 End definitions.
+
+Existing Instances int_ctx_persistent closed_timeless.
+
+Arguments interrupt {_ _} _.
+Arguments hpri {_ _} _ {_} _ _.
+Arguments closed {_ _} _ {_} _.
+Arguments int_ctx {_ _} _ {_} _ _ _.

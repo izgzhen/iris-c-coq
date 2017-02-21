@@ -44,6 +44,10 @@ Section rules.
 
   Definition sstate (s: spec_state) := ([⋅ map] l ↦ v ∈ s, l S↦ v)%I.
   Definition scode (c: spec_code) := own spec_gname (◯ (Some (to_agree (c: leibnizC spec_code)))).
+
+  Lemma mapsto_singleton l v:
+    l S↦ v ⊣⊢ sstate {[ l := v ]}.
+  Proof. by rewrite /sstate big_sepM_singleton. Qed.
   
   Definition spec_inv :=
     (∃ c0 s0 c s,

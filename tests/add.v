@@ -1,30 +1,38 @@
-From iris_os.clang Require Import lang logic.
+From iris_os.clang Require Import logic.
 From iris.base_logic Require Import big_op.
-From iris_os.os Require Import spec.
+From iris_os.os Require Import spec interrupt.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
 Section example.
   Context `{clangG Σ, specG Σ} {N: namespace}.
-  
+
   Parameter py: addr.
   Parameter Y lock unlock: ident.
-
   Definition y := Evalue (Vptr py).
-  
+  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.  
+
+  Definition invs (prio: nat) : iProp Σ :=
+    match prio with
+      | 0 => I
+      | _ => True%I
+    end.
+
+  Context `{i: interrupt invs}.
+
   Definition f_body (px: addr) : stmts :=
-    Scall lock [] ;;;
+    Sprim Pcli;;;
     Sassign y (Ebinop oplus (Ederef y) (Ederef (Evalue (Vptr px)))) ;;;
     Sassign (Evalue (Vptr px)) (Ederef y) ;;;
-    Scall unlock [] ;;;
+    Sprim Psti;;;
     Srete (Ederef (Evalue (Vptr px))).
 
   Definition f_body' (x: ident) : stmts :=
-    Scall lock [] ;;;
+    Sprim Pcli;;;
     Sassign y (Ebinop oplus (Ederef y) (Evar x)) ;;;
     Sassign (Evar x) (Ederef y) ;;;
-    Scall unlock [] ;;;
+    Sprim Psti;;;
     Srete (Evar x).
 
   Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
@@ -32,31 +40,20 @@ Section example.
               r = Some (Vint32 (Int.add vx vy)) ∧
               s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
 
-  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.
-
-  (* XXX: very naive *)
+  Definition int_ctx := @int_ctx _ _ invs i.
   
-  Lemma lock_spec Φ Φret:
-    (I -∗ Φ) ⊢ WP (curs (Scall lock []), knil) {{ _, Φ; Φret }}.
-  Admitted.
-
-  Lemma unlock_spec Φ Φret:
-    I ∗ (True -∗ Φ) ⊢ WP (curs (Scall unlock []), knil) {{ _, Φ; Φret }}.
-  Admitted.
-
-  Lemma mapsto_singleton l v:
-    l S↦ v ⊣⊢ sstate {[ l := v ]}.
-  Proof. by rewrite /sstate big_sepM_singleton. Qed.
-  
-  Lemma f_spec px vx Φ Φret:
-    inv N spec_inv ∗
+  Lemma f_spec γ γp px vx Φ Φret:
+    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗
-    (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ Φret (Some v))
+    (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φret (Some v))
     ⊢ WP (curs (f_body px), knil) {{ Φ ; Φret }}.
   Proof.
-    iIntros "(#? & Hx & Hsc & HΦret)".
-    iApply wp_seq. iApply lock_spec. iIntros "HI".
-    iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
+    iIntros "(#? & #? & Hp & Hx & Hsc & HΦret)".
+    iApply wp_seq.
+    iApply cli_spec.
+    iFrame "#". iFrame.
+    iIntros "HI Hp Hcl".
+    simpl. iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
     (* Open invariant *)
     iInv N as ">Hspec" "Hclose".
     iDestruct (spec_update with "[Hspec HY Hsc]") as "(Hspec & Hss' & Hsc')".
@@ -93,26 +90,27 @@ Section example.
     iApply (wp_unbind_s _ (SKassignl _)).
     simpl. iApply wp_assign; first by apply typeof_int32.
     iSplitL "Hx"; first eauto. iIntros "Hx".
-    iApply wp_seq. iApply unlock_spec.
+    iApply wp_seq. iApply sti_spec.
+    iFrame. iFrame "#".
     iSplitL "Hss' Hy".
     { iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton. }
-    iIntros "_".
+    iIntros "Hp".
     iApply (wp_bind_s _ SKrete).
     iApply wp_conte. iApply wp_load.
     iFrame "Hx". iIntros "Hx".
     iApply (wp_unbind_s _ SKrete). simpl.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
-    by iApply "HΦret".
+    iApply ("HΦret" with "[Hsc']")=>//.
   Admitted.
   
-  Lemma f_spec' (p: program) (x: ident) f vx Φ Φret:
+  Lemma f_spec' (p: program) (x: ident) γ γp f vx Φ Φret:
     p f = Some (Tint32, [(x, Tint32)], f_body' x) →
-    inv N spec_inv ∗
-    scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ Φ)
+    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
+    scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φ)
     ⊢ WP (curs (Scall f [Evalue (Vint32 vx)]), knil) {{ _, Φ ; Φret }}.
   Proof.
-    iIntros (Hpf) "(#? & Hsc & HΦ)".
+    iIntros (Hpf) "(#? & #? & Hp & Hsc & HΦ)".
     iApply (wp_call _ _ [Vint32 vx])=>//.
     { simpl. split=>//. apply typeof_int32. }
     iIntros (ls) "% Hls".
@@ -121,9 +119,9 @@ Section example.
     - simpl. destruct (decide (x = x))=>//.
       iDestruct "Hls" as "[Hx _]".
       iApply f_spec. iFrame "#". iFrame.
-      iIntros (v) "_ Hsc". (* XXX: free *)
+      iIntros (v) "_ Hsc Hp". (* XXX: free *)
       iApply wp_skip.
-      by iApply "HΦ".
+      iApply ("HΦ" with "[Hsc]")=>//.
     - inversion H1.
   Qed.
 
