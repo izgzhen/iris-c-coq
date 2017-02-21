@@ -1,17 +1,11 @@
 (* Reentrant Lock *)
 
 Require Import logic.
-From iris.algebra Require Import gset auth.
-From iris.base_logic.lib Require Import wsat fancy_updates.
-From iris.base_logic.lib Require Export namespaces invariants.
-From iris.proofmode Require Import tactics.
-Set Default Proof Using "Type".
-Import uPred.
 
 (* TODO: Implementation *)
-Class reentG Σ := ReentG {
-  reent_G :> inG Σ (authR (gset_disjUR nat))
-}.
+(* Class reentG Σ := ReentG { *)
+(*   reent_G :> inG Σ (authR (gset_disjUR nat)) *)
+(* }. *)
 
 (* Interface *)
   

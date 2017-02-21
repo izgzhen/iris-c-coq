@@ -1,16 +1,6 @@
 (* Interrupt Mechanism *)
-(* Spec Monoid *)
 
 Require Import logic.
-From iris.base_logic Require Export big_op.
-From iris.algebra Require Import agree auth.
-From iris.base_logic.lib Require Import wsat fancy_updates.
-From iris.base_logic.lib Require Export namespaces invariants.
-From iris.proofmode Require Import tactics.
-Require Import iris_os.clang.lib.Integers.
-Set Default Proof Using "Type".
-Import uPred.
-
 
 (* TODO: implementation *)
 (* Class intG (n: nat) Σ := IntG { *)
