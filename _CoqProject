@@ -5,4 +5,6 @@ clang/memory.v
 clang/lang.v
 clang/logic.v
 os/spec.v
+os/interrupt.v
+os/reentrant.v
 tests/add.v

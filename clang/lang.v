@@ -100,7 +100,7 @@ Fixpoint check_pointer (n: nat) (p: addr) (vl: list byteval) : bool :=
   match n, vl with
     | O, nil => true
     | S m, BVaddr p' m' :: vl' =>
-       bool_decide (p = p') && beq_nat m m' && check_pointer m p vl'
+      bool_decide (p = p') && beq_nat m m' && check_pointer m p vl'
     | _, _ => false
   end.
 
@@ -113,52 +113,58 @@ Definition proj_pointer (vl: list byteval) : option val :=
 
 Definition encode_val (t: type) (v: val) : list byteval :=
   match v, t with
-  | Vint32 n, Tint8  => inj_bytes (encode_int 1%nat (Int.unsigned n))
-  | Vint32 n, Tint32 => inj_bytes (encode_int 4%nat (Int.unsigned n))
-  | Vptr p, Tptr _ => inj_pointer 4%nat p
-  | Vnull, Tnull => list_repeat 4 BVnull
-  | Vnull, Tptr _ => list_repeat 4 BVnull
-  | _, _ => list_repeat (sizeof t) BVundef
+    | Vint32 n, Tint8  => inj_bytes (encode_int 1%nat (Int.unsigned n))
+    | Vint32 n, Tint32 => inj_bytes (encode_int 4%nat (Int.unsigned n))
+    | Vptr p, Tptr _ => inj_pointer 4%nat p
+    | Vnull, Tnull => list_repeat 4 BVnull
+    | Vnull, Tptr _ => list_repeat 4 BVnull
+    | _, _ => list_repeat (sizeof t) BVundef
   end.
 
 Definition decode_val (t: type) (vl: list byteval) : option val :=
   match proj_bytes vl with
-  | Some bl =>
+    | Some bl =>
       match t with
-      | Tint8  => Some (Vint32 (Int.zero_ext 8 (Int.repr (decode_int bl))))
-      | Tint32 => Some (Vint32 (Int.repr (decode_int bl)))
-      | _ => None
+        | Tint8  => Some (Vint32 (Int.zero_ext 8 (Int.repr (decode_int bl))))
+        | Tint32 => Some (Vint32 (Int.repr (decode_int bl)))
+        | _ => None
       end
-  | None =>
-    match vl with
-      | BVnull :: BVnull ::BVnull :: BVnull :: nil =>
-        match t with
-          | Tnull => Some Vnull
-          | Tptr _ => Some Vnull
-          | _ => None
-        end
-      | _ =>
-        match t with
-          | Tptr _ => proj_pointer vl
-          | _ => None
-        end
-    end
+    | None =>
+      match vl with
+        | BVnull :: BVnull ::BVnull :: BVnull :: nil =>
+          match t with
+            | Tnull => Some Vnull
+            | Tptr _ => Some Vnull
+            | _ => None
+          end
+        | _ =>
+          match t with
+            | Tptr _ => proj_pointer vl
+            | _ => None
+          end
+      end
   end.
 
 Definition ident := Z.
 
 Inductive expr :=
- | Evalue (v: val)
- | Evar (x: ident)
- | Ebinop (op: bop) (e1: expr) (e2: expr)
- | Ederef (e: expr)
- | Eaddrof (e: expr)
- (* | Efield (e: expr) *)
- | Ecast (e: expr) (t: type).
- (* | Eindex (e: expr) (e: expr). *)
+| Evalue (v: val)
+| Evar (x: ident)
+| Ebinop (op: bop) (e1: expr) (e2: expr)
+| Ederef (e: expr)
+| Eaddrof (e: expr)
+(* | Efield (e: expr) *)
+| Ecast (e: expr) (t: type).
+(* | Eindex (e: expr) (e: expr). *)
+
+Definition tid := nat.
+
+Inductive prim :=
+| Pcli | Psti | Pswitch (i: tid).
 
 Inductive stmts :=
 | Sskip
+| Sprim (p: prim)
 | Sassign (lhs: expr) (rhs: expr)
 | Sif (cond: expr) (s1 s2: stmts)
 | Swhile (cond: expr) (s: stmts)
@@ -175,7 +181,8 @@ Notation "S1 ';;;' S2" := (Sseq S1 S2) (at level 97, right associativity, format
 
 Definition decls := list (ident * type).
 
-Definition function : Set := (type * decls * stmts). (* (type * decls * decls * stmts). *) (* no local vars *)
+Definition function : Type := (type * decls * stmts).
+(* (type * decls * decls * stmts). *) (* no local vars *)
 
 Definition program := ident → option function.
 
@@ -204,8 +211,8 @@ Inductive stmtsctx :=
 
 Definition exprcont := list exprctx.
 Definition stmtscont := list stmtsctx.
-Definition cont : Set := (exprcont * stmtscont).
-Definition code : Set := (cureval * cont).
+Definition cont : Type := (exprcont * stmtscont).
+Definition code : Type := (cureval * cont).
 
 Definition knil : cont := ([], []).
 
@@ -255,7 +262,7 @@ Definition evalbop (op: bop) v1 v2 : option val :=
                   | Vint8 i1, Vint8 i2 => Some (Vint8 (Byte.add i1 i2))
                   | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.add i1 i2))
                   | _, _ => None
-               end)
+                end)
     | ominus => None
   end.
 
@@ -294,3 +301,4 @@ Inductive head_step : code → state → code → state → Prop :=
     ∀ c c' ks ks' ke σ σ',
       sstep c ks σ c' ks' σ' →
       head_step (c, (ke, ks)) σ (c', (ke, ks')) σ'.
+

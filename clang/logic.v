@@ -204,6 +204,7 @@ Section rules.
   Fixpoint subst_s (x: ident) (l: addr) (s: stmts) : stmts :=
     match s with
       | Sskip => Sskip
+      | Sprim p => Sprim p
       | Sassign e1 e2 => Sassign (subst_e x (Evalue (Vptr l)) e1)
                                  (subst_e x (Ederef (Evalue (Vptr l))) e2)
       | Sif e s1 s2 => Sif (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s1) (subst_s x l s2)

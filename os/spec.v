@@ -32,6 +32,8 @@ Class specG Σ := SpecG {
   spec_gname : gname
 }.
 
+(* TODO: Missing sub-functors derivation *)
+
 Notation "l S↦ v" :=
   (@mapsto _ _ _ _ _ specG_spstG l 1%Qp v) (at level 20) : uPred_scope.
 
