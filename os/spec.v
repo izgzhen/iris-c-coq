@@ -1,9 +1,11 @@
 (* Spec Monoid *)
 
 Require Import logic.
-From iris.base_logic Require Import gen_heap big_op.
+From iris.base_logic Require Import gen_heap.
+From iris.base_logic Require Export big_op.
 From iris.algebra Require Import gmap agree auth.
 From iris.base_logic.lib Require Import wsat fancy_updates.
+From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 Import uPred.
