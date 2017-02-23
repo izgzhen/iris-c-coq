@@ -56,12 +56,15 @@ Section example.
     simpl. iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
     (* Open invariant *)
     iInv N as ">Hspec" "Hclose".
-    iDestruct (spec_update with "[Hspec HY Hsc]") as "(Hspec & Hss' & Hsc')".
+    iDestruct (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
+               with "[Hspec HY Hsc]")
+      as "(Hspec & Hss' & Hsc')".
     { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
       iFrame "Hsc". 
       iPureIntro.
       apply spec_step_rel. unfold f_rel.
-      exists vy. admit.
+      exists vy. split; first by simplify_map_eq.
+      split=>//. by rewrite insert_singleton.
     }
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     iApply wp_seq.
@@ -93,7 +96,7 @@ Section example.
     iApply wp_seq. iApply sti_spec.
     iFrame. iFrame "#".
     iSplitL "Hss' Hy".
-    { iExists (Int.add vy vx). iFrame. by iApply mapsto_singleton. }
+    { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp".
     iApply (wp_bind_s _ SKrete).
     iApply wp_conte. iApply wp_load.
@@ -102,7 +105,8 @@ Section example.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
     iApply ("HΦret" with "[Hsc']")=>//.
-  Admitted.
+    by rewrite Int.add_commut.
+  Qed.
   
   Lemma f_spec' (p: program) (x: ident) γ γp f vx Φ Φret:
     p f = Some (Tint32, [(x, Tint32)], f_body' x) →
