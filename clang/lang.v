@@ -7,6 +7,7 @@ Open Scope Z_scope.
 
 (* High-level value *)
 Inductive val : Set :=
+| Vvoid
 | Vnull
 | Vint8 (i: int8)
 | Vint32 (i: int32)
@@ -29,6 +30,7 @@ Fixpoint sizeof (t : type) : nat :=
   end.
 
 Inductive typeof : type → val → Prop :=
+| typeof_void: typeof Tvoid Vvoid
 | typeof_null: typeof Tnull Vnull
 | typeof_int8_to_int32:
     ∀ v: int32, (Int.unsigned v) <=? Byte.max_unsigned → typeof Tint8 (Vint32 v)
@@ -168,7 +170,7 @@ Inductive stmts :=
 | Sassign (lhs: expr) (rhs: expr)
 | Sif (cond: expr) (s1 s2: stmts)
 | Swhile (cond: expr) (s: stmts)
-(* | Sret *)
+| Sret
 | Srete (e: expr)
 | Scall (fid: ident) (args: list expr)
 (* | Scalle (lhs: expr) (fid: ident) (args: list expr) *)
@@ -188,11 +190,8 @@ Definition program := ident → option function.
 
 (* Operational Semantics *)
 
-Inductive cureval :=
-| cure (e: expr)
-| curs (s: stmts).
-
 Inductive exprctx :=
+| EKid
 | EKbinopr (op: bop) (re: expr)
 | EKbinopl (op: bop) (lv: val)
 | EKderef
@@ -209,15 +208,16 @@ Inductive stmtsctx :=
 (* | SKcaller (fid: ident) (args: list expr) *)
 (* | SKcallel (lhs: addr) (fid: ident) (vargs: list val) (args: list expr) (args: list expr). *)
 
-Definition exprcont := list exprctx.
-Definition stmtscont := list stmtsctx.
-Definition cont : Type := (exprcont * stmtscont).
-Definition code : Type := (cureval * cont).
+Definition context : Type := (exprctx * stmtsctx).
 
-Definition knil : cont := ([], []).
+Inductive cureval :=
+| curs (s: stmts) | cure (e: expr).
 
-Definition fill_expr (Ke : exprctx) (e : expr) : expr :=
+Definition code : Type := (cureval * context * list context).
+
+Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
   match Ke with
+    | EKid => e
     | EKbinopr op re => Ebinop op e re
     | EKbinopl op lv => Ebinop op (Evalue lv) e
     | EKderef => Ederef e
@@ -225,7 +225,7 @@ Definition fill_expr (Ke : exprctx) (e : expr) : expr :=
     | EKcast t => Ecast e t
   end.
 
-Definition fill_stmts (Ks : stmtsctx) (e : expr) : stmts :=
+Definition fill_stmts (e : expr) (Ks : stmtsctx) : stmts :=
   match Ks with
     | SKassignr rhs => Sassign e rhs
     | SKassignl lhs => Sassign (Evalue (Vptr lhs)) e
@@ -235,25 +235,12 @@ Definition fill_stmts (Ks : stmtsctx) (e : expr) : stmts :=
     | SKrete => Srete e
   end.
 
+Definition fill_ctx (e: expr) (K: context) : stmts :=
+  match K with (ke, ks) => fill_stmts (fill_expr e ke) ks end.
+
 Definition mem := gmap block (list byteval).
 
 Definition state := mem.
-
-Definition to_val (c: code) : option val :=
-  match c with
-    | (cure (Evalue v), knil) => Some v
-    | _ => None
-  end.
-
-Definition of_val (v: val) : code := (cure (Evalue v), knil).
-
-Definition reducible (c: code) : Prop :=
-  match c with
-    | (cure (Evalue v), knil) => False
-    | (curs Sskip, knil) => False
-    | (curs (Srete (Evalue v)), knil) => False
-    | _ => True
-  end.
 
 (* XXX: not precise *)
 Definition evalbop (op: bop) v1 v2 : option val :=
@@ -266,39 +253,41 @@ Definition evalbop (op: bop) v1 v2 : option val :=
     | ominus => None
   end.
 
-Inductive estep : cureval → exprcont → cureval → exprcont → state → Prop :=
-| ESbinop: ∀ lv rv op ke σ v',
+(* expr *can* have side-effect *)
+Inductive estep : expr → expr → state → Prop :=
+| ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
-             estep (cure (Evalue rv))
-                   (EKbinopl op lv :: ke)
-                   (cure (Evalue v')) ke σ
+             estep (Ebinop op (Evalue lv) (Evalue rv))
+                   (Evalue v')
+                   σ
 (* | EKderef *)
 (* | ekaddrof *)
 (* | EKcast (t: type). *)
 .
 
 (* Offset is ignored *)
-Inductive sstep : cureval → stmtscont → state → cureval → stmtscont → state → Prop :=
+Inductive sstep : stmts → state → stmts → state → Prop :=
 | SSassign:
-    ∀ t rv bytes bytes' σ b off ks,
+    ∀ t rv bytes bytes' σ b off,
       typeof t rv →
       encode_val t rv = bytes' →
       σ !! b = Some bytes →
-      sstep (cure (Evalue rv))
-            (SKassignl (b, off) :: ks) σ
-            (curs Sskip) ks
+      sstep (Sassign (Evalue (Vptr (b, off))) (Evalue rv))
+            σ
+            Sskip
             (<[ b := take off bytes ++ take (length bytes - off) bytes' ]> σ)
 (* | SKif (s1 s2: stmts) *)
 (* | SKwhile (s: stmts). *)
 .
 
-Inductive head_step : code → state → code → state → Prop :=
-| head_estep:
-    ∀ c c' ke ke' ks σ,
-      estep c ke c' ke' σ →
-      head_step (c, (ke, ks)) σ (c', (ke', ks)) σ
-| head_sstep:
-    ∀ c c' ks ks' ke σ σ',
-      sstep c ks σ c' ks' σ' →
-      head_step (c, (ke, ks)) σ (c', (ke, ks')) σ'.
+Definition to_val (e: expr) :=
+  match e with
+    | Evalue v => Some v
+    | _ => None
+  end.
 
+Definition of_val (v: val) := Evalue v.
+
+Inductive cstep: cureval → state → cureval → state → Prop :=
+| CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
+| CSsstep: ∀ s s' σ σ', sstep s σ s' σ' → cstep (curs s) σ (curs s') σ'.

@@ -17,20 +17,20 @@ Section wp.
   Context `{clangG Σ}.
 
   Definition wp_pre
-           (wp: coPset -c> code -c> (val -c> iProp Σ) -c> (option val -c> iProp Σ) -c> iProp Σ) :
-    coPset -c> code -c> (val -c> iProp Σ) -c> (option val -c> iProp Σ) -c> iProp Σ :=
-    (λ E c Φ Φret,
-     (* value case *)
-     (∃ v, ⌜to_val c = Some v⌝ ∧ |={E}=> Φ v) ∨
-     (* return case *) (* XXX: return nothing case *)
-     (∃ v k, ⌜ c = (curs (Srete (Evalue v)), k) ⌝ ∧ |={E}=> Φret (Some v) ) ∨
-     (* step case *)
-     (⌜to_val c = None⌝ ∧
-      (∀ (σ: mem),
+           (wp: coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ) :
+    coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ :=
+    (λ E cur Φ Φret,
+     match cur with
+       | curs Sskip => |={E}=> Φ Vvoid
+       | cure (Evalue v) => |={E}=> Φ v
+       | curs Sret => |={E}=> Φret Vvoid
+       | curs (Srete (Evalue v)) => |={E}=> Φret v
+       | _ =>
+         (∀ (σ: mem),
           gen_heap_ctx σ ={E,∅}=∗
-            ⌜reducible c⌝ ∗
-            ▷ (∀ c' σ', ⌜head_step c σ c' σ'⌝ ={∅,E}=∗
-            gen_heap_ctx σ' ∗ wp E c' Φ Φret))))%I.
+            ▷ (∀ cur' σ', ⌜cstep cur σ cur' σ'⌝ ={∅,E}=∗
+                        gen_heap_ctx σ' ∗ wp E cur' Φ Φret))
+     end)%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
   Proof.
@@ -43,7 +43,7 @@ Section wp.
        mapsto (l.1) q bytes ∗
        ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.  
   Definition wp_def :
-    coPset → code → (val → iProp Σ) → (option val → iProp Σ) → iProp Σ := fixpoint wp_pre.
+    coPset → cureval → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
   Definition wp_aux : { x | x = @wp_def }. by eexists. Qed.
   Definition wp := proj1_sig wp_aux.
   Definition wp_eq : @wp = @wp_def := proj2_sig wp_aux.
@@ -78,13 +78,18 @@ Section rules.
   Lemma wp_unfold E c Φ Φret: WP c @ E {{ Φ; Φret }} ⊣⊢ wp_pre wp E c Φ Φret.
   Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
 
-  Lemma wp_value Φ Φret v E: Φ v ⊢ WP (of_val v) @ E {{ Φ; Φret }}.
+  Lemma wp_skip Φ Φret E: Φ Vvoid ⊢ WP curs Sskip @ E {{ Φ; Φret }}.
   Proof.
     iIntros "HΦ".
-    rewrite wp_unfold /wp_pre.
-    iLeft. iExists v. auto.
+    by rewrite wp_unfold /wp_pre.
   Qed.
 
+  Lemma wp_value Φ Φret E v: Φ v ⊢ WP (cure (Evalue v)) @ E {{ Φ; Φret }}.
+  Proof.
+    iIntros "HΦ".
+    by rewrite wp_unfold /wp_pre.
+  Qed.
+  
   (* Lemma wp_strong_mono E1 E2 c Φ Φret Ψ : *)
   (*   E1 ⊆ E2 → (∀ v, Φ v ={E2}=∗ Ψ v) ∗ WP c @ E1 {{ Φ; Φret }} ⊢ WP c @ E2 {{ Ψ; Φret }}. *)
   (* Proof. *)
@@ -114,67 +119,34 @@ Section rules.
   (* Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}. *)
   (* Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed. *)
 
-  Lemma fill_step_inv K e1' σ1 e2 σ2 :
-    to_val (e1', knil) = None → head_step (e1', K) σ1 e2 σ2 →
-    ∃ e2', e2 = (e2', K) ∧ head_step (e1', knil) σ1 (e2', knil) σ2.
+  Lemma wp_bind e Ke Ks E Φ Φret:
+    WP cure e @ E {{ v, WP curs (fill_ctx (Evalue v) (Ke, Ks)) {{ Φ ; Φret }} ; Φret }}
+    ⊢ WP curs (fill_ctx e (Ke, Ks)) @ E {{ Φ ; Φret }}.
   Admitted.
 
-  Lemma wp_cont E k s Φ Φret:
-    WP (curs s, knil) @ E {{ v, WP (curs Sskip, k) @ E {{ Φ; Φret }} ; Φret }}
-       ⊢ WP (curs s, k) @ E {{ Φ; Φret }}.
-  Admitted.
-
-  Lemma wp_conte E k e Φ Φret:
-    WP (cure e, knil) @ E {{ v, WP (cure (Evalue v), k) @ E {{ Φ ; Φret }} ; Φret }}
-       ⊢ WP (cure e, k) @ E {{ Φ ; Φret }}.
-  Admitted.
-
-  Lemma wp_bind e Ke ke ks E Φ Φret:
-    WP (cure e, (Ke::ke, ks)) @ E {{ Φ ; Φret }}
-    ⊢ WP (cure (fill_expr Ke e), (ke, ks)) @ E {{ Φ ; Φret }}.
-  Admitted.
-
-  Lemma wp_unbind e Ke ke ks E Φ Φret:
-    WP (cure (fill_expr Ke e), (ke, ks)) @ E {{ Φ ; Φret }}
-    ⊢ WP (cure e, (Ke::ke, ks)) @ E {{ Φ ; Φret }}.
-  Admitted.
-
-  Lemma wp_bind_s e Ks ks E Φ Φret:
-    WP (cure e, ([], Ks::ks)) @ E {{ Φ; Φret }}
-       ⊢ WP (curs (fill_stmts Ks e), ([], ks)) @ E {{ Φ; Φret }}.
-  Admitted.
-
-  Lemma wp_unbind_s e Ks ks E Φ Φret:
-    WP (curs (fill_stmts Ks e), ([], ks)) @ E {{ Φ ; Φret }}
-    ⊢ WP (cure e, ([], Ks::ks)) @ E {{ Φ ; Φret }}.
-  Admitted.
- 
-  (* High-level Assertions *)
-  
   Lemma wp_assign E l t v Φ Φret:
     typeof t v →
     l ↦ - ∗ (l ↦ v @ t -∗ Φ)
-    ⊢ WP (curs (Sassign (Evalue (Vptr l)) (Evalue v)), knil) @ E {{ _, Φ ; Φret }}.
+    ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v)) @ E {{ _, Φ ; Φret }}.
   Admitted.
 
   Lemma wp_seq E s1 s2 Φ Φret:
-    WP (curs s1, knil) @ E {{ _, WP (curs s2, knil) @ E {{ Φ ; Φret }} ; Φret }}
-    ⊢ WP (curs (Sseq s1 s2), knil) @ E {{ Φ ; Φret }}.
+    WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}
+    ⊢ WP curs (Sseq s1 s2) @ E {{ Φ ; Φret }}.
   Admitted.
 
   Lemma wp_load E Φ p v t q Φret:
     p ↦{q} v @ t ∗ (p ↦{q} v @ t -∗ Φ v)
-    ⊢ WP (cure (Ederef (Evalue (Vptr p))), knil) @ E {{ Φ ; Φret }}.
+    ⊢ WP cure (Ederef (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
   Admitted.
 
   Lemma wp_op E op v1 v2 v' Φ Φret:
     evalbop op v1 v2 = Some v' →
-    Φ v' ⊢ WP (cure (Ebinop op (Evalue v1) (Evalue v2)), knil) @ E {{ Φ ; Φret }}.
+    Φ v' ⊢ WP cure (Ebinop op (Evalue v1) (Evalue v2)) @ E {{ Φ ; Φret }}.
   Admitted.
 
-  Lemma wp_ret E v Φ Φret k:
-    Φret (Some v)
-    ⊢ WP (curs (Srete (Evalue v)), k) @ E {{ Φ; Φret }}.
+  Lemma wp_ret E v Φ Φret:
+    Φret v ⊢ WP curs (Srete (Evalue v)) @ E {{ Φ; Φret }}.
   Admitted.
 
   Fixpoint params_match (params: decls) (vs: list val) :=
@@ -210,6 +182,7 @@ Section rules.
       | Sif e s1 s2 => Sif (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s1) (subst_s x l s2)
       | Swhile e s => Swhile (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s)
       | Srete e => Srete (subst_e x (Ederef (Evalue (Vptr l))) e)
+      | Sret => Sret
       | Scall f es => Scall f (map (subst_e x (Ederef (Evalue (Vptr l)))) es)
       | Sseq s1 s2 => Sseq (subst_s x l s1) (subst_s x l s2)
     end.
@@ -220,19 +193,16 @@ Section rules.
       | [] => s
     end.
 
-  Lemma wp_call (p: program) es vs params f_body f retty k Φ Φret: 
+  Lemma wp_call (p: program) es vs params f_body f retty Φ Φret: 
     p f = Some (retty, params, f_body) →
     es = map Evalue vs →
     params_match params vs →
     (∀ ls,
        ⌜ length ls = length vs ⌝ -∗
        alloc_params (zip ls (params.*2)) vs -∗
-       WP (curs (substs (zip (params.*1) ls) f_body), knil)
-          {{ _, True; fun v => WP (curs Sskip, k) {{ Φ; Φret }} }})
-    ⊢ WP (curs (Scall f es), k) {{ Φ; Φret }}.
+       WP curs (substs (zip (params.*1) ls) f_body)
+          {{ _, True; Φ }})
+    ⊢ WP curs (Scall f es) {{ Φ; Φret }}.
   Admitted.
 
-  Lemma wp_skip Φ E Φret : Φ ⊢ WP (curs Sskip, knil) @ E {{ _, Φ ; Φret}}.
-  Admitted.
-  
 End rules.

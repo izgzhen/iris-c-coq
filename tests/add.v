@@ -41,12 +41,12 @@ Section example.
               s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
 
   Definition int_ctx := @int_ctx _ _ invs i.
-  
+
   Lemma f_spec γ γp px vx Φ Φret:
     int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗
-    (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φret (Some v))
-    ⊢ WP (curs (f_body px), knil) {{ Φ ; Φret }}.
+    (∀ v, px ↦ v @ Tint32 -∗ scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φret v)
+    ⊢ WP curs (f_body px) {{ Φ ; Φret }}.
   Proof.
     iIntros "(#? & #? & Hp & Hx & Hsc & HΦret)".
     iApply wp_seq.
@@ -69,39 +69,32 @@ Section example.
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     iApply wp_seq.
     rewrite /example.y.
-    iApply (wp_bind_s _ (SKassignl _)).
-    iApply (wp_bind _ (EKbinopr _ _)).
-    iApply wp_conte.
+    iApply (wp_bind _ (EKbinopr _ _) (SKassignl _)).
     iApply wp_load. iFrame "Hy". iIntros "Hy". (* XXX: use wp_load tactic *)
-    iApply (wp_unbind _ (EKbinopr _ _)).
-    simpl. iApply (wp_bind _ (EKbinopl _ _)).
-    iApply wp_conte.
+    simpl. iApply (wp_bind _ (EKbinopl _ _) (SKassignl _)).
     iApply wp_load. iFrame "Hx". iIntros "Hx".
-    iApply (wp_unbind _ (EKbinopl _ _)).
-    simpl.
-    iApply wp_conte.
+    simpl. (* XXX: WHAT? *)
+    iApply (wp_bind _ EKid (SKassignl _)).
     iApply wp_op=>//.
-    iApply (wp_unbind_s _ (SKassignl _)).
     simpl.
     iApply wp_assign; first by apply typeof_int32.
     iSplitL "Hy"; first eauto.
     iIntros "Hy".
     iApply wp_seq.
-    iApply (wp_bind_s _ (SKassignl _)).
-    iApply wp_conte.
+    iApply (wp_bind _ EKid (SKassignl _)).
     iApply wp_load. iFrame "Hy". iIntros "Hy".
-    iApply (wp_unbind_s _ (SKassignl _)).
-    simpl. iApply wp_assign; first by apply typeof_int32.
+    simpl.
+    iApply wp_assign; first by apply typeof_int32.
     iSplitL "Hx"; first eauto. iIntros "Hx".
     iApply wp_seq. iApply sti_spec.
     iFrame. iFrame "#".
     iSplitL "Hss' Hy".
     { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp".
-    iApply (wp_bind_s _ SKrete).
-    iApply wp_conte. iApply wp_load.
+    iApply (wp_bind _ EKid SKrete).
+    iApply wp_load.
     iFrame "Hx". iIntros "Hx".
-    iApply (wp_unbind_s _ SKrete). simpl.
+    simpl.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
     iApply ("HΦret" with "[Hsc']")=>//.
@@ -112,7 +105,7 @@ Section example.
     p f = Some (Tint32, [(x, Tint32)], f_body' x) →
     int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φ)
-    ⊢ WP (curs (Scall f [Evalue (Vint32 vx)]), knil) {{ _, Φ ; Φret }}.
+    ⊢ WP curs (Scall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}.
   Proof.
     iIntros (Hpf) "(#? & #? & Hp & Hsc & HΦ)".
     iApply (wp_call _ _ [Vint32 vx])=>//.
@@ -124,7 +117,6 @@ Section example.
       iDestruct "Hls" as "[Hx _]".
       iApply f_spec. iFrame "#". iFrame.
       iIntros (v) "_ Hsc Hp". (* XXX: free *)
-      iApply wp_skip.
       iApply ("HΦ" with "[Hsc]")=>//.
     - inversion H1.
   Qed.

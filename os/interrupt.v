@@ -42,10 +42,10 @@ Section definitions.
     (* -- operation specs -- *)
     sti_spec N prio γ γp Φ Φret :
       int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ)
-      ⊢ WP (curs (Sprim Psti), knil) {{ _, Φ; Φret }};
+      ⊢ WP curs (Sprim Psti) {{ _, Φ; Φret }};
     cli_spec N prio γ γp Φ Φret :
       int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ)
-      ⊢ WP (curs (Sprim Pcli), knil) {{ _, Φ; Φret }}
+      ⊢ WP curs (Sprim Pcli) {{ _, Φ; Φret }}
   }.
 End definitions.
 
