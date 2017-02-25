@@ -1,10 +1,10 @@
 -R theories iris_os
-clang/lib/Integers.v
-clang/lib/Coqlib.v
-clang/memory.v
-clang/lang.v
-clang/logic.v
-os/spec.v
-os/interrupt.v
-os/reentrant.v
-tests/add.v
+theories/clang/lib/Integers.v
+theories/clang/lib/Coqlib.v
+theories/clang/memory.v
+theories/clang/lang.v
+theories/clang/logic.v
+theories/os/spec.v
+theories/os/interrupt.v
+theories/os/reentrant.v
+theories/tests/add.v

@@ -69,19 +69,19 @@ Section example.
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     iApply wp_seq.
     rewrite /example.y.
-    iApply (wp_bind _ (EKbinopr _ _) (SKassignl _)).
+    iApply (wp_bind _ (EKbinopr _ _, SKassignl _)).
     iApply wp_load. iFrame "Hy". iIntros "Hy". (* XXX: use wp_load tactic *)
-    simpl. iApply (wp_bind _ (EKbinopl _ _) (SKassignl _)).
+    simpl. iApply (wp_bind _ (EKbinopl _ _, SKassignl _)).
     iApply wp_load. iFrame "Hx". iIntros "Hx".
     simpl. (* XXX: WHAT? *)
-    iApply (wp_bind _ EKid (SKassignl _)).
+    iApply (wp_bind _ (EKid, SKassignl _)).
     iApply wp_op=>//.
     simpl.
     iApply wp_assign; first by apply typeof_int32.
     iSplitL "Hy"; first eauto.
     iIntros "Hy".
     iApply wp_seq.
-    iApply (wp_bind _ EKid (SKassignl _)).
+    iApply (wp_bind _ (EKid, SKassignl _)).
     iApply wp_load. iFrame "Hy". iIntros "Hy".
     simpl.
     iApply wp_assign; first by apply typeof_int32.
@@ -91,7 +91,7 @@ Section example.
     iSplitL "Hss' Hy".
     { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp".
-    iApply (wp_bind _ EKid SKrete).
+    iApply (wp_bind _ (EKid, SKrete)).
     iApply wp_load.
     iFrame "Hx". iIntros "Hx".
     simpl.
