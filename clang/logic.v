@@ -119,9 +119,9 @@ Section rules.
   (* Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}. *)
   (* Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed. *)
 
-  Lemma wp_bind e Ke Ks E Φ Φret:
-    WP cure e @ E {{ v, WP curs (fill_ctx (Evalue v) (Ke, Ks)) {{ Φ ; Φret }} ; Φret }}
-    ⊢ WP curs (fill_ctx e (Ke, Ks)) @ E {{ Φ ; Φret }}.
+  Lemma wp_bind e K E Φ Φret:
+    WP cure e @ E {{ v, WP curs (fill_ctx (Evalue v) K) {{ Φ ; Φret }} ; Φret }}
+    ⊢ WP curs (fill_ctx e K) @ E {{ Φ ; Φret }}.
   Admitted.
 
   Lemma wp_assign E l t v Φ Φret:

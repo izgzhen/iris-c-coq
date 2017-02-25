@@ -1,0 +1,118 @@
+\section{Program Logic}
+\label{sec:program-logic}
+
+This section describes how to build a program logic for the C language (\cf \Sref{sec:language}) on top of the base logic of Iris.
+
+\subsection{Extended Assertions}
+
+Using the standard Iris assertions and the ownership of ghost heap resource, we can define some basic custom assertions:
+
+\begin{align*}
+\vaddr{b}{o} \mapsto_q v : t \eqdef{}& \Exists bs, bs'. b \mapsto_q bs * (\encode \footnotemark (t, v) = bs' \land bs' = bs[o..o + |bs'|\,]) \\
+l \mapsto v : t              \eqdef{}& l \mapsto_1 v : t\\
+l \mapsto_q -                \eqdef{}& \Exists v, t. l \mapsto_q v : t
+\end{align*}
+\footnotetext{see Coq implementation for details}
+
+\subsection{Weakest Precondition}
+
+Finally, we can define the core piece of the program logic, the assertion that reasons about program behavior: Weakest precondition, from which Hoare triples will be derived.
+
+\paragraph{Defining weakest precondition.}
+
+While we have fixed the program state $\sigma$ in language definition, but it can be any state, as long as it has a predicate
+$S : \State \to \iProp$ that interprets the physical state as an Iris assertion.
+For our heap state, $S(\sigma) \eqdef \ownPhys{\authfull \fmap (\lambda v. (1, \aginj v), \sigma)}$.
+
+\begin{align*}
+  \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, \cureval, \pred, \predret. \\
+        & (\cureval = \sskip^\dag \land \pvs[\mask] \pred(\void)) \lor {}\\
+        & (\Exists v. \cureval = v^\dag \land \pvs[\mask] \pred (v)) \lor {}\\
+        & (\cureval = \sret^\dag \land \pvs[\mask] \predret (\void)) \lor {}\\
+        & (\Exists v. \cureval = \srete{v}^\dag \land \pvs[\mask] \predret (v)) \lor {}\\
+        & \Bigl(\All \state. S(\state) \vsW[\mask][\emptyset] {}\\
+        &\qquad \later\All \cureval', \state'. (\cureval, \state \step \cureval', \state') \vsW[\emptyset][\mask] {}\\
+        &\qquad\qquad S(\state') * \textdom{wp}(\mask, \cureval', \pred, \predret)\Bigr) \\
+\end{align*}
+
+Here are some conventions:
+
+\begin{itemize}
+\item If we leave away the mask, we assume it to default to $\top$.
+\item We will leave $\dag$ out when writing $\cureval$ in WP.
+\item $\pred$ in post-condition might or might not take a value parameter, depending on the context.
+\end{itemize}
+
+\paragraph{Laws of weakest precondition.}
+The following rules can all be derived:
+\begin{mathpar}
+\infer[wp-value]
+{}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}{\predret}}
+
+\infer[wp-skip]
+{}{\pred(\void) \proves \wpre{\val}[\mask]{\pred}{\predret}}
+
+\infer[wp-ret]
+{}{\predret(v) \proves \wpre{\srete{v}}[\mask]{\pred}{\predret}}
+
+
+% \infer[wp-mono]
+% {\mask_1 \subseteq \mask_2 \and \vctx,\var:\textlog{val}\mid\prop \proves \propB}
+% {\vctx\mid\wpre\expr[\mask_1]{\Ret\var.\prop} \proves \wpre\expr[\mask_2]{\Ret\var.\propB}}
+
+% \infer[fup-wp]
+% {}{\pvs[\mask] \wpre\expr[\mask]{\Ret\var.\prop} \proves \wpre\expr[\mask]{\Ret\var.\prop}}
+
+% \infer[wp-fup]
+% {}{\wpre\expr[\mask]{\Ret\var.\pvs[\mask] \prop} \proves \wpre\expr[\mask]{\Ret\var.\prop}}
+
+% \infer[wp-atomic]
+% {\physatomic{\expr}}
+% {\pvs[\mask_1][\mask_2] \wpre\expr[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
+%  \proves \wpre\expr[\mask_1]{\Ret\var.\prop}}
+
+% \infer[wp-frame]
+% {}{\propB * \wpre\expr[\mask]{\Ret\var.\prop} \proves \wpre\expr[\mask]{\Ret\var.\propB*\prop}}
+
+% \infer[wp-frame-step]
+% {\toval(\expr) = \bot \and \mask_2 \subseteq \mask_1}
+% {\wpre\expr[\mask_2]{\Ret\var.\prop} * \pvs[\mask_1][\mask_2]\later\pvs[\mask_2][\mask_1]\propB \proves \wpre\expr[\mask_1]{\Ret\var.\propB*\prop}}
+
+\infer[wp-bind]
+{}
+{\wpre\expr[\mask]{\Ret\var. \wpre{\ctx(\var)}[\mask]{\pred}{\predret}}{\predret}
+ \proves 
+ \wpre{\ctx(\expr)}[\mask]{\pred}{\predret}}
+
+ \infer[wp-op]
+{\llbracket oplus \rrbracket (v_1, v_2) = v'}
+{\pred(v')
+ \proves
+ \wpre{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
+
+
+ \infer[wp-assign]
+{\typeof\footnotemark(\tau, v)}
+{ l \mapsto - * (l \mapsto v : t \wand \pred)
+ \proves
+ \wpre{l \la v}[\mask]{\pred}{\predret}}
+
+ \infer[wp-load]
+{}
+{ l \mapsto_q v : t  * (l \mapsto_q v : t \wand \pred (v))
+ \proves
+ \wpre{\deref{l}}[\mask]{\pred}{\predret}}
+
+\infer[wp-seq]
+{}
+{\wpre{s_1}[\mask]{\wpre{s_2}[\mask]{\pred}{\predret}}{\predret} 
+ \proves
+ \wpre{s_1 ; s_2}[\mask]{\pred}{\predret}}
+
+\end{mathpar}
+\footnotetext{see Coq implementation for details}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "iris"
+%%% End:

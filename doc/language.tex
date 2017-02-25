@@ -1,0 +1,81 @@
+\section{Language}
+\label{sec:language}
+
+\paragraph{Syntax.}
+
+The language is a simplified version of C. It consists of \Stmts{} (statements), \Prim{} (primitives),
+\Expr{} (expressions), \Type{} (types) and \Val{} (values).
+
+Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, offset $o \in \integer^{+}$.
+
+\begin{align*}
+    \tau : \Type \bnfdef{}&
+        \tyvoid \mid \tynull \mid \tybyte \mid \tyword \mid \typtr{\tau}
+\\
+    v : \Val \bnfdef{}&
+        \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l
+\\
+    e : \Expr \bnfdef{}&
+        v \mid x \mid e \oplus e \mid \deref{e} \mid \& e \mid \ecast{e}{\tau}
+\\
+    p : \Prim \bnfdef{}&
+        \pcli \mid \psti
+\\
+    s : \Stmts \bnfdef{}&
+        \sskip \mid p \mid e \la e \mid \sif{e}{s}{s} \mid \swhile{e}{s} \mid \\&
+        \sret \mid \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid s ; s
+\\
+\end{align*}
+
+\paragraph{Program.}
+
+A program is considered to be a set of functions, each identified by its name. Each
+function is a triple of return type $\tau_{ret}$, parameter declarations $(x_1 : \tau_1, ...)$,
+and function body $s$.
+
+\paragraph{Evaluation Context.}
+
+To make the evaluation order explicit and reusable by the $\text{WP-BIND}$ rule, we define evaluation context.
+Compared to a simple expression-based language which has only one kind of context $\ctx$, we define two contexts
+$\ctx_e, \ctx_s$ for both $\Expr$ and $\Stmts$:
+
+\begin{align*}
+    \ctx_e : \ectx \eqdef{}&
+        \emptyctx \mid \emptyctx \oplus e \mid v \oplus \emptyctx \mid
+        \deref{\emptyctx} \mid \& \emptyctx \mid \ecast{\emptyctx}{\tau}
+\\
+    \ctx_s : \sctx \eqdef{}&
+        \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{s}{s} \mid \swhile{\emptyctx}{s} \mid \\&
+         \srete{\emptyctx} \mid \scall{f}{v_1, ..., \emptyctx, e_1, ...}
+\end{align*}
+
+Now we can define \emph{context}: $\ctx : \allctx \eqdef (\ctx_e, \ctx_s)$.
+
+\paragraph{Model.}
+
+Define $c: \Code \eqdef (\cureval: \{ \Expr + \Stmts\}, \curctx: \allctx, \ctx^{*}: [\allctx])$, in which
+
+\begin{itemize}
+\item $\cureval$ is the ``current evaluation'', which could be either an expression $e^\dag$ or a statement $s^\dag$.
+\item $\curctx$ is the ``current context'', which semantically means rest code to execute in current frame.
+\item $\ctx^{*}$ is the ``previous contexts'', which semantically means previous frames on call stack
+\end{itemize}
+
+Next, we define byte-size value and memory model:
+
+\[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
+
+We define state $\sigma: \State \eqdef [ b \gmapsto [\bval] ]$,
+i.e. a heap in which every block maps to a list of byte-size values.
+
+You may notice the difference between $\Val$ and $\byteval$, it is intentional to create a layer of abstraction for
+easier manipulation of spatial assertions and also a clean, unified language syntax.
+
+\paragraph{Operational Semantics.}
+
+TODO.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "iris"
+%%% End:
