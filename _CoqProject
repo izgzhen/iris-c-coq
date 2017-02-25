@@ -1,4 +1,4 @@
--R . iris_os
+-R theories iris_os
 clang/lib/Integers.v
 clang/lib/Coqlib.v
 clang/memory.v
