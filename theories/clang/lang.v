@@ -179,8 +179,6 @@ Inductive stmts :=
 (* | Sfree *)
 (* | Salloc *)
 
-Notation "S1 ';;;' S2" := (Sseq S1 S2) (at level 97, right associativity, format "S1 ';;;' S2").
-
 Definition decls := list (ident * type).
 
 Definition function : Type := (type * decls * stmts).
@@ -282,13 +280,22 @@ Inductive sstep : stmts → state → stmts → state → Prop :=
 (* | SKwhile (s: stmts). *)
 .
 
-Definition to_val (cur: cureval) :=
-  match cur with
-    | cure (Evalue v) => Some v
+Bind Scope val_scope with val.
+Delimit Scope val_scope with V.
+Bind Scope expr_scope with expr.
+Delimit Scope expr_scope with E.
+Bind Scope stmts_scope with stmts.
+Delimit Scope stmts_scope with S.
+Bind Scope prim_scope with prim.
+Delimit Scope prim_scope with prim.
+
+Definition to_val (e: expr) :=
+  match e with
+    | Evalue v => Some v
     | _ => None
   end.
 
-Definition of_val (v: val) := cure (Evalue v).
+Definition of_val (v: val) := Evalue v.
 
 Inductive cstep: cureval → state → cureval → state → Prop :=
 | CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
