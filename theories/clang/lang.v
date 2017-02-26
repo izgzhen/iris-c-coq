@@ -11,14 +11,31 @@ Inductive val : Set :=
 | Vnull
 | Vint8 (i: int8)
 | Vint32 (i: int32)
-| Vptr (p: addr).
+| Vptr (p: addr)
+| Vpair (v1 v2: val).
+
+Instance int_eq_dec : EqDecision int.
+Proof. apply Int.eq_dec. Defined.
+
+Instance byte_eq_dec : EqDecision byte.
+Proof. apply Byte.eq_dec. Defined.
+
+Instance val_eq_dec : EqDecision val.
+Proof. solve_decision. Defined.
+
+Definition vtrue := Vint8 (Byte.repr 1).
+Definition vfalse := Vint8 (Byte.repr 0).
+
+Definition ident := Z.
 
 Inductive type : Set :=
 | Tnull
 | Tvoid
 | Tint8
 | Tint32
-| Tptr (t: type).
+| Tptr (t: type)
+| Tprod (t1 t2: type)
+| Tmu (tx: ident) (t: type). (* recursive type -- we might need to prove something about it *)
 
 Fixpoint sizeof (t : type) : nat :=
   match t with
@@ -27,6 +44,8 @@ Fixpoint sizeof (t : type) : nat :=
     | Tint8 => 1 % nat
     | Tint32 => 4 % nat
     | Tptr _ => 4 % nat
+    | Tprod t1 t2 => sizeof t1 + sizeof t2
+    | Tmu _ t => sizeof t
   end.
 
 Inductive typeof : type → val → Prop :=
@@ -36,11 +55,15 @@ Inductive typeof : type → val → Prop :=
     ∀ v: int32, (Int.unsigned v) <=? Byte.max_unsigned → typeof Tint8 (Vint32 v)
 | typeof_int8: ∀ i, typeof Tint8 (Vint8 i)
 | typeof_int32: ∀ i, typeof Tint32 (Vint32 i)
-| typeof_ptr: ∀ t l, typeof (Tptr t) (Vptr l).
+| typeof_ptr: ∀ t l, typeof (Tptr t) (Vptr l)
+| typeof_prod: ∀ t1 t2 v1 v2, typeof t1 v2 → typeof t2 v2 → typeof (Tprod t1 t2) (Vpair v1 v2)
+| typeof_mu: ∀ tx t v, typeof t v → typeof (Tmu tx t) v.
 
 Inductive bop:=
 | oplus
-| ominus.
+| ominus
+| oequals
+| oneq.
 
 (* Encoding and decoding for values *)
 Fixpoint encode_int (n: nat) (x: Z): list byte :=
@@ -113,41 +136,51 @@ Definition proj_pointer (vl: list byteval) : option val :=
     | _ => None
   end.
 
-Definition encode_val (t: type) (v: val) : list byteval :=
+Fixpoint encode_val (t: type) (v: val) : list byteval :=
   match v, t with
     | Vint32 n, Tint8  => inj_bytes (encode_int 1%nat (Int.unsigned n))
     | Vint32 n, Tint32 => inj_bytes (encode_int 4%nat (Int.unsigned n))
     | Vptr p, Tptr _ => inj_pointer 4%nat p
     | Vnull, Tnull => list_repeat 4 BVnull
     | Vnull, Tptr _ => list_repeat 4 BVnull
+    | Vpair v1 v2, Tprod t1 t2 => encode_val t1 v1 ++ encode_val t1 v2
+    | v, Tmu _ t => encode_val t v
     | _, _ => list_repeat (sizeof t) BVundef
   end.
 
-Definition decode_val (t: type) (vl: list byteval) : option val :=
-  match proj_bytes vl with
-    | Some bl =>
-      match t with
-        | Tint8  => Some (Vint32 (Int.zero_ext 8 (Int.repr (decode_int bl))))
-        | Tint32 => Some (Vint32 (Int.repr (decode_int bl)))
-        | _ => None
-      end
-    | None =>
-      match vl with
-        | BVnull :: BVnull ::BVnull :: BVnull :: nil =>
-          match t with
-            | Tnull => Some Vnull
-            | Tptr _ => Some Vnull
-            | _ => None
-          end
-        | _ =>
-          match t with
-            | Tptr _ => proj_pointer vl
-            | _ => None
-          end
-      end
+Fixpoint decode_val (t: type) (vl: list byteval) : option val :=
+  match t with
+    | Tprod t1 t2 =>
+      (match decode_val t1 (take (sizeof t1) vl),
+             decode_val t2 (drop (sizeof t1) vl) with
+         | Some v1, Some v2 => Some (Vpair v1 v2)
+         | _, _ => None
+       end)
+    | Tmu _ t => decode_val t vl
+    | _ =>
+      (match proj_bytes vl with
+         | Some bl =>
+           match t with
+             | Tint8  => Some (Vint32 (Int.zero_ext 8 (Int.repr (decode_int bl))))
+             | Tint32 => Some (Vint32 (Int.repr (decode_int bl)))
+             | _ => None
+           end
+         | None =>
+           match vl with
+             | BVnull :: BVnull ::BVnull :: BVnull :: nil =>
+               match t with
+                 | Tnull => Some Vnull
+                 | Tptr _ => Some Vnull
+                 | _ => None
+               end
+             | _ =>
+               match t with
+                 | Tptr _ => proj_pointer vl
+                 | _ => None
+               end
+           end
+       end)
   end.
-
-Definition ident := Z.
 
 Inductive expr :=
 | Evalue (v: val)
@@ -155,7 +188,8 @@ Inductive expr :=
 | Ebinop (op: bop) (e1: expr) (e2: expr)
 | Ederef (e: expr)
 | Eaddrof (e: expr)
-(* | Efield (e: expr) *)
+| Efst (e: expr)
+| Esnd (e: expr)
 | Ecast (e: expr) (t: type).
 (* | Eindex (e: expr) (e: expr). *)
 
@@ -194,6 +228,8 @@ Inductive exprctx :=
 | EKbinopl (op: bop) (lv: val)
 | EKderef
 | EKaddrof
+| EKfst
+| EKsnd
 | EKcast (t: type).
 
 Inductive stmtsctx :=
@@ -220,6 +256,8 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKbinopl op lv => Ebinop op (Evalue lv) e
     | EKderef => Ederef e
     | EKaddrof => Eaddrof e
+    | EKfst => Efst e
+    | EKsnd => Esnd e
     | EKcast t => Ecast e t
   end.
 
@@ -250,7 +288,13 @@ Definition evalbop (op: bop) v1 v2 : option val :=
                   | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.add i1 i2))
                   | _, _ => None
                 end)
-    | ominus => None
+    | ominus => (match v1, v2 with
+                  | Vint8 i1, Vint8 i2 => Some (Vint8 (Byte.sub i1 i2))
+                  | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.sub i1 i2))
+                  | _, _ => None
+                 end)
+    | oequals => if decide (v1 = v2) then Some vtrue else Some vfalse
+    | oneq => if decide (v1 = v2) then Some vfalse else Some vtrue
   end.
 
 (* expr *can* have side-effect *)

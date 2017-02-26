@@ -12,13 +12,22 @@ Coercion Evar : ident >-> expr.
 
 Notation "'void'" := Vvoid.
 Notation "'null'" := Vnull.
+Notation "'true'" := vtrue : expr_scope.
+Notation "'false'" := vfalse : expr_scope.
 Notation "# v" := (Evalue v) (at level 8) : expr_scope.
+Notation "! e" := (Ederef e%E) (at level 9, right associativity) : expr_scope.
+Notation "'fst' e" := (Efst e%E) (at level 9, right associativity) : expr_scope.
+Notation "'snd' e" := (Esnd e%E) (at level 9, right associativity) : expr_scope.
 Notation "! e" := (Ederef e%E) (at level 9, right associativity) : expr_scope.
 Notation "& e" := (Eaddrof e%E)
   (at level 30, right associativity) : expr_scope.
 Notation "e1 + e2" := (Ebinop oplus e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
 Notation "e1 - e2" := (Ebinop ominus e1%E e2%E)
+  (at level 50, left associativity) : expr_scope.
+Notation "e1 == e2" := (Ebinop oequals e1%E e2%E)
+  (at level 50, left associativity) : expr_scope.
+Notation "e1 != e2" := (Ebinop oneq e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
 Notation "e 'as' t" := (Ecast e%E t)
   (at level 50, left associativity) : expr_scope.
@@ -37,4 +46,3 @@ Notation "f < e1 , e2 , .. , en >" := (Scall f (cons e1%E (cons e2%E .. (cons en
 
 Notation "'cli'" := (Sprim Pcli) (at level 80) : stmts_scope.
 Notation "'sti'" := (Sprim Psti) (at level 80) : stmts_scope.
-
