@@ -107,6 +107,18 @@ Proof.
   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
 Qed.
 
+Lemma tac_wp_load Δ Δ' E i l q v t Φ Φret:
+  IntoLaterNEnvs 1 Δ Δ' →
+  envs_lookup i Δ' = Some (false, l ↦{q} v @ t)%I →
+  (Δ' ⊢ Φ v) →
+  Δ ⊢ WP (cure (Ederef (Evalue (Vptr l)))) @ E {{ Φ ; Φret }}.
+Proof.
+  intros. eapply wand_apply.
+  { iIntros "HP HQ". iApply wp_load. iSplitL "HP"; eauto. }
+  rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
+  by apply later_mono, sep_mono_r, wand_mono.
+Qed.
+
 End heap.
 
 Tactic Notation "wp_assign" :=
@@ -122,4 +134,20 @@ Tactic Notation "wp_assign" :=
       |env_cbv; reflexivity
       | auto (* wp_finish *)]
   | _ => fail "wp_assign: not a 'wp'"
+  end.
+
+Tactic Notation "wp_load" :=
+  iStartProof;
+  lazymatch goal with
+  | |- _ ⊢ wp ?E (curs ?s) ?P ?Q =>
+    first
+      [reshape_stmts s ltac:(fun Kes Ks e' =>
+         match eval hnf in e' with Ederef _ => wp_bind_core Kes Ks end)
+      |fail 1 "wp_load: cannot find 'Ederef' in" s];
+    eapply tac_wp_load;
+      [apply _
+      |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
+       iAssumptionCore || fail "wp_load: cannot find" l "↦ ? @ ?"
+      |(* wp_finish *) auto]
+  | _ => fail "wp_load: not a 'wp'"
   end.

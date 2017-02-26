@@ -68,25 +68,20 @@ Section example.
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     iApply wp_seq.
     rewrite /example.y.
-    wp_bind (Ederef _).
-    iApply wp_load. iFrame "Hy". iIntros "Hy".
-    wp_bind (Ederef _).
-    iApply wp_load. iFrame "Hx". iIntros "Hx".
+    wp_load.
+    wp_load.
     wp_bind (Ebinop _ _ _).
     iApply wp_op=>//.
     wp_assign.
     iApply wp_seq.
-    wp_bind (Ederef _).
-    iApply wp_load. iFrame "Hy". iIntros "Hy".
+    wp_load.
     wp_assign.
     iApply wp_seq. iApply sti_spec.
     iFrame. iFrame "#".
     iSplitL "Hss' Hy".
     { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp".
-    wp_bind (Ederef _).
-    iApply wp_load.
-    iFrame "Hx". iIntros "Hx".
+    wp_load.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
     iApply ("HΦret" with "[Hsc']")=>//.

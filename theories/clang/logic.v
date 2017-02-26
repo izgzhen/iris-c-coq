@@ -160,7 +160,7 @@ Section rules.
   Admitted.
 
   Lemma wp_load E Φ p v t q Φret:
-    p ↦{q} v @ t ∗ (p ↦{q} v @ t -∗ Φ v)
+    ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP cure (Ederef (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
   Admitted.
 
