@@ -10,8 +10,9 @@ Coercion of_val : val >-> expr.
 
 Coercion Evar : ident >-> expr.
 
-Notation "'void'" := Vvoid : val_scope.
-Notation "'null'" := Vnull : val_scope.
+Notation "'void'" := Vvoid.
+Notation "'null'" := Vnull.
+Notation "# v" := (Evalue v) (at level 8) : expr_scope.
 Notation "! e" := (Ederef e%E) (at level 9, right associativity) : expr_scope.
 Notation "& e" := (Eaddrof e%E)
   (at level 30, right associativity) : expr_scope.

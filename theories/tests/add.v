@@ -42,7 +42,7 @@ Section example.
   Proof.
     iIntros "(#? & #? & Hp & Hx & Hsc & HΦret)".
     simpl. destruct (decide (x = x))=>//.
-    iApply wp_seq.
+    wp_run.
     iApply cli_spec.
     iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
@@ -58,20 +58,13 @@ Section example.
       exists vy. gmap_solve. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-    iApply wp_seq.
-    wp_load.
-    wp_load.
-    wp_op.
-    wp_assign.
-    iApply wp_seq.
-    wp_load.
-    wp_assign.
-    iApply wp_seq. iApply sti_spec.
+    wp_run. 
+    iApply sti_spec.
     iFrame. iFrame "#".
     iSplitL "Hss' Hy".
     { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp".
-    wp_load.
+    wp_run.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
     iApply ("HΦret"  with "[Hsc']")=>//.

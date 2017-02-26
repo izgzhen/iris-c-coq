@@ -80,6 +80,7 @@ Ltac wp_bind_core Kes Ks :=
 
 Tactic Notation "wp_bind" open_constr(efoc) :=
   iStartProof;
+  try (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs ?s) ?Q ?P => reshape_stmts s ltac:(fun Kes Ks e' =>
     match e' with
@@ -87,7 +88,6 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     end) || fail "wp_bind: cannot find" efoc "in" s
   | _ => fail "wp_bind: not a 'wp'"
   end.
-
 
 Section heap.
 Context `{clangG Σ}.
@@ -123,6 +123,7 @@ End heap.
 
 Tactic Notation "wp_assign" :=
   iStartProof;
+  try (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs (Sassign ?e _)) ?P ?Q =>
     eapply tac_wp_assign;
@@ -138,6 +139,7 @@ Tactic Notation "wp_assign" :=
 
 Tactic Notation "wp_load" :=
   iStartProof;
+  try (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs ?s) ?P ?Q =>
     first
@@ -154,6 +156,7 @@ Tactic Notation "wp_load" :=
 
 Tactic Notation "wp_op" :=
   iStartProof;
+  try (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs ?s) ?P ?Q => reshape_stmts s ltac:(fun Kes Ks e' =>
     lazymatch eval hnf in e' with
@@ -161,3 +164,11 @@ Tactic Notation "wp_op" :=
     end) || fail "wp_op: cannot find Ebinop in" s
   | _ => fail "wp_op: not a 'wp'"
 end.
+
+Ltac wp_run :=
+  (match goal with
+   | |- _ ⊢ wp ?E (curs (Sassign _ _)) ?P ?Q => wp_assign
+   | |- _ ⊢ wp ?E (curs (Sseq _ _)) ?P ?Q => iApply wp_seq
+   | |- _ => wp_load
+   | |- _ => wp_op
+  end; wp_run) || idtac.
