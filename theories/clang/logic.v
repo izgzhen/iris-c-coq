@@ -64,6 +64,25 @@ Notation "'WP' c {{ v , Q ; Φret } }" := (wp ⊤ c (λ v, Q) Φret)
   (at level 20, c, Q, Φret at level 200,
    format "'WP'  c  {{  v ,  Q  ; Φret } }") : uPred_scope.
 
+Notation "'{{{' P } } } e {{{ x .. y , 'RET' pat ; Q ; Φret } } }" :=
+  (∀ Φ Φret : _ → uPred _,
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat) .. ) -∗ WP e {{ Φ; Φret }})
+    (at level 20, x closed binder, y closed binder,
+     format "{{{  P  } } }  e  {{{  x .. y ,  RET  pat ;  Q ;  Φret } } }") : C_scope.
+Notation "'{{{' P } } } e @ E {{{ x .. y , 'RET' pat ; Q ; Φret } } }" :=
+  (∀ Φ Φret: _ → uPred _,
+      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat) .. ) -∗ WP e @ E {{ Φ ; Φret }})
+    (at level 20, x closed binder, y closed binder,
+     format "{{{  P  } } }  e  @  E  {{{  x .. y ,  RET  pat ;  Q ;  Φret } } }") : C_scope.
+Notation "'{{{' P } } } e {{{ 'RET' pat ; Q ; Φret } } }" :=
+  (∀ Φ Φret : _ → uPred _, P -∗ ▷ (Q -∗ Φ pat) -∗ WP e {{ Φ ; Φret }})
+    (at level 20,
+     format "{{{  P  } } }  e  {{{  RET  pat ;  Q ;  Φret } } }") : C_scope.
+Notation "'{{{' P } } } e @ E {{{ 'RET' pat ; Q ; Φret } } }" :=
+  (∀ Φ Φret: _ → uPred _, P -∗ ▷ (Q -∗ Φ pat) -∗ WP e @ E {{ Φ; Φret }})
+    (at level 20,
+     format "{{{  P  } } }  e  @  E  {{{  RET  pat ;  Q ;  Φret } } }") : C_scope.
+
 Notation "l ↦{ q } v @ t" := (mapstoval l q v t)
   (at level 20, q at level 50, format "l  ↦{ q }  v  @  t") : uPred_scope.
 Notation "l ↦ v @ t" :=
@@ -119,15 +138,20 @@ Section rules.
   (* Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}. *)
   (* Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed. *)
 
-  Lemma wp_bind e K E Φ Φret:
-    WP cure e @ E {{ v, WP curs (fill_ctx (Evalue v) K) {{ Φ ; Φret }} ; Φret }}
-    ⊢ WP curs (fill_ctx e K) @ E {{ Φ ; Φret }}.
+  Lemma wp_bind {E e} (Kes: list exprctx) (Ks: stmtsctx) Φ Φret:
+    WP cure e @ E {{ v, WP curs (fill_stmts (fill_ectxs (Evalue v) Kes) Ks) {{ Φ ; Φret }} ; Φret }}
+    ⊢ WP curs (fill_stmts (fill_ectxs e Kes) Ks) @ E {{ Φ ; Φret }}.
   Admitted.
 
-  Lemma wp_assign E l t v Φ Φret:
-    typeof t v →
-    l ↦ - ∗ (l ↦ v @ t -∗ Φ)
-    ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v)) @ E {{ _, Φ ; Φret }}.
+  Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret:
+    WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }}
+    ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}.
+  Admitted.
+  
+  Lemma wp_assign E l v v' t t' Φ Φret:
+    typeof t' v' →
+    ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t' -∗ Φ Vvoid)
+    ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
   Admitted.
 
   Lemma wp_seq E s1 s2 Φ Φret:

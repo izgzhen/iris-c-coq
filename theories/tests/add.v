@@ -1,4 +1,4 @@
-From iris_os.clang Require Import logic.
+From iris_os.clang Require Import logic tactics.
 From iris.base_logic Require Import big_op.
 From iris_os.os Require Import spec interrupt.
 From iris.proofmode Require Import tactics.
@@ -69,32 +69,28 @@ Section example.
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     iApply wp_seq.
     rewrite /example.y.
-    iApply (wp_bind _ (EKbinopr _ _, SKassignl _)).
-    iApply wp_load. iFrame "Hy". iIntros "Hy". (* XXX: use wp_load tactic *)
-    simpl. iApply (wp_bind _ (EKbinopl _ _, SKassignl _)).
+    wp_bind (Ederef _).
+    iApply wp_load. iFrame "Hy". iIntros "Hy".
+    wp_bind (Ederef _).
     iApply wp_load. iFrame "Hx". iIntros "Hx".
-    simpl. (* XXX: WHAT? *)
-    iApply (wp_bind _ (EKid, SKassignl _)).
+    wp_bind (Ebinop _ _ _).
     iApply wp_op=>//.
-    simpl.
     iApply wp_assign; first by apply typeof_int32.
     iSplitL "Hy"; first eauto.
-    iIntros "Hy".
+    iIntros "!>Hy".
     iApply wp_seq.
-    iApply (wp_bind _ (EKid, SKassignl _)).
+    wp_bind (Ederef _).
     iApply wp_load. iFrame "Hy". iIntros "Hy".
-    simpl.
     iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hx"; first eauto. iIntros "Hx".
+    iSplitL "Hx"; first eauto. iIntros "!> Hx".
     iApply wp_seq. iApply sti_spec.
     iFrame. iFrame "#".
     iSplitL "Hss' Hy".
     { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp".
-    iApply (wp_bind _ (EKid, SKrete)).
+    wp_bind (Ederef _).
     iApply wp_load.
     iFrame "Hx". iIntros "Hx".
-    simpl.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
     iApply ("HΦret" with "[Hsc']")=>//.

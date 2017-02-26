@@ -4,6 +4,7 @@
 
 # coq
 *.vo
+*.vio
 *.glob
 *.d
 .deps

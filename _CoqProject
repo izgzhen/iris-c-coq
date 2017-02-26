@@ -4,6 +4,7 @@ theories/clang/lib/Coqlib.v
 theories/clang/memory.v
 theories/clang/lang.v
 theories/clang/logic.v
+theories/clang/tactics.v
 theories/os/spec.v
 theories/os/interrupt.v
 theories/os/reentrant.v

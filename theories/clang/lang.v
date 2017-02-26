@@ -238,6 +238,8 @@ Definition fill_stmts (e : expr) (Ks : stmtsctx) : stmts :=
 Definition fill_ctx (e: expr) (K: context) : stmts :=
   match K with (ke, ks) => fill_stmts (fill_expr e ke) ks end.
 
+Definition fill_ectxs := foldl fill_expr.
+
 Definition mem := gmap block (list byteval).
 
 Definition state := mem.
@@ -280,13 +282,13 @@ Inductive sstep : stmts → state → stmts → state → Prop :=
 (* | SKwhile (s: stmts). *)
 .
 
-Definition to_val (e: expr) :=
-  match e with
-    | Evalue v => Some v
+Definition to_val (cur: cureval) :=
+  match cur with
+    | cure (Evalue v) => Some v
     | _ => None
   end.
 
-Definition of_val (v: val) := Evalue v.
+Definition of_val (v: val) := cure (Evalue v).
 
 Inductive cstep: cureval → state → cureval → state → Prop :=
 | CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
