@@ -1,6 +1,7 @@
 -R theories iris_os
 theories/lib/Integers.v
 theories/lib/Coqlib.v
+theories/lib/gmap_solve.v
 theories/clang/memory.v
 theories/clang/lang.v
 theories/clang/logic.v

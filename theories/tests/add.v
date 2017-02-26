@@ -2,6 +2,7 @@ From iris_os.clang Require Import logic tactics.
 From iris.base_logic Require Import big_op.
 From iris_os.os Require Import spec interrupt.
 From iris.proofmode Require Import tactics.
+Require Import lib.gmap_solve.
 Set Default Proof Using "Type".
 
 Section example.
@@ -41,6 +42,9 @@ Section example.
 
   Definition int_ctx := @int_ctx _ _ invs i.
 
+
+
+
   Lemma f_spec γ γp px vx Φ Φret:
     int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     px ↦ Vint32 vx @ Tint32 ∗ scode (SCrel (f_rel vx)) ∗
@@ -60,11 +64,8 @@ Section example.
       as "(Hspec & Hss' & Hsc')".
     { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
       iFrame "Hsc". 
-      iPureIntro.
-      apply spec_step_rel. unfold f_rel.
-      exists vy. split; first by simplify_map_eq.
-      split=>//. by rewrite insert_singleton.
-    }
+      iPureIntro. apply spec_step_rel. unfold f_rel.
+      exists vy. gmap_solve. }
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     iApply wp_seq.
     rewrite /example.y.
