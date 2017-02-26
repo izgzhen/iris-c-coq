@@ -212,12 +212,12 @@ Section rules.
 
   Fixpoint substs (m: list (ident * (type * addr))) (s: stmts) : stmts :=
     match m with
-      | (i, (_, l))::m => substs m (subst_s i (Evalue (Vptr l)) s)
+      | (i, (_, l))::m => substs m (subst_s i (Ederef (Evalue (Vptr l))) s)
       | [] => s
     end.
 
   Definition resolve_rhs (e: env) (s: stmts) : stmts :=
-    substs (gmap_to_list e) s.
+    substs (map_to_list e) s.
 
   Fixpoint resolve_lhs_e (ev: env) (e: expr) : option addr :=
     match e with
@@ -234,6 +234,7 @@ Section rules.
            | _, _ => None
          end)
       | Ecast e' _ => resolve_lhs_e ev e' (* XXX *)
+      | Evalue (Vptr l) => Some l
       | _ => None
     end.
   
