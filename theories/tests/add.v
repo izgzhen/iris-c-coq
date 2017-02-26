@@ -83,7 +83,7 @@ Section example.
     wp_load.
     iApply wp_ret.
     iSpecialize ("HΦret" $! (Vint32 (Int.add vy vx)) with "Hx").
-    iApply ("HΦret" with "[Hsc']")=>//.
+    iApply ("HΦret"  with "[Hsc']")=>//.
     by rewrite Int.add_commut.
   Qed.
   
