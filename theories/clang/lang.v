@@ -205,7 +205,7 @@ Inductive stmts :=
 | Sprim (p: prim)
 | Sassign (lhs: expr) (rhs: expr)
 | Sif (cond: expr) (s1 s2: stmts)
-| Swhile (cond: expr) (s: stmts)
+| Swhile (cond: expr) (curcond: expr) (s: stmts)
 | Sret
 | Srete (e: expr)
 | Scall (fid: ident) (args: list expr)
@@ -238,7 +238,7 @@ Inductive stmtsctx :=
 | SKassignr (rhs: expr)
 | SKassignl (lhs: addr)
 | SKif (s1 s2: stmts)
-| SKwhile (s: stmts)
+| SKwhile (cond: expr) (s: stmts)
 | SKrete
 | SKcall (fid: ident) (vargs: list val) (args: list expr).
 (* | SKcaller (fid: ident) (args: list expr) *)
@@ -304,7 +304,7 @@ Definition fill_stmts (e : expr) (Ks : stmtsctx) : stmts :=
     | SKassignr rhs => Sassign e rhs
     | SKassignl lhs => Sassign (Evalue (Vptr lhs)) e
     | SKif s1 s2 => Sif e s1 s2
-    | SKwhile s => Swhile e s
+    | SKwhile c s => Swhile c e s
     | SKcall f vargs args => Scall f (map Evalue vargs ++ e :: args)
     | SKrete => Srete e
   end.
@@ -382,5 +382,3 @@ Definition of_val (v: val) := Evalue v.
 Inductive cstep: cureval → state → cureval → state → Prop :=
 | CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
 | CSsstep: ∀ s s' σ σ', sstep s σ s' σ' → cstep (curs s) σ (curs s') σ'.
-
-

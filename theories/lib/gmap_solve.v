@@ -7,6 +7,5 @@ Ltac gmap_solve :=
   | |- ?H1 ∧ ?H2 => split=>//; gmap_solve
   | |- _ =>
     try (rewrite insert_singleton);
-    try (simplify_map_eq);
-    eauto
+    try (simplify_map_eq)
 end.

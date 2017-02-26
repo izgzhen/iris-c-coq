@@ -1,7 +1,6 @@
 From iris_os.clang Require Import logic tactics notations.
 From iris.base_logic Require Import big_op.
 From iris_os.os Require Import spec interrupt.
-From iris.proofmode Require Import tactics.
 Require Import lib.gmap_solve.
 Set Default Proof Using "Type".
 

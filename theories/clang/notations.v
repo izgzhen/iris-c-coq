@@ -35,8 +35,8 @@ Notation "e 'as' t" := (Ecast e%E t)
 Notation "e1 <- e2" := (Sassign e1%E e2%E) (at level 80) : stmts_scope.
 Notation "'if' ( e ) { s1 } 'else' { s2 }" := (Sif e%E s1%S s2%S)
   (at level 200, e, s1, s2 at level 200) : stmts_scope.
-Notation "'while' ( e ) <{ s }>" := (Swhile e%E s%S)
-  (at level 200, e, s at level 200) : stmts_scope.
+Notation "'while' [ c ] ( e ) <{ s }>" := (Swhile c%E e%E s%S)
+  (at level 200, c, e, s at level 200) : stmts_scope.
 Notation "s1 ;; s2" := (Sseq s1%S s2%S)
   (at level 100, s2 at level 200, format "s1  ;;  s2") : stmts_scope.
 Notation "'ret'" := Sret (at level 80): stmts_scope.

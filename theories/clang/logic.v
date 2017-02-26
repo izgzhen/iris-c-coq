@@ -4,7 +4,7 @@ Require Export lang.
 From iris.base_logic Require Import gen_heap big_op.
 From iris.algebra Require Export gmap agree auth.
 From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
@@ -173,6 +173,16 @@ Section rules.
     Φret v ⊢ WP curs (Srete (Evalue v)) @ E {{ Φ; Φret }}.
   Admitted.
 
+  Lemma wp_while_true E cond s Φ Φret:
+    ▷ WP curs (Sseq s (Swhile cond cond s)) {{ Φ; Φret }}
+    ⊢ WP curs (Swhile cond (Evalue vtrue) s) @ E {{ Φ; Φret }}.
+  Admitted.
+
+  Lemma wp_while_false E cond s Φ Φret:
+    ▷ Φ Vvoid
+    ⊢ WP curs (Swhile cond (Evalue vfalse) s) @ E {{ Φ; Φret }}.
+  Admitted.
+  
   Fixpoint params_match (params: decls) (vs: list val) :=
     match params, vs with
       | (_, t)::params, v::vs => typeof t v ∧ params_match params vs
@@ -203,7 +213,7 @@ Section rules.
       | Sprim p => Sprim p
       | Sassign e1 e2 => Sassign e1 (subst_e x es e2)
       | Sif e s1 s2 => Sif (subst_e x es e) (subst_s x es s1) (subst_s x es s2)
-      | Swhile e s => Swhile (subst_e x es e) (subst_s x es s)
+      | Swhile c e s => Swhile (subst_e x es c) (subst_e x es e) (subst_s x es s)
       | Srete e => Srete (subst_e x es e)
       | Sret => Sret
       | Scall f args => Scall f (map (subst_e x es) args)
@@ -231,6 +241,7 @@ Section rules.
       | Esnd e' =>
         (match type_infer ev e', resolve_lhs_e ev e' with
            | Some (Tprod t1 _), Some (b, o) => Some (b, o + sizeof t1)%nat
+           | Some (Tmu _ (Tprod t1 _)), Some (b, o) => Some (b, o + sizeof t1)%nat
            | _, _ => None
          end)
       | Ecast e' _ => resolve_lhs_e ev e' (* XXX *)
@@ -246,7 +257,7 @@ Section rules.
           | Some s1', Some s2' => Some (Sif ex s1' s2')
           | _, _ => None
         end
-      | Swhile ex s => Swhile ex <$> resolve_lhs e s
+      | Swhile c ex s => Swhile c ex <$> resolve_lhs e s
       | Sseq s1 s2 =>
         match resolve_lhs e s1, resolve_lhs e s2 with
           | Some s1', Some s2' => Some (Sseq s1' s2')

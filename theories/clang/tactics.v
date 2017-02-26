@@ -5,7 +5,9 @@ Import uPred.
 
 Ltac solve_typeof :=
   match goal with
-  | |- typeof _ (Vint32 _) => apply typeof_int32
+    | |- typeof _ (Vint32 _) => apply typeof_int32
+    | |- typeof _ (Vint8 _) => apply typeof_int8
+    | |- typeof _ Vnull => apply typeof_null
   end.
 
 Ltac wp_done :=
@@ -48,6 +50,8 @@ Ltac reshape_stmts s tac :=
       reshape_expr e ltac:(fun Kes e' => tac Kes (SKassignl l) e')
     | Srete ?e =>
       reshape_expr e ltac:(fun Kes e' => tac Kes SKrete e')
+    | Swhile ?c ?e ?s =>
+      reshape_expr e ltac:(fun Kes e' => tac Kes (SKwhile c s) e')
   end.
 
 (* Ltac reshape_cur cur tac := *)
