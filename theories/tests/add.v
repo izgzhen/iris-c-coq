@@ -3,7 +3,6 @@ From iris.base_logic Require Import big_op.
 From iris_os.os Require Import spec interrupt.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
-Import uPred.
 
 Section example.
   Context `{clangG Σ, specG Σ} {N: namespace}.
@@ -75,14 +74,11 @@ Section example.
     iApply wp_load. iFrame "Hx". iIntros "Hx".
     wp_bind (Ebinop _ _ _).
     iApply wp_op=>//.
-    iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hy"; first eauto.
-    iIntros "!>Hy".
+    wp_assign.
     iApply wp_seq.
     wp_bind (Ederef _).
     iApply wp_load. iFrame "Hy". iIntros "Hy".
-    iApply wp_assign; first by apply typeof_int32.
-    iSplitL "Hx"; first eauto. iIntros "!> Hx".
+    wp_assign.
     iApply wp_seq. iApply sti_spec.
     iFrame. iFrame "#".
     iSplitL "Hss' Hy".
@@ -112,7 +108,7 @@ Section example.
     - simpl. destruct (decide (x = x))=>//.
       iDestruct "Hls" as "[Hx _]".
       iApply f_spec. iFrame "#". iFrame.
-      iIntros (v) "_ Hsc Hp". (* XXX: free *)
+      iIntros (v) "_ Hsc Hp".
       iApply ("HΦ" with "[Hsc]")=>//.
     - inversion H1.
   Qed.

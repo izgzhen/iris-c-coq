@@ -3,6 +3,17 @@ From iris.proofmode Require Import coq_tactics tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
+Ltac solve_typeof :=
+  match goal with
+  | |- typeof _ (Vint32 _) => apply typeof_int32
+  end.
+
+Ltac wp_done :=
+  match goal with
+  | |- typeof _ _ => solve_typeof
+  | _ => fast_done
+  end.
+
 (** The tactic [reshape_expr e tac] decomposes the expression [e] into an
 evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']
 for each possible decomposition until [tac] succeeds. *)
@@ -78,45 +89,37 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
   end.
 
 
-(* Section heap. *)
-(* Context `{clangG Σ}. *)
+Section heap.
+Context `{clangG Σ}.
 
-(* Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ Φret: *)
-(*   typeof t' v' → *)
-(*   IntoLaterNEnvs 1 Δ Δ' → *)
-(*   envs_lookup i Δ' = Some (false, l ↦ v @ t)%I → *)
-(*   envs_simple_replace i false (Esnoc Enil i (l ↦ v' @ t')) Δ' = Some Δ'' → *)
-(*   (Δ'' ⊢ Φ Vvoid) → *)
-(*   Δ ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}. *)
-(* Proof. *)
-(*   intros. eapply wand_apply. *)
-(*   { iIntros "HP HQ". iApply wp_assign; first done. *)
-(*     iSplitL "HP"; eauto. } *)
-(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
-(*   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//. *)
-(* Qed. *)
+Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ Φret:
+  typeof t' v' →
+  IntoLaterNEnvs 1 Δ Δ' →
+  envs_lookup i Δ' = Some (false, l ↦ v @ t)%I →
+  envs_simple_replace i false (Esnoc Enil i (l ↦ v' @ t')) Δ' = Some Δ'' →
+  (Δ'' ⊢ Φ Vvoid) →
+  Δ ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
+Proof.
+  intros. eapply wand_apply.
+  { iIntros "HP HQ". iApply wp_assign; first done.
+    iSplitL "HP"; eauto. }
+  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
+  rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
+Qed.
 
+End heap.
 
-(* Tactic Notation "wp_assign" := *)
-(*   iStartProof; *)
-(*   lazymatch goal with *)
-(*   | |- _ ⊢ wp ?E ?cur ?Q ?P => *)
-(*     first *)
-(*       [reshape_expr cur ltac:(fun K cur' => *)
-(*          match eval hnf in cur' with (curs (Sassign _ _)) => wp_bind_core K end) *)
-(*       |fail 1 "wp_assign: cannot find 'Sassign' in" cur]; *)
-(*     eapply tac_wp_assign; *)
-(*       [let cur' := match goal with |- to_val ?cur' = _ => cur' end in *)
-(*        auto (* wp_done *) || fail "wp_assign:" cur' "not a value" *)
-(*       |apply _ *)
-(*       |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in *)
-(*        iAssumptionCore || fail "wp_assign: cannot find" l "↦ ? @ ?" *)
-(*       |env_cbv; reflexivity *)
-(*       | auto (* wp_finish *)] *)
-(*   | _ => fail "wp_assign: not a 'wp'" *)
-(*   end. *)
-
-
-(* End heap. *)
-
-
+Tactic Notation "wp_assign" :=
+  iStartProof;
+  lazymatch goal with
+  | |- _ ⊢ wp ?E (curs (Sassign ?e _)) ?P ?Q =>
+    eapply tac_wp_assign;
+      [let v := match goal with |- typeof ?t ?v => v end in
+       wp_done || fail "wp_store:" v "doesn't type check"
+      |apply _
+      |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
+       iAssumptionCore || fail "wp_assign: cannot find" l "↦ ? @ ?"
+      |env_cbv; reflexivity
+      | auto (* wp_finish *)]
+  | _ => fail "wp_assign: not a 'wp'"
+  end.
