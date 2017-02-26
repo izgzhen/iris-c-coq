@@ -151,3 +151,13 @@ Tactic Notation "wp_load" :=
       |(* wp_finish *) auto]
   | _ => fail "wp_load: not a 'wp'"
   end.
+
+Tactic Notation "wp_op" :=
+  iStartProof;
+  lazymatch goal with
+  | |- _ ⊢ wp ?E (curs ?s) ?P ?Q => reshape_stmts s ltac:(fun Kes Ks e' =>
+    lazymatch eval hnf in e' with
+    | Ebinop _ _ _ => wp_bind_core Kes Ks; iApply wp_op=>//
+    end) || fail "wp_op: cannot find Ebinop in" s
+  | _ => fail "wp_op: not a 'wp'"
+end.

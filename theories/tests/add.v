@@ -70,8 +70,7 @@ Section example.
     rewrite /example.y.
     wp_load.
     wp_load.
-    wp_bind (Ebinop _ _ _).
-    iApply wp_op=>//.
+    wp_op.
     wp_assign.
     iApply wp_seq.
     wp_load.
