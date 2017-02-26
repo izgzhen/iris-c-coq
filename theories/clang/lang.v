@@ -5,6 +5,18 @@ Require Export memory.
 Require Export lib.Integers.
 Open Scope Z_scope.
 
+Definition ident := Z.
+
+Inductive type : Set :=
+| Tvar (x: ident)
+| Tnull
+| Tvoid
+| Tint8
+| Tint32
+| Tptr (t: type)
+| Tprod (t1 t2: type)
+| Tmu (tx: ident) (t: type). (* recursive type -- we might need to prove something about it *)
+
 (* High-level value *)
 Inductive val : Set :=
 | Vvoid
@@ -25,18 +37,6 @@ Proof. solve_decision. Defined.
 
 Definition vtrue := Vint8 (Byte.repr 1).
 Definition vfalse := Vint8 (Byte.repr 0).
-
-Definition ident := Z.
-
-Inductive type : Set :=
-| Tvar (x: ident)
-| Tnull
-| Tvoid
-| Tint8
-| Tint32
-| Tptr (t: type)
-| Tprod (t1 t2: type)
-| Tmu (tx: ident) (t: type). (* recursive type -- we might need to prove something about it *)
 
 Fixpoint sizeof (t : type) : nat :=
   match t with
@@ -249,6 +249,42 @@ Definition context : Type := (exprctx * stmtsctx).
 Inductive cureval :=
 | curs (s: stmts) | cure (e: expr).
 
+Definition env : Type := gmap ident (type * addr).
+
+Fixpoint type_infer_v (v: val) : type :=
+  match v with
+    | Vnull => Tnull
+    | Vvoid => Tvoid
+    | Vint8 _ => Tint8
+    | Vint32 _ => Tint32
+    | Vptr _ => Tptr Tvoid (* XXX *)
+    | Vpair v1 v2 => Tprod (type_infer_v v1) (type_infer_v v2)
+  end.
+
+Fixpoint type_infer (ev: env) (e: expr) : option type :=
+  match e with
+    | Evalue v => Some (type_infer_v v)
+    | Evar x => p ← ev !! x; Some (p.1)
+    | Ebinop _ e1 _ => type_infer ev e1 (* FIXME *)
+    | Ederef e' =>
+      (match type_infer ev e' with
+         | Some (Tptr t) => Some t
+         | _ => None
+       end)
+    | Eaddrof e' => Tptr <$> type_infer ev e'
+    | Efst e' =>
+      (match type_infer ev e' with
+         | Some (Tprod t1 _) => Some t1
+         | _ => None
+       end)
+    | Esnd e' =>
+      (match type_infer ev e' with
+         | Some (Tprod _ t2) => Some t2
+         | _ => None
+       end)
+    | Ecast _ t => Some t (* FIXME *)
+  end.
+
 Definition code : Type := (cureval * context * list context).
 
 Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
@@ -346,3 +382,5 @@ Definition of_val (v: val) := Evalue v.
 Inductive cstep: cureval → state → cureval → state → Prop :=
 | CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
 | CSsstep: ∀ s s' σ σ', sstep s σ s' σ' → cstep (curs s) σ (curs s') σ'.
+
+

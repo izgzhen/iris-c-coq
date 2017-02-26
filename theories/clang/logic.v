@@ -197,35 +197,81 @@ Section rules.
       | _ => e
     end.
   
-  Fixpoint subst_s (x: ident) (l: addr) (s: stmts) : stmts :=
+  Fixpoint subst_s (x: ident) (es: expr) (s: stmts) : stmts :=
     match s with
       | Sskip => Sskip
       | Sprim p => Sprim p
-      | Sassign e1 e2 => Sassign (subst_e x (Evalue (Vptr l)) e1)
-                                 (subst_e x (Ederef (Evalue (Vptr l))) e2)
-      | Sif e s1 s2 => Sif (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s1) (subst_s x l s2)
-      | Swhile e s => Swhile (subst_e x (Ederef (Evalue (Vptr l))) e) (subst_s x l s)
-      | Srete e => Srete (subst_e x (Ederef (Evalue (Vptr l))) e)
+      | Sassign e1 e2 => Sassign e1 (subst_e x es e2)
+      | Sif e s1 s2 => Sif (subst_e x es e) (subst_s x es s1) (subst_s x es s2)
+      | Swhile e s => Swhile (subst_e x es e) (subst_s x es s)
+      | Srete e => Srete (subst_e x es e)
       | Sret => Sret
-      | Scall f es => Scall f (map (subst_e x (Ederef (Evalue (Vptr l)))) es)
-      | Sseq s1 s2 => Sseq (subst_s x l s1) (subst_s x l s2)
+      | Scall f args => Scall f (map (subst_e x es) args)
+      | Sseq s1 s2 => Sseq (subst_s x es s1) (subst_s x es s2)
     end.
 
-  Fixpoint substs (m: list (ident * addr)) (s: stmts) : stmts :=
+  Fixpoint substs (m: list (ident * (type * addr))) (s: stmts) : stmts :=
     match m with
-      | (i, l)::m => substs m (subst_s i l s)
+      | (i, (_, l))::m => substs m (subst_s i (Evalue (Vptr l)) s)
       | [] => s
     end.
 
-  Lemma wp_call (p: program) es vs params f_body f retty Φ Φret: 
+  Definition resolve_rhs (e: env) (s: stmts) : stmts :=
+    substs (gmap_to_list e) s.
+
+  Fixpoint resolve_lhs_e (ev: env) (e: expr) : option addr :=
+    match e with
+      | Evar x =>
+        (match ev !! x with
+           | Some (_, l) => Some l
+           | None => None
+         end)
+      | Ederef e' => resolve_lhs_e ev e' (* XXX *)
+      | Efst e' => resolve_lhs_e ev e'
+      | Esnd e' =>
+        (match type_infer ev e', resolve_lhs_e ev e' with
+           | Some (Tprod t1 _), Some (b, o) => Some (b, o + sizeof t1)%nat
+           | _, _ => None
+         end)
+      | Ecast e' _ => resolve_lhs_e ev e' (* XXX *)
+      | _ => None
+    end.
+  
+  Fixpoint resolve_lhs (e: env) (s: stmts) : option stmts :=
+    match s with
+      | Sassign e1 e2 => l ← resolve_lhs_e e e1; Some (Sassign (Evalue (Vptr l)) e2)
+      | Sif ex s1 s2 =>
+        match resolve_lhs e s1, resolve_lhs e s2 with
+          | Some s1', Some s2' => Some (Sif ex s1' s2')
+          | _, _ => None
+        end
+      | Swhile ex s => Swhile ex <$> resolve_lhs e s
+      | Sseq s1 s2 =>
+        match resolve_lhs e s1, resolve_lhs e s2 with
+          | Some s1', Some s2' => Some (Sseq s1' s2')
+          | _, _ => None
+        end
+      | _ => Some s
+    end.
+
+  Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
+    match params, ls with
+      | (x, t)::ps, l::ls' => add_params_to_env (<[ x := (t, l) ]> e) ps ls'
+      | _, _ => e
+    end.
+
+  Definition instantiate_f_body (ev: env) (s: stmts) : option stmts :=
+    resolve_lhs ev (resolve_rhs ev s).
+  
+  Lemma wp_call (p: program) es vs params f_body f retty Φ Φret:
     p f = Some (retty, params, f_body) →
     es = map Evalue vs →
     params_match params vs →
-    (∀ ls,
-       ⌜ length ls = length vs ⌝ -∗
+    (∀ ls f_body',
+       ⌜ length ls = length vs ∧
+         instantiate_f_body (add_params_to_env ∅ params ls) f_body = Some f_body' ⌝ -∗
        alloc_params (zip ls (params.*2)) vs -∗
-       WP curs (substs (zip (params.*1) ls) f_body)
-          {{ _, True; Φ }})
+       WP curs f_body' {{ _, True; Φ }})
     ⊢ WP curs (Scall f es) {{ Φ; Φret }}.
   Admitted.
 
