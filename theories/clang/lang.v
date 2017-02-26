@@ -29,6 +29,7 @@ Definition vfalse := Vint8 (Byte.repr 0).
 Definition ident := Z.
 
 Inductive type : Set :=
+| Tvar (x: ident)
 | Tnull
 | Tvoid
 | Tint8
@@ -46,6 +47,7 @@ Fixpoint sizeof (t : type) : nat :=
     | Tptr _ => 4 % nat
     | Tprod t1 t2 => sizeof t1 + sizeof t2
     | Tmu _ t => sizeof t
+    | Tvar _ => 0 % nat (* XXX: while it should be prohibited ... *)
   end.
 
 Inductive typeof : type → val → Prop :=

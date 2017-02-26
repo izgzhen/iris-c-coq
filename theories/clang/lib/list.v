@@ -15,10 +15,18 @@ Section proof.
 
   Parameter y t: addr.
 
-  (* Definition rev_list (x: val) : stmts := *)
-  (*   y <- null ;; *)
-  (*   while (x != null) { *)
-  (*      t = !x *)
-  (*   } *)
-End proof.
+  (* de brujin with autosubst? *)
+  Definition tcell (telem: type): type := Tmu 0 (Tprod telem (Tptr (Tvar 0))).
+  Definition tlist (telem: type): type := Tptr (tcell telem).
+  
+  Definition rev_list (x: val) (telem: type) : stmts :=
+    y <- null ;;
+    while ( x != null ) {{
+      t <- snd (!x) ;;
+      snd (!x) <- y ;;
+      y <- x ;;
+      x <- t
+    }};;
+    x <- y.
 
+End proof.
