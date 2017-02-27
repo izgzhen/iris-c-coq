@@ -42,7 +42,7 @@ Section proof.
   Lemma rev_spec Φ Φret body xs:
     ∀ lx ly ys,
     instantiate_f_body {[ x := (tlist Tint32, px) ]} (rev_list Tint32) = Some body →
-    isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - ∗
+    isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ (∃ v, pt ↦ v @ tlist Tint32) ∗
     px ↦ lx @ tlist Tint32 ∗ py ↦ ly @ tlist Tint32 ∗
     (∀ ly', py ↦ ly' @ tlist Tint32 ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
     ⊢ WP curs body {{ Φ; Φret }}.
@@ -69,7 +69,7 @@ Section proof.
       iApply wp_load. iFrame. iIntros "!> Hbo".
       simpl. wp_load. wp_bind (Esnd _).
       iApply wp_snd. iNext. iApply wp_value.
-      iDestruct "Ht" as (??) "Ht".
+      iDestruct "Ht" as (?) "Ht".
       wp_assign. repeat (iApply wp_seq).
       iApply (wp_bind [EKbinopr _ _] (SKassignr _)).
       iApply wp_load. iFrame. iIntros "!> ?".

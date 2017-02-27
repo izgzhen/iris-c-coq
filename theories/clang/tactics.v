@@ -98,11 +98,11 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 Section heap.
 Context `{clangG Σ}.
 
-Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ Φret:
-  typeof t' v' →
+Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t: type) Φ Φret:
+  typeof t v' →
   IntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, l ↦ v @ t)%I →
-  envs_simple_replace i false (Esnoc Enil i (l ↦ v' @ t')) Δ' = Some Δ'' →
+  envs_simple_replace i false (Esnoc Enil i (l ↦ v' @ t)) Δ' = Some Δ'' →
   (Δ'' ⊢ Φ Vvoid) →
   Δ ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
 Proof.

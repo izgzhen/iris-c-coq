@@ -64,7 +64,7 @@ Section example.
       { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
         iFrame "Hsc". 
         iPureIntro. apply spec_step_rel. unfold f_rel.
-        exists vy. gmap_solve. }
+        exists vy. gmap_solve=>//. }
       (* close invariant *)
       iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
       wp_run. iApply sti_spec.
