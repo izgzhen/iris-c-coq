@@ -29,8 +29,8 @@ Ltac reshape_expr e tac :=
   (* | If ?e0 ?e1 ?e2 => go (IfCtx e1 e2 :: K) e0 *)
   (* | Pair ?e1 ?e2 => reshape_val e1 ltac:(fun v1 => go (PairRCtx v1 :: K) e2) *)
   (* | Pair ?e1 ?e2 => go (PairLCtx e2 :: K) e1 *)
-  (* | Fst ?e => go (FstCtx :: K) e *)
-  (* | Snd ?e => go (SndCtx :: K) e *)
+  | Efst ?e => go (EKfst :: K) e
+  | Esnd ?e => go (EKsnd :: K) e
   (* | InjL ?e => go (InjLCtx :: K) e *)
   (* | InjR ?e => go (InjRCtx :: K) e *)
   (* | Case ?e0 ?e1 ?e2 => go (CaseCtx e1 e2 :: K) e0 *)
@@ -53,12 +53,6 @@ Ltac reshape_stmts s tac :=
     | Swhile ?c ?e ?s =>
       reshape_expr e ltac:(fun Kes e' => tac Kes (SKwhile c s) e')
   end.
-
-(* Ltac reshape_cur cur tac := *)
-(*   match cur with *)
-(*     | cure ?e => reshape_expr e ltac:(fun K e' => tac K (cure e')) *)
-(*     | curs ?s => reshape_stmts s tac *)
-  (* end. *)
 
 Ltac wp_bind_e_core K :=
   lazymatch eval hnf in K with

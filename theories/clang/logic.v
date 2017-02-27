@@ -154,11 +154,23 @@ Section rules.
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
   Admitted.
 
+  Lemma wp_assign_offset E b o off v1 v2 v2' t1 t2 t2'  Φ Φret:
+    typeof t2' v2' → sizeof t1 = off →
+    ▷ (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2 ∗
+    ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2' -∗ Φ Vvoid)
+    ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
+  Admitted.
+  
   Lemma wp_seq E s1 s2 Φ Φret:
     WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}
     ⊢ WP curs (Sseq s1 s2) @ E {{ Φ ; Φret }}.
   Admitted.
 
+  Lemma wp_unseq E s1 s2 Φ Φret:
+    WP curs (Sseq s1 s2) @ E {{ Φ ; Φret }}
+    ⊢ WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}.
+  Admitted.
+  
   Lemma wp_load E Φ p v t q Φret:
     ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP cure (Ederef (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
@@ -182,6 +194,17 @@ Section rules.
     ▷ Φ Vvoid
     ⊢ WP curs (Swhile cond (Evalue vfalse) s) @ E {{ Φ; Φret }}.
   Admitted.
+
+  Lemma wp_fst v1 v2 Φ Φret:
+    ▷ WP cure (Evalue v1) {{ Φ; Φret }}
+    ⊢ WP cure (Efst (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
+  Admitted.
+
+  Lemma wp_snd v1 v2 Φ Φret:
+    ▷ WP cure (Evalue v2) {{ Φ; Φret }}
+    ⊢ WP cure (Esnd (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
+  Admitted.
+
   
   Fixpoint params_match (params: decls) (vs: list val) :=
     match params, vs with
@@ -204,6 +227,8 @@ Section rules.
       | Ederef e => Ederef (subst_e x es e)
       | Eaddrof e => Eaddrof (subst_e x es e)
       | Ecast e t => Ecast (subst_e x es e) t
+      | Efst e => Efst (subst_e x es e)
+      | Esnd e => Esnd (subst_e x es e)
       | _ => e
     end.
   
@@ -229,29 +254,31 @@ Section rules.
   Definition resolve_rhs (e: env) (s: stmts) : stmts :=
     substs (map_to_list e) s.
 
-  Fixpoint resolve_lhs_e (ev: env) (e: expr) : option addr :=
+  Fixpoint resolve_lhs_e (ev: env) (e: expr) : option expr :=
     match e with
       | Evar x =>
         (match ev !! x with
-           | Some (_, l) => Some l
+           | Some (_, l) => Some (Evalue (Vptr l))
            | None => None
          end)
-      | Ederef e' => resolve_lhs_e ev e' (* XXX *)
+      | Ederef e' => Ederef <$> resolve_lhs_e ev e'
       | Efst e' => resolve_lhs_e ev e'
       | Esnd e' =>
         (match type_infer ev e', resolve_lhs_e ev e' with
-           | Some (Tprod t1 _), Some (b, o) => Some (b, o + sizeof t1)%nat
-           | Some (Tmu _ (Tprod t1 _)), Some (b, o) => Some (b, o + sizeof t1)%nat
+           | Some (Tprod t1 _), Some e'' =>
+             Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
+           | Some (Tmu _ (Tprod t1 _)), Some e'' =>
+             Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
            | _, _ => None
          end)
       | Ecast e' _ => resolve_lhs_e ev e' (* XXX *)
-      | Evalue (Vptr l) => Some l
+      | Evalue (Vptr l) => Some e
       | _ => None
     end.
   
   Fixpoint resolve_lhs (e: env) (s: stmts) : option stmts :=
     match s with
-      | Sassign e1 e2 => l ← resolve_lhs_e e e1; Some (Sassign (Evalue (Vptr l)) e2)
+      | Sassign e1 e2 => e'' ← resolve_lhs_e e e1; Some (Sassign e'' e2)
       | Sif ex s1 s2 =>
         match resolve_lhs e s1, resolve_lhs e s2 with
           | Some s1', Some s2' => Some (Sif ex s1' s2')

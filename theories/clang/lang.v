@@ -318,12 +318,19 @@ Definition mem := gmap block (list byteval).
 
 Definition state := mem.
 
+Definition offset_by_int32 (o: nat) (i: int32) : nat := o + Z.to_nat (Int.intval i).
+Definition offset_by_byte (o: nat) (i: byte) : nat := o + Z.to_nat (Byte.intval i).
+
 (* XXX: not precise *)
 Definition evalbop (op: bop) v1 v2 : option val :=
   match op with
     | oplus => (match v1, v2 with
                   | Vint8 i1, Vint8 i2 => Some (Vint8 (Byte.add i1 i2))
                   | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.add i1 i2))
+                  | Vint8 i, Vptr (b, o) => Some (Vptr (b, offset_by_byte o i))
+                  | Vint32 i, Vptr (b, o) => Some (Vptr (b, offset_by_int32 o i))
+                  | Vptr (b, o), Vint8 i => Some (Vptr (b, offset_by_byte o i))
+                  | Vptr (b, o), Vint32 i => Some (Vptr (b, offset_by_int32 o i))
                   | _, _ => None
                 end)
     | ominus => (match v1, v2 with
