@@ -7,7 +7,7 @@ Section proof.
   Context `{clangG Σ}.
 
   (* de brujin with autosubst? *)
-  Definition tcell (telem: type): type := Tmu 0 (Tprod telem (Tptr (Tvar 0))).
+  Definition tcell (telem: type): type := Tprod telem (Tptr Tvoid).
   Definition tlist (telem: type): type := Tptr (tcell telem).
 
   Fixpoint isList (l: val) (xs: list val) (t: type) :=
@@ -18,6 +18,16 @@ Section proof.
                      p ↦ Vpair x l' @ (Tprod t (Tptr t)) ∗ isList l' xs' t)%I
     end.
 
+  Lemma isList_ptr (l: val) (xs: list val) (t: type) :
+    isList l xs t ⊢ ⌜ typeof (Tptr Tvoid) l ⌝.
+  Proof.
+    destruct xs as [|x xs'].
+    - iIntros "%". iPureIntro. subst. solve_typeof.
+    - simpl. iIntros "H".
+      iDestruct "H" as (??) "(% & ? & _)".
+      destruct H2 as (?&?&?). subst. iPureIntro. solve_typeof.
+  Qed.
+  
   Parameter py pt px: addr.
   Parameter x: ident.
 
@@ -68,14 +78,13 @@ Section proof.
       iApply wp_op=>//. simpl.
       rewrite /offset_by_byte.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
-      wp_load. iApply (wp_assign_offset _ _ _ _ _ _ _ Tint32)=>//.
-      { admit. }
+      wp_load. iDestruct (isList_ptr with "Hlr") as "%".
+      iApply (wp_assign_offset Tint32)=>//.
       iFrame. iIntros "!> ?".
-      wp_load. iApply (wp_assign _ _ _ _ _ (tlist Tint32)).
+      wp_load. iApply (wp_assign (tlist Tint32)).
       apply typeof_ptr.
       iFrame. iIntros "!> ?".
-      wp_load. iApply wp_assign.
-      { admit. }
+      wp_load. iApply wp_assign=>//.
       iFrame. iIntros "!> ?".
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)).
       { rewrite /instantiate_f_body /resolve_rhs map_to_list_singleton.
@@ -83,9 +92,11 @@ Section proof.
         destruct px. gmap_solve. done. }
       iFrame. simpl.
       iSplitL "~1 Hlr".
-      { iExists (pb, po), ly. iFrame. admit. }
+      { iExists (pb, po), ly. iFrame.
+        iPureIntro. repeat (split; first done).
+        by eapply typeof_any_ptr. }
       iSplitL "Ht"; first eauto.
       replace (rev xs' ++ x :: ys) with ((rev xs' ++ [x]) ++ ys); first done; last by rewrite -app_assoc.
-  Admitted.      
+  Qed.
   
 End proof.

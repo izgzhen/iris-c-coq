@@ -7,8 +7,16 @@ Ltac solve_typeof :=
   match goal with
     | |- typeof _ (Vint32 _) => apply typeof_int32
     | |- typeof _ (Vint8 _) => apply typeof_int8
-    | |- typeof _ Vnull => apply typeof_null
+    | |- typeof Tnull Vnull => apply typeof_null
+    | |- typeof _ Vnull => apply typeof_null_ptr
+    | |- typeof (Tptr _) (Vptr _) => apply typeof_ptr
   end.
+
+Lemma typeof_any_ptr (t1 t2: type) (v: val):
+  typeof (Tptr t1) v → typeof (Tptr t2) v.
+Proof.
+  induction v; intros H; try (inversion H); try solve_typeof.
+Qed.
 
 Ltac wp_done :=
   match goal with

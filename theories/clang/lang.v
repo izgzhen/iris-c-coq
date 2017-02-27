@@ -8,14 +8,12 @@ Open Scope Z_scope.
 Definition ident := Z.
 
 Inductive type : Set :=
-| Tvar (x: ident)
 | Tnull
 | Tvoid
 | Tint8
 | Tint32
 | Tptr (t: type)
-| Tprod (t1 t2: type)
-| Tmu (tx: ident) (t: type). (* recursive type -- we might need to prove something about it *)
+| Tprod (t1 t2: type).
 
 (* High-level value *)
 Inductive val : Set :=
@@ -46,20 +44,18 @@ Fixpoint sizeof (t : type) : nat :=
     | Tint32 => 4 % nat
     | Tptr _ => 4 % nat
     | Tprod t1 t2 => sizeof t1 + sizeof t2
-    | Tmu _ t => sizeof t
-    | Tvar _ => 0 % nat (* XXX: while it should be prohibited ... *)
   end.
 
 Inductive typeof : type → val → Prop :=
 | typeof_void: typeof Tvoid Vvoid
 | typeof_null: typeof Tnull Vnull
+| typeof_null_ptr: ∀ t, typeof (Tptr t) Vnull
 | typeof_int8_to_int32:
     ∀ v: int32, (Int.unsigned v) <=? Byte.max_unsigned → typeof Tint8 (Vint32 v)
 | typeof_int8: ∀ i, typeof Tint8 (Vint8 i)
 | typeof_int32: ∀ i, typeof Tint32 (Vint32 i)
 | typeof_ptr: ∀ t l, typeof (Tptr t) (Vptr l)
-| typeof_prod: ∀ t1 t2 v1 v2, typeof t1 v2 → typeof t2 v2 → typeof (Tprod t1 t2) (Vpair v1 v2)
-| typeof_mu: ∀ tx t v, typeof t v → typeof (Tmu tx t) v.
+| typeof_prod: ∀ t1 t2 v1 v2, typeof t1 v2 → typeof t2 v2 → typeof (Tprod t1 t2) (Vpair v1 v2).
 
 Inductive bop:=
 | oplus
@@ -146,7 +142,6 @@ Fixpoint encode_val (t: type) (v: val) : list byteval :=
     | Vnull, Tnull => list_repeat 4 BVnull
     | Vnull, Tptr _ => list_repeat 4 BVnull
     | Vpair v1 v2, Tprod t1 t2 => encode_val t1 v1 ++ encode_val t1 v2
-    | v, Tmu _ t => encode_val t v
     | _, _ => list_repeat (sizeof t) BVundef
   end.
 
@@ -158,7 +153,6 @@ Fixpoint decode_val (t: type) (vl: list byteval) : option val :=
          | Some v1, Some v2 => Some (Vpair v1 v2)
          | _, _ => None
        end)
-    | Tmu _ t => decode_val t vl
     | _ =>
       (match proj_bytes vl with
          | Some bl =>

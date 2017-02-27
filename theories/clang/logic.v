@@ -148,16 +148,16 @@ Section rules.
     ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}.
   Admitted.
   
-  Lemma wp_assign E l v v' t t' Φ Φret:
-    typeof t' v' →
-    ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t' -∗ Φ Vvoid)
+  Lemma wp_assign {E l v v'} t Φ Φret:
+    typeof t v' →
+    ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
   Admitted.
 
-  Lemma wp_assign_offset E b o off v1 v2 v2' t1 t2 t2'  Φ Φret:
-    typeof t2' v2' → sizeof t1 = off →
+  Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 Φ Φret:
+    typeof t2 v2' → sizeof t1 = off →
     ▷ (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2 ∗
-    ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2' -∗ Φ Vvoid)
+    ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2 -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
   Admitted.
   
@@ -266,8 +266,6 @@ Section rules.
       | Esnd e' =>
         (match type_infer ev e', resolve_lhs_e ev e' with
            | Some (Tprod t1 _), Some e'' =>
-             Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
-           | Some (Tmu _ (Tprod t1 _)), Some e'' =>
              Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
            | _, _ => None
          end)
