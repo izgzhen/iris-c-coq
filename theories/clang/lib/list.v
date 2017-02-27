@@ -47,20 +47,16 @@ Section proof.
     (∀ ly', py ↦ ly' @ tlist Tint32 ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
     ⊢ WP curs body {{ Φ; Φret }}.
   Proof.
-    induction xs as [|x xs' IHxs'].
-    - iIntros (????) "(% & Hlr & Ht & Hpx & Hpy & HΦ)".
-      subst. rewrite /instantiate_f_body /resolve_rhs map_to_list_singleton in H0.
-      simpl in H0.
-      destruct (decide (x = x))=>//.
-      destruct px. gmap_solve.
-      wp_load. wp_op. simpl.
+    induction xs as [|x xs' IHxs'];
+    unfold_f_inst;
+    destruct (decide (x = x))=>//;
+    intros ??? [=]; destruct px; subst.
+    - iIntros "(% & Hlr & Ht & Hpx & Hpy & HΦ)".
+      subst. wp_load. wp_op.
       iApply wp_while_false.
       iNext. iApply "HΦ". iFrame.
-    - iIntros (????) "(Hl & Hlr & Ht & Hpx & Hpy & HΦ)".
-      rewrite /instantiate_f_body /resolve_rhs map_to_list_singleton in H0.
-      simpl in H0.
-      destruct (decide (x = x))=>//.
-      destruct px. gmap_solve.
+    - iIntros "(Hl & Hlr & Ht & Hpx & Hpy & HΦ)".
+      destruct (decide (proof.x = proof.x))=>//.
       wp_load. iDestruct "Hl" as (p l') "(% & Hp & Hl')".
       destruct H0 as [? [? ?]]. subst.
       wp_op. iApply wp_while_true.
@@ -87,9 +83,7 @@ Section proof.
       wp_load. iApply wp_assign=>//.
       iFrame. iIntros "!> ?".
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)).
-      { rewrite /instantiate_f_body /resolve_rhs map_to_list_singleton.
-        simpl. destruct (decide (x = x))=>//.
-        destruct px. gmap_solve. done. }
+      { unfold_f_inst. destruct (decide (proof.x = proof.x))=>//. }
       iFrame. simpl.
       iSplitL "~1 Hlr".
       { iExists (pb, po), ly. iFrame.

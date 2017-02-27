@@ -1,5 +1,6 @@
 Require Import clang.logic.
 From iris.proofmode Require Import coq_tactics tactics.
+Require Import lib.gmap_solve.
 Set Default Proof Using "Type".
 Import uPred.
 
@@ -178,3 +179,6 @@ Ltac wp_run :=
    | |- _ => wp_load
    | |- _ => wp_op
   end; wp_run) || idtac.
+
+Ltac unfold_f_inst :=
+  rewrite /instantiate_f_body /resolve_rhs; repeat gmap_rewrite.

@@ -32,7 +32,7 @@ Section example.
               s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
 
   Definition int_ctx := @int_ctx _ _ invs i.
-  
+
   Lemma f_spec (p: program) γ γp f vx Φ Φret:
     p f = Some (Tint32, [(x, Tint32)], f_body) →
     int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
@@ -45,16 +45,13 @@ Section example.
     iIntros (ls) "% Hls".
     destruct ls as [|? [|? ls]].
     - simpl. iDestruct "Hls" as "%"=>//. by iIntros "%".
-    - simpl. rewrite insert_empty.
-      rewrite /instantiate_f_body /resolve_rhs map_to_list_singleton. simpl.
+    - unfold_f_inst. gmap_rewrite.
       destruct (decide (x = x))=>//.
-      gmap_solve. iDestruct "Hls" as "[_ %]".
+      iDestruct "Hls" as "[_ %]".
       inversion H1; subst.
       iIntros "[Hvx _]".
-      wp_run.
-      iApply cli_spec.
-      iFrame "#". iFrame.
-      iIntros "HI Hp Hcl".
+      wp_run. iApply cli_spec.
+      iFrame "#". iFrame.  iIntros "HI Hp Hcl".
       iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
       (* Open invariant *)
       iInv N as ">Hspec" "Hclose".
@@ -64,7 +61,7 @@ Section example.
       { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
         iFrame "Hsc". 
         iPureIntro. apply spec_step_rel. unfold f_rel.
-        exists vy. gmap_solve=>//. }
+        exists vy. gmap_simplify=>//. by gmap_rewrite. }
       (* close invariant *)
       iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
       wp_run. iApply sti_spec.

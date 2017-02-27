@@ -2,7 +2,7 @@
 
 From iris.algebra Require Export gmap.
 Require Export memory.
-Require Export lib.Integers.
+From iris_os.lib Require Export Integers.
 Open Scope Z_scope.
 
 Definition ident := Z.
