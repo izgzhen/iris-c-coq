@@ -63,21 +63,21 @@ Ltac reshape_stmts s tac :=
       reshape_expr e ltac:(fun Kes e' => tac Kes (SKwhile c s) e')
   end.
 
-Ltac wp_bind_e_core K :=
-  lazymatch eval hnf in K with
-  | [] => idtac
-  | _ => etrans; [|fast_by apply (wp_bind_e K)]; simpl
-  end.
+(* Ltac wp_bind_e_core K := *)
+(*   lazymatch eval hnf in K with *)
+(*   | [] => idtac *)
+(*   | _ => etrans; [|fast_by apply (wp_bind_e K)]; simpl *)
+(*   end. *)
 
-Tactic Notation "wp_bind_e" open_constr(efoc) :=
-  iStartProof;
-  lazymatch goal with
-  | |- _ ⊢ wp ?E (cure ?e) ?Q ?P => reshape_expr e ltac:(fun K e' =>
-    match e' with
-    | efoc => unify e' efoc; wp_bind_e_core K
-    end) || fail "wp_bind_e: cannot find" efoc "in" e
-  | _ => fail "wp_bind_e: not a 'wp'"
-  end.
+(* Tactic Notation "wp_bind_e" open_constr(efoc) := *)
+(*   iStartProof; *)
+(*   lazymatch goal with *)
+(*   | |- _ ⊢ wp ?E (cure ?e) ?Q ?P => reshape_expr e ltac:(fun K e' => *)
+(*     match e' with *)
+(*     | efoc => unify e' efoc; wp_bind_e_core K *)
+(*     end) || fail "wp_bind_e: cannot find" efoc "in" e *)
+(*   | _ => fail "wp_bind_e: not a 'wp'" *)
+(*   end. *)
 
 Ltac wp_bind_core Kes Ks :=
   lazymatch eval hnf in Kes with

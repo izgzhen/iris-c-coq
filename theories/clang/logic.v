@@ -160,10 +160,10 @@ Section rules.
       by iApply "IH".
   Qed.
 
-  Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret:
-    WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }}
-    ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}.
-  Admitted.
+  (* NOTE: it looks not very useful ... *)
+  (* Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret: *)
+  (*   WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }} *)
+  (*   ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}. *)
   
   Lemma wp_assign {E l v v'} t Φ Φret:
     typeof t v' →
@@ -213,7 +213,7 @@ Section rules.
   Admitted.
 
   Lemma wp_while_inv I Q Φret cond s:
-    □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP cure cond {{ Φ ; Φret }})) ∗
+    □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP cure cond {{ Φ ; fun _ => True }})) ∗
     □ (∀ Φ, (I ∗ (I -∗ Φ Vvoid)) -∗ WP curs s {{ Φ; Φret }}) ∗ I
     ⊢ WP curs (Swhile cond cond s) {{ Q ; Φret }}.
   Proof.

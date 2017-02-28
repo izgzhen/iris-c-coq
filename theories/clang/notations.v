@@ -4,6 +4,7 @@ Set Default Proof Using "Type".
 Coercion Vint8 : int8 >-> val.
 Coercion Vint32 : int32 >-> val.
 Coercion Vptr : addr >-> val.
+Coercion Evalue : val >-> expr.
 Coercion Evar : ident >-> expr.
 
 Notation "'void'" := Vvoid.
