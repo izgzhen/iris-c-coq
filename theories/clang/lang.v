@@ -380,7 +380,8 @@ Definition to_val (c: cureval) :=
     | _ => None
   end.
 
-Definition of_val (v: val) := cure (Evalue v).
+Lemma of_to_val e v : to_val (cure e) = Some v → e = Evalue v.
+Admitted.
 
 Definition to_ret_val (c: cureval) :=
   match c with
@@ -388,6 +389,12 @@ Definition to_ret_val (c: cureval) :=
     | curs (Srete (Evalue v)) => Some v
     | _ => None
   end.
+
+Lemma fill_not_val Kes Ks e: to_val (curs (fill_stmts (fill_ectxs e Kes) Ks)) = None.
+Admitted.
+
+Lemma fill_not_ret_val Kes Ks e: to_ret_val (curs (fill_stmts (fill_ectxs e Kes) Ks)) = None.
+Admitted.
 
 Lemma val_implies_not_ret_val c v:
   to_val c = Some v → to_ret_val c = None.
@@ -408,3 +415,10 @@ Proof. intros ?. destruct c as [[]|[]]=>//. Qed.
 Inductive cstep: cureval → state → cureval → state → Prop :=
 | CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
 | CSsstep: ∀ s s' σ σ', sstep s σ s' σ' → cstep (curs s) σ (curs s') σ'.
+
+Lemma fill_step_inv σ σ' e c' Kes Ks:
+  to_val (cure e) = None →
+  to_ret_val (cure e) = None →
+  cstep (curs (fill_stmts (fill_ectxs e Kes) Ks)) σ c' σ' →
+  (∃ e', c' = curs (fill_stmts (fill_ectxs e' Kes) Ks) ∧ estep e e' σ ∧ σ = σ').
+Admitted.

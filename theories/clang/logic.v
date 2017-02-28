@@ -140,9 +140,25 @@ Section rules.
   Proof. iIntros "H". iApply (wp_strong_mono E)=>//. iFrame. iSplit; auto. Qed.
 
   Lemma wp_bind {E e} (Kes: list exprctx) (Ks: stmtsctx) Φ Φret:
-    WP cure e @ E {{ v, WP curs (fill_stmts (fill_ectxs (Evalue v) Kes) Ks) {{ Φ ; Φret }} ; Φret }}
+    WP cure e @ E
+       {{ v, WP curs (fill_stmts (fill_ectxs (Evalue v) Kes) Ks) @ E {{ Φ ; Φret }} ; fun _ => True }}
     ⊢ WP curs (fill_stmts (fill_ectxs e Kes) Ks) @ E {{ Φ ; Φret }}.
-  Admitted.
+  Proof.
+    iIntros "H". iLöb as "IH" forall (E e Φ). rewrite wp_unfold /wp_pre.
+    iDestruct "H" as "[Hv|[Hrv|[% H]]]".
+    - iDestruct "Hv" as (v) "[Hev Hv]". iDestruct "Hev" as % <-%of_to_val.
+      by iApply fupd_wp.
+    - iDestruct "Hrv" as (rv) "[% Hv]". inversion H0.
+    - rewrite wp_unfold /wp_pre. iRight; iRight; iSplit.
+      { eauto using fill_not_val, fill_not_ret_val. }
+      iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "H".
+      iModIntro. iNext; iIntros (e2 σ2 Hstep).
+      destruct H0. destruct (fill_step_inv σ1 σ2 e e2 Kes Ks) as (e2'&->&?); auto.
+      destruct H2. subst.
+      iMod ("H" $! (cure e2') σ2 with "[#]") as "($ & H)".
+      { iPureIntro. by apply CSestep. }
+      by iApply "IH".
+  Qed.
 
   Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret:
     WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }}
