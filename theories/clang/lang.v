@@ -50,8 +50,9 @@ Inductive typeof : type → val → Prop :=
 | typeof_void: typeof Tvoid Vvoid
 | typeof_null: typeof Tnull Vnull
 | typeof_null_ptr: ∀ t, typeof (Tptr t) Vnull
-| typeof_int8_to_int32:
+| typeof_int32_to_int8:
     ∀ v: int32, (Int.unsigned v) <=? Byte.max_unsigned → typeof Tint8 (Vint32 v)
+| typeof_int8_to_int32: ∀ v: int8, typeof Tint32 (Vint8 v)
 | typeof_int8: ∀ i, typeof Tint8 (Vint8 i)
 | typeof_int32: ∀ i, typeof Tint32 (Vint32 i)
 | typeof_ptr: ∀ t l, typeof (Tptr t) (Vptr l)

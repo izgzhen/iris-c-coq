@@ -1,7 +1,9 @@
 \section{Language}
 \label{sec:language}
 
-\paragraph{Syntax.}
+\subsection{Definitions}
+
+\paragraph{Syntax.}\label{p:type}
 
 The language is a simplified version of C. It consists of \Stmts{} (statements), \Prim{} (primitives),
 \Expr{} (expressions), \Type{} (types) and \Val{} (values).
@@ -10,13 +12,13 @@ Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, 
 
 \begin{align*}
     \tau : \Type \bnfdef{}&
-        \tyvoid \mid \tynull \mid \tybyte \mid \tyword \mid \typtr{\tau}
+        \tyvoid \mid \tynull \mid \tybyte \mid \tyword \mid \typtr{\tau} \mid \tau \times \tau
 \\
     v : \Val \bnfdef{}&
-        \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l
+        \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l \mid (v, v)
 \\
     e : \Expr \bnfdef{}&
-        v \mid x \mid e \oplus e \mid \deref{e} \mid \& e \mid \ecast{e}{\tau}
+        v \mid x \mid e \oplus e \mid \deref{e} \mid \& e \mid \ecast{e}{\tau} \mid \efst{e} \mid \esnd{e}
 \\
     p : \Prim \bnfdef{}&
         \pcli \mid \psti
@@ -42,7 +44,8 @@ $\ctx_e, \ctx_s$ for both $\Expr$ and $\Stmts$:
 \begin{align*}
     \ctx_e : \ectx \eqdef{}&
         \emptyctx \mid \emptyctx \oplus e \mid v \oplus \emptyctx \mid
-        \deref{\emptyctx} \mid \& \emptyctx \mid \ecast{\emptyctx}{\tau}
+        \deref{\emptyctx} \mid \& \emptyctx \mid \ecast{\emptyctx}{\tau} \mid
+        \efst{\emptyctx} \mid \esnd{\emptyctx}
 \\
     \ctx_s : \sctx \eqdef{}&
         \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{s}{s} \mid \swhile{\emptyctx}{s} \mid \\&
@@ -51,6 +54,7 @@ $\ctx_e, \ctx_s$ for both $\Expr$ and $\Stmts$:
 
 Now we can define \emph{context}: $\ctx : \allctx \eqdef (\ctx_e, \ctx_s)$.
 
+\subsection{Semantics}
 \paragraph{Model.}
 
 Define $c: \Code \eqdef (\cureval: \{ \Expr + \Stmts\}, \curctx: \allctx, \ctx^{*}: [\allctx])$, in which
@@ -71,9 +75,40 @@ i.e. a heap in which every block maps to a list of byte-size values.
 You may notice the difference between $\Val$ and $\byteval$, it is intentional to create a layer of abstraction for
 easier manipulation of spatial assertions and also a clean, unified language syntax.
 
-\paragraph{Operational Semantics.}
+\paragraph{Small-Step Operational Semantics.}
 
 TODO.
+
+\subsection{Type System and Environment}
+
+\paragraph{Typing Rules.}
+
+The types are defined in \Sref{p:type}, and all values in $\val$ can be \emph{locally} typed trivially (since $\val$ is introduced to reflect type structure in some sense). Nevertheless, due to the fact that language of study is weakly-typed in the vein of C, we still have some ``weird'' rules worth documenting.
+
+First, we define local typing judgement $\vdash v : \tau$ for values.
+
+\begin{mathpar}
+\infer[tychk-void]{}{\vdash \void : \tyvoid}
+
+\infer[tychk-null]{}{\vdash \vnull : \tynull}
+
+\infer[tychk-int8]{}{\vdash i \in [0, 2^8) : \tybyte}
+
+\infer[tychk-int32]{}{\vdash i \in [0, 2^{32}) : \tyword}
+
+\infer[tychk-int8-to-32]{\vdash v : \tybyte}{\vdash v : \tyword}
+
+\infer[tychk-int32-to-8]{\vdash i \in [0, 2^8) : \tyword}{\vdash i : \tybyte}
+
+\infer[tychk-null-ptr]{}{\All \tau. \vdash \vnull : \typtr{\tau}}
+
+\infer[tychk-ptr]{}{\All \tau, l. \vdash l : \typtr{\tau}}
+
+\infer[tychk-ptr-cast]{\vdash v : \typtr{\tau}}{\vdash v : \typtr{\tau'}}
+
+\infer[tychk-prod]{\vdash v_1 : \tau_1, v_2 : \tau_2 }{\vdash (v_1, v_2) : \tau_1 \times \tau_2}
+
+\end{mathpar}
 
 %%% Local Variables:
 %%% mode: latex

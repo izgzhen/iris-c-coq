@@ -84,18 +84,31 @@ The following rules can all be derived:
  \proves 
  \wpre{\ctx(\expr)}[\mask]{\pred}{\predret}}
 
+\infer[wp-bind-e]
+{}
+{\wpre\expr[\mask]{\Ret\var. \wpre{\ctx_e(\var)}[\mask]{\pred}{\predret}}{\predret}
+ \proves 
+ \wpre{\ctx_e(\expr)}[\mask]{\pred}{\predret}}
+
  \infer[wp-op]
 {\llbracket oplus \rrbracket (v_1, v_2) = v'}
 {\pred(v')
  \proves
  \wpre{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
 
-
  \infer[wp-assign]
-{\typeof\footnotemark(\tau, v)}
-{ l \mapsto - * (l \mapsto v : t \wand \pred)
+{\typeof(\tau, v)}
+{ l \mapsto - : \tau * (l \mapsto v : \tau \wand \pred)
  \proves
  \wpre{l \la v}[\mask]{\pred}{\predret}}
+
+ \infer[wp-assign-offset]
+{\typeof(\tau_2, v_2)}
+{ \vaddr{b}{o} \mapsto (v_1, -) : \tau_1 \times \tau_2 *
+  (\vaddr{b}{o} \mapsto (v_1, v_2) : \tau_1 \times \tau_2 \wand \pred)
+ \proves
+ \wpre{\vaddr{b}{(o + \sizeof(\tau_1))} \la v_2}[\mask]{\pred}{\predret}}
+
 
  \infer[wp-load]
 {}
@@ -110,7 +123,6 @@ The following rules can all be derived:
  \wpre{s_1 ; s_2}[\mask]{\pred}{\predret}}
 
 \end{mathpar}
-\footnotetext{see Coq implementation for details}
 
 %%% Local Variables:
 %%% mode: latex
