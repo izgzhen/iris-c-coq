@@ -195,6 +195,21 @@ Section rules.
     ⊢ WP curs (Swhile cond (Evalue vfalse) s) @ E {{ Φ; Φret }}.
   Admitted.
 
+  Lemma wp_while_inv I Q Φret cond s:
+    □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP cure cond {{ Φ ; Φret }})) ∗
+    □ (∀ Φ, (I ∗ (I -∗ Φ Vvoid)) -∗ WP curs s {{ Φ; Φret }}) ∗ I
+    ⊢ WP curs (Swhile cond cond s) {{ Q ; Φret }}.
+  Proof.
+    iIntros "(#Hcond & #Hs & HI)".
+    iLöb as "IH".
+    iApply (wp_bind [] (SKwhile _ _)). simpl.
+    iApply "Hcond". iFrame.
+    iIntros (v) "[[% HQ]|[% HI]]"; subst.
+    - iApply wp_while_false. by iNext.
+    - iApply wp_while_true. iNext.
+      iApply wp_seq. iApply "Hs". by iFrame.
+  Qed.
+
   Lemma wp_fst v1 v2 Φ Φret:
     ▷ WP cure (Evalue v1) {{ Φ; Φret }}
     ⊢ WP cure (Efst (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
