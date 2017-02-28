@@ -97,9 +97,11 @@ Section rules.
   Lemma wp_skip Φ Φret E: Φ Vvoid ⊢ WP curs Sskip @ E {{ Φ; Φret }}.
   Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
 
-  Lemma wp_value Φ Φret E v: Φ v ⊢ WP (cure (Evalue v)) @ E {{ Φ; Φret }}.
-  Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
-  
+  Lemma wp_value Φ Φret E c v:
+    to_val c = Some v →
+    Φ v ⊢ WP c @ E {{ Φ; Φret }}.
+  Proof. iIntros (?) "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
+
   Lemma wp_strong_mono E1 E2 c Φ Φret Ψ Ψret:
     E1 ⊆ E2 →
     ((∀ v, Φ v ={E2}=∗ Ψ v) ∧ (∀ v, Φret v ={E2}=∗ Ψret v)) ∗ WP c @ E1 {{ Φ; Φret }}
@@ -185,11 +187,29 @@ Section rules.
     iIntros (Hsafe) "H".
     iApply wp_lift_step;
       [by eapply reducible_not_val, (Hsafe inhabitant) |
-       by eapply reducible_not_ret_val, (Hsafe inhabitant)|].    
+       by eapply reducible_not_ret_val, (Hsafe inhabitant)|].
     iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ?).
     iMod "Hclose"; iModIntro.
     inversion H0. subst. iFrame. by iApply "H".
+  Qed.
+
+  Lemma wp_lift_sstep {E Φ Φret} s1 :
+    to_val (curs s1) = None → to_ret_val (curs s1) = None →
+    (∀ σ1, gen_heap_ctx σ1 ={E}=∗
+      ⌜reducible (curs s1) σ1⌝ ∗
+      ▷ ∀ s2 σ2, ⌜cstep (curs s1) σ1 s2 σ2⌝ ={E}=∗
+        gen_heap_ctx σ2 ∗
+        default False (to_val s2) Φ)
+    ⊢ WP curs s1 @ E {{ Φ ; Φret }}.
+  Proof.
+    iIntros (??) "H". iApply (wp_lift_step E _ _ (curs s1))=>//; iIntros (σ1) "Hσ1".
+    iMod ("H" $! σ1 with "Hσ1") as "[$ H]".
+    iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iModIntro; iNext; iIntros (s2 σ2) "%". iMod "Hclose" as "_".
+    iMod ("H" $! s2 σ2 with "[#]") as "($ & H)"=>//.
+    destruct (to_val s2) eqn:?; last by iExFalso.
+    by iApply wp_value.
   Qed.
 
   Lemma wp_assign {E l v v'} t Φ Φret:
