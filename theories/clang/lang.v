@@ -373,13 +373,37 @@ Delimit Scope stmts_scope with S.
 Bind Scope prim_scope with prim.
 Delimit Scope prim_scope with prim.
 
-Definition to_val (e: expr) :=
-  match e with
-    | Evalue v => Some v
+Definition to_val (c: cureval) :=
+  match c with
+    | cure (Evalue v) => Some v
+    | curs Sskip => Some Vvoid
     | _ => None
   end.
 
-Definition of_val (v: val) := Evalue v.
+Definition of_val (v: val) := cure (Evalue v).
+
+Definition to_ret_val (c: cureval) :=
+  match c with
+    | curs Sret => Some Vvoid
+    | curs (Srete (Evalue v)) => Some v
+    | _ => None
+  end.
+
+Lemma val_implies_not_ret_val c v:
+  to_val c = Some v → to_ret_val c = None.
+Proof. intros ?. destruct c as [[]|[]]=>//. Qed.
+
+Lemma ret_val_implies_not_val c v:
+  to_ret_val c = Some v → to_val c = None.
+Proof. intros ?. destruct c as [[]|[]]=>//. Qed.
+
+(* Definition to_val (e: expr) := *)
+(*   match e with *)
+(*     | Evalue v => Some v *)
+(*     | _ => None *)
+(*   end. *)
+
+(* Definition of_val (v: val) := Evalue v. *)
 
 Inductive cstep: cureval → state → cureval → state → Prop :=
 | CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ

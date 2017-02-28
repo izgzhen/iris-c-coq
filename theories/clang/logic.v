@@ -20,28 +20,24 @@ Section wp.
            (wp: coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ) :
     coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ :=
     (λ E cur Φ Φret,
-     match cur with
-       | curs Sskip => |={E}=> Φ Vvoid
-       | cure (Evalue v) => |={E}=> Φ v
-       | curs Sret => |={E}=> Φret Vvoid
-       | curs (Srete (Evalue v)) => |={E}=> Φret v
-       | _ =>
+     (∃ v, ⌜ to_val cur = Some v ⌝ ∧ |={E}=> Φ v) ∨
+     (∃ v, ⌜ to_ret_val cur = Some v ⌝ ∧ |={E}=> Φret v) ∨
+     (⌜ to_val cur = None ∧ to_ret_val cur = None ⌝ ∧
          (∀ (σ: mem),
           gen_heap_ctx σ ={E,∅}=∗
             ▷ (∀ cur' σ', ⌜cstep cur σ cur' σ'⌝ ={∅,E}=∗
-                        gen_heap_ctx σ' ∗ wp E cur' Φ Φret))
-     end)%I.
+                        gen_heap_ctx σ' ∗ wp E cur' Φ Φret))))%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
   Proof.
-    rewrite /wp_pre=> n wp wp' Hwp E e1 Φ.
-    (* repeat (f_contractive || f_equiv); apply Hwp. *)
-  Admitted.
+    rewrite /wp_pre=> n wp wp' Hwp E e1 Φ Φret.
+    repeat (f_contractive || f_equiv); apply Hwp.
+  Qed.
 
   Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
     (∃ bytes bytes',
        mapsto (l.1) q bytes ∗
-       ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.  
+       ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.
   Definition wp_def :
     coPset → cureval → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
   Definition wp_aux : { x | x = @wp_def }. by eexists. Qed.
@@ -93,50 +89,55 @@ Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : uPred_scope.
 
 Section rules.
   Context `{clangG Σ}.
-  
+
   Lemma wp_unfold E c Φ Φret: WP c @ E {{ Φ; Φret }} ⊣⊢ wp_pre wp E c Φ Φret.
   Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
 
   Lemma wp_skip Φ Φret E: Φ Vvoid ⊢ WP curs Sskip @ E {{ Φ; Φret }}.
-  Proof.
-    iIntros "HΦ".
-    by rewrite wp_unfold /wp_pre.
-  Qed.
+  Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
 
   Lemma wp_value Φ Φret E v: Φ v ⊢ WP (cure (Evalue v)) @ E {{ Φ; Φret }}.
-  Proof.
-    iIntros "HΦ".
-    by rewrite wp_unfold /wp_pre.
-  Qed.
+  Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
   
-  (* Lemma wp_strong_mono E1 E2 c Φ Φret Ψ : *)
-  (*   E1 ⊆ E2 → (∀ v, Φ v ={E2}=∗ Ψ v) ∗ WP c @ E1 {{ Φ; Φret }} ⊢ WP c @ E2 {{ Ψ; Φret }}. *)
-  (* Proof. *)
-  (*   iIntros (?) "[HΦ H]". iLöb as "IH" forall (c). *)
-  (*   rewrite !wp_unfold /wp_pre. *)
-    (* idestruct "H" as "[Hv|[% H]]"; [iLeft|iRight]. *)
-    (* { iDestruct "Hv" as (v) "[% Hv]". iExists v; iSplit; first done. *)
-    (*   iApply ("HΦ" with ">[-]"). by iApply (fupd_mask_mono E1 _). } *)
-    (* iSplit; [done|]; iIntros (σ1) "Hσ". *)
-    (* iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done. *)
-    (* iMod ("H" $! σ1 with "Hσ") as "[$ H]". *)
-    (* iModIntro. iNext. iIntros (e2 σ2 Hstep). *)
-    (* iMod ("H" $! e2 σ2 with "[#]") as "($ & H)"; auto. *)
-    (* iMod "Hclose" as "_". by iApply ("IH" with "HΦ"). *)
-  (* Admitted. *)
+  Lemma wp_strong_mono E1 E2 c Φ Φret Ψ Ψret:
+    E1 ⊆ E2 →
+    ((∀ v, Φ v ={E2}=∗ Ψ v) ∧ (∀ v, Φret v ={E2}=∗ Ψret v)) ∗ WP c @ E1 {{ Φ; Φret }}
+    ⊢ WP c @ E2 {{ Ψ; Ψret }}.
+  Proof.
+    iIntros (?) "[HΦ H]". iLöb as "IH" forall (c). rewrite !wp_unfold /wp_pre.
+    iDestruct "H" as "[Hv|[Hrv|[% H]]]".
+    - iLeft. iDestruct "Hv" as (v) "[% Hv]". iExists v; iSplit; first done.
+      iDestruct "HΦ" as "[HΦ _]". iApply ("HΦ" with ">[-]"). by iApply (fupd_mask_mono E1 _).
+    - iRight. iLeft. iDestruct "Hrv" as (v) "[% Hrv]". iExists v; iSplit; first done.
+      iDestruct "HΦ" as "[_ HΦret]".
+      iApply ("HΦret" with ">[-]"). by iApply (fupd_mask_mono E1 _). (* XXX: Boilerplate? *)
+    - iRight. iRight. iSplit; [done|]; iIntros (σ1) "Hσ".
+      iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done.
+      iMod ("H" $! σ1 with "Hσ") as "H".
+      iModIntro. iNext. iIntros (e2 σ2 Hstep).
+      iMod ("H" $! e2 σ2 with "[#]") as "($ & H)"; auto.
+      iMod "Hclose" as "_". iApply ("IH" $! e2 with "HΦ H").
+  Qed.
 
   Lemma fupd_wp E e Φ Φret: (|={E}=> WP e @ E {{ Φ; Φret }}) ⊢ WP e @ E {{ Φ; Φret }}.
   Proof.
-  (*   rewrite wp_unfold /wp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?. *)
-  (*   { iLeft. iExists v; iSplit; first done. *)
-  (*       by iMod "H" as "[H|[% ?]]"; [iDestruct "H" as (v') "[% ?]"|]; simplify_eq. } *)
-    (*   iRight; iSplit; [done|]; iIntros (σ1) "Hσ1". *)
-    (* iMod "H" as "[H|[% H]]"; last by iApply "H". *)
-    (* iDestruct "H" as (v') "[% ?]"; simplify_eq. *)
-  Admitted.
+    rewrite wp_unfold /wp_pre. iIntros "H".
+    destruct (to_val e) as [v|] eqn:Hev; destruct (to_ret_val e) as [retv|] eqn:Hevr.
+    - assert (to_val e = None) as H0; first by eapply ret_val_implies_not_val.
+      simplify_eq.
+    - iLeft. iExists v; iSplit; first done.
+      iMod "H" as "[H|[H|[% ?]]]"; try iDestruct "H" as (v') "[% ?]"; try (by inversion H0).
+    - iRight. iLeft. iExists retv; iSplit; first done.
+      iMod "H" as "[H|[H|[% ?]]]"; try iDestruct "H" as (v') "[% ?]"; try (by inversion H0).
+    - iRight. iRight. iSplit; first done.
+      iIntros (σ1) "Hσ1". iMod "H" as "[H|[H|[% H]]]".
+      + iDestruct "H" as (v') "[% ?]"; simplify_eq.
+      + iDestruct "H" as (v') "[% ?]"; simplify_eq.
+      + by iApply "H".
+  Qed.
 
-  (* Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}. *)
-  (* Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed. *)
+  Lemma wp_fupd E c Φ Φret: WP c @ E {{ v, |={E}=> Φ v ; fun v => |={E}=> Φret v}} ⊢ WP c @ E {{ Φ; Φret }}.
+  Proof. iIntros "H". iApply (wp_strong_mono E)=>//. iFrame. iSplit; auto. Qed.
 
   Lemma wp_bind {E e} (Kes: list exprctx) (Ks: stmtsctx) Φ Φret:
     WP cure e @ E {{ v, WP curs (fill_stmts (fill_ectxs (Evalue v) Kes) Ks) {{ Φ ; Φret }} ; Φret }}
