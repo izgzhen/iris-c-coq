@@ -245,9 +245,11 @@ Section rules.
       by iFrame.
   Qed.
 
+  Definition same_size v v' := sizeof (type_infer_v v) = sizeof (type_infer_v v').
+  
   Lemma wp_assign {E l v v'} Φ Φret:
-    sizeof (type_infer_v v) = sizeof (type_infer_v v') → (* typing info is higher -- though encode_val plays *)
-    l ↦ v ∗ ▷ (l ↦ v' -∗ Φ Vvoid)
+    same_size v v' → (* typing info is higher -- though encode_val plays *)
+    ▷ l ↦ v ∗ ▷ (l ↦ v' -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
   Proof.
     iIntros (?) "[Hl HΦ]".
@@ -263,10 +265,10 @@ Section rules.
     iModIntro. iFrame. by iApply "HΦ".
   Qed.
 
-  Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 Φ Φret:
-    typeof t2 v2' → sizeof t1 = off →
-    ▷ (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2 ∗
-    ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2 -∗ Φ Vvoid)
+  Lemma wp_assign_offset {E b o off v1 v2 v2'} Φ Φret:
+    same_size v2 v2' → sizeof (type_infer_v v1) = off →
+    ▷ (b, o) ↦ Vpair v1 v2∗
+    ▷ ((b, o) ↦ Vpair v1 v2' -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
   Admitted.
   
@@ -280,8 +282,8 @@ Section rules.
     ⊢ WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}.
   Admitted.
   
-  Lemma wp_load E Φ p v t q Φret:
-    ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
+  Lemma wp_load E Φ p v q Φret:
+    ▷ p ↦{q} v ∗ ▷ (p ↦{q} v -∗ Φ v)
     ⊢ WP cure (Ederef (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
   Admitted.
 
@@ -337,9 +339,9 @@ Section rules.
       | _, _ => False
     end.
 
-  Fixpoint alloc_params (addrs: list (addr * type)) (vs: list val) :=
+  Fixpoint alloc_params (addrs: list addr) (vs: list val) :=
     (match addrs, vs with
-       | (l, t)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
+       | l::params, v::vs => l ↦ v ∗ alloc_params params vs
        | [], [] => True
        | _, _ => False
      end)%I.
@@ -431,7 +433,7 @@ Section rules.
     (∀ ls f_body',
        ⌜ length ls = length vs ∧
          instantiate_f_body (add_params_to_env ∅ params ls) f_body = Some f_body' ⌝ -∗
-       alloc_params (zip ls (params.*2)) vs -∗
+       alloc_params ls vs -∗
        WP curs f_body' {{ _, True; Φ }})
     ⊢ WP curs (Scall f es) {{ Φ; Φret }}.
   Admitted.

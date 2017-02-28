@@ -99,11 +99,11 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 Section heap.
 Context `{clangG Σ}.
 
-Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t: type) Φ Φret:
-  typeof t v' →
+Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) Φ Φret:
+  same_size v v' →
   IntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v @ t)%I →
-  envs_simple_replace i false (Esnoc Enil i (l ↦ v' @ t)) Δ' = Some Δ'' →
+  envs_lookup i Δ' = Some (false, l ↦ v)%I →
+  envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' = Some Δ'' →
   (Δ'' ⊢ Φ Vvoid) →
   Δ ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
 Proof.
@@ -114,9 +114,9 @@ Proof.
   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
 Qed.
 
-Lemma tac_wp_load Δ Δ' E i l q v t Φ Φret:
+Lemma tac_wp_load Δ Δ' E i l q v Φ Φret:
   IntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦{q} v @ t)%I →
+  envs_lookup i Δ' = Some (false, l ↦{q} v)%I →
   (Δ' ⊢ Φ v) →
   Δ ⊢ WP (cure (Ederef (Evalue (Vptr l)))) @ E {{ Φ ; Φret }}.
 Proof.
@@ -137,8 +137,8 @@ Tactic Notation "wp_assign" :=
       [let v := match goal with |- typeof ?t ?v => v end in
        wp_done || fail "wp_store:" v "doesn't type check"
       |apply _
-      |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
-       iAssumptionCore || fail "wp_assign: cannot find" l "↦ ? @ ?"
+      |let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
+       iAssumptionCore || fail "wp_assign: cannot find" l "↦ ?"
       |env_cbv; reflexivity
       | auto (* wp_finish *)]
   | _ => fail "wp_assign: not a 'wp'"
@@ -155,8 +155,8 @@ Tactic Notation "wp_load" :=
       |fail 1 "wp_load: cannot find 'Ederef' in" s];
     eapply tac_wp_load;
       [apply _
-      |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
-       iAssumptionCore || fail "wp_load: cannot find" l "↦ ? @ ?"
+      |let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
+       iAssumptionCore || fail "wp_load: cannot find" l "↦ ?"
       |(* wp_finish *) auto]
   | _ => fail "wp_load: not a 'wp'"
   end.
