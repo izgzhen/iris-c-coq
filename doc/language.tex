@@ -81,34 +81,50 @@ TODO.
 
 \subsection{Type System and Environment}
 
-\paragraph{Typing Rules.}
+\paragraph{Local Typing Rules.}
 
 The types are defined in \Sref{p:type}, and all values in $\val$ can be \emph{locally} typed trivially (since $\val$ is introduced to reflect type structure in some sense). Nevertheless, due to the fact that language of study is weakly-typed in the vein of C, we still have some ``weird'' rules worth documenting.
 
-First, we define local typing judgement $\vdash v : \tau$ for values.
+Here we define local typing judgement $\tychk{v}{\tau}$ for values.
 
 \begin{mathpar}
-\infer[tychk-void]{}{\vdash \void : \tyvoid}
+\infer[tychk-void]{}{\tychk{\void}{\tyvoid}}
 
-\infer[tychk-null]{}{\vdash \vnull : \tynull}
+\infer[tychk-null]{}{\tychk{\vnull}{\tynull}}
 
-\infer[tychk-int8]{}{\vdash i \in [0, 2^8) : \tybyte}
+\infer[tychk-int8]{}{\tychk{i \in [0, 2^8)}{\tybyte}}
 
-\infer[tychk-int32]{}{\vdash i \in [0, 2^{32}) : \tyword}
+\infer[tychk-int32]{}{\tychk{i \in [0, 2^{32})}{\tyword}}
 
-\infer[tychk-int8-to-32]{\vdash v : \tybyte}{\vdash v : \tyword}
+\infer[tychk-int8-to-32]{\tychk{v}{\tybyte}}{\tychk{v}{\tyword}}
 
-\infer[tychk-int32-to-8]{\vdash i \in [0, 2^8) : \tyword}{\vdash i : \tybyte}
+\infer[tychk-int32-to-8]{\tychk{i \in [0, 2^8)}{\tyword}}{\tychk{i}{\tybyte}}
 
-\infer[tychk-null-ptr]{}{\All \tau. \vdash \vnull : \typtr{\tau}}
+\infer[tychk-null-ptr]{}{\All \tau. \tychk{\vnull}{\typtr{\tau}}}
 
-\infer[tychk-ptr]{}{\All \tau, l. \vdash l : \typtr{\tau}}
+\infer[tychk-ptr]{}{\All \tau, l. \tychk{l}{\typtr{\tau}}}
 
-\infer[tychk-ptr-cast]{\vdash v : \typtr{\tau}}{\vdash v : \typtr{\tau'}}
+\infer[tychk-ptr-cast]{\tychk{v}{\typtr{\tau}}}{\tychk{v}{\typtr{\tau'}}}
 
-\infer[tychk-prod]{\vdash v_1 : \tau_1, v_2 : \tau_2 }{\vdash (v_1, v_2) : \tau_1 \times \tau_2}
+\infer[tychk-prod]{\tychk{v_1}{\tau_1} \quad \tychk{v_2}{\tau_2}}{\tychk{(v_1, v_2)}{\tau_1 \times \tau_2}}
 
 \end{mathpar}
+
+\paragraph{Typing Environment}
+
+When variables are introduced, we will need an environment $\Gamma : \Env \eqdef [x \gmapsto (\tau, l)]$
+to ``unfold'' the meaning of variables.
+
+In Iris-OS, variables are all unfolded before the running the function body,
+which saves the program logic from caring about the lexical environment.
+During this unfolding, we will replace variables with either their location (left-hand side)
+or the dereference of their location (right-hand side). And we will also produce a pointer arithmetic
+expression when processing the left-hand side expression, which requires type inference.
+
+Here we first define the type inference rules. Although it is written in an axiomatic way,
+it is a direct translation of our monadic algorithm (TODO).
+
+Then we define the rules for ``interpreting'' left-hand side expression (TODO).
 
 %%% Local Variables:
 %%% mode: latex

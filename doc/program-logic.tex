@@ -97,13 +97,13 @@ The following rules can all be derived:
  \wpre{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
 
  \infer[wp-assign]
-{\typeof(\tau, v)}
+{\tychk{v}{\tau}}
 { l \mapsto - : \tau * (l \mapsto v : \tau \wand \pred)
  \proves
  \wpre{l \la v}[\mask]{\pred}{\predret}}
 
  \infer[wp-assign-offset]
-{\typeof(\tau_2, v_2)}
+{\tychk{v_2}{\tau_2}}
 { \vaddr{b}{o} \mapsto (v_1, -) : \tau_1 \times \tau_2 *
   (\vaddr{b}{o} \mapsto (v_1, v_2) : \tau_1 \times \tau_2 \wand \pred)
  \proves
