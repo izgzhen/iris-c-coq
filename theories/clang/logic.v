@@ -24,7 +24,7 @@ Section wp.
      (∃ v, ⌜ to_ret_val cur = Some v ⌝ ∧ |={E}=> Φret v) ∨
      (⌜ to_val cur = None ∧ to_ret_val cur = None ⌝ ∧
          (∀ (σ: mem),
-          gen_heap_ctx σ ={E,∅}=∗
+          gen_heap_ctx σ ={E,∅}=∗ ⌜ reducible cur σ ⌝ ∗
             ▷ (∀ cur' σ', ⌜cstep cur σ cur' σ'⌝ ={∅,E}=∗
                         gen_heap_ctx σ' ∗ wp E cur' Φ Φret))))%I.
 
@@ -91,7 +91,8 @@ Section rules.
   Context `{clangG Σ}.
 
   Lemma wp_unfold E c Φ Φret: WP c @ E {{ Φ; Φret }} ⊣⊢ wp_pre wp E c Φ Φret.
-  Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
+    (* Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed. *)
+  Admitted. (* XXX: just too slow ... *)
 
   Lemma wp_skip Φ Φret E: Φ Vvoid ⊢ WP curs Sskip @ E {{ Φ; Φret }}.
   Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
@@ -113,7 +114,7 @@ Section rules.
       iApply ("HΦret" with ">[-]"). by iApply (fupd_mask_mono E1 _). (* XXX: Boilerplate? *)
     - iRight. iRight. iSplit; [done|]; iIntros (σ1) "Hσ".
       iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done.
-      iMod ("H" $! σ1 with "Hσ") as "H".
+      iMod ("H" $! σ1 with "Hσ") as "[$ H]".
       iModIntro. iNext. iIntros (e2 σ2 Hstep).
       iMod ("H" $! e2 σ2 with "[#]") as "($ & H)"; auto.
       iMod "Hclose" as "_". iApply ("IH" $! e2 with "HΦ H").
@@ -151,11 +152,11 @@ Section rules.
     - iDestruct "Hrv" as (rv) "[% Hv]". inversion H0.
     - rewrite wp_unfold /wp_pre. iRight; iRight; iSplit.
       { eauto using fill_not_val, fill_not_ret_val. }
-      iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "H".
-      iModIntro. iNext; iIntros (e2 σ2 Hstep).
-      destruct H0. destruct (fill_step_inv σ1 σ2 e e2 Kes Ks) as (e2'&->&?); auto.
-      destruct H2. subst.
-      iMod ("H" $! (cure e2') σ2 with "[#]") as "($ & H)".
+      iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
+      iModIntro. iSplitL "". { iPureIntro. by apply lift_reducible. }
+      iNext; iIntros (e2 σ2 Hstep).
+      destruct H0. destruct (fill_step_inv σ1 σ2 e e2 Kes Ks) as (e2'&->&[]); auto.
+      subst. iMod ("H" $! (cure e2') σ2 with "[#]") as "($ & H)".
       { iPureIntro. by apply CSestep. }
       by iApply "IH".
   Qed.
@@ -164,12 +165,38 @@ Section rules.
   (* Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret: *)
   (*   WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }} *)
   (*   ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}. *)
-  
+
+  Lemma wp_lift_step E Φ Φret e1 :
+    to_val e1 = None →
+    to_ret_val e1 = None →
+    (∀ σ1, gen_heap_ctx σ1 ={E,∅}=∗
+      ⌜reducible e1 σ1⌝ ∗
+      ▷ ∀ e2 σ2, ⌜cstep e1 σ1 e2 σ2⌝ ={∅,E}=∗
+        gen_heap_ctx σ2 ∗ WP e2 @ E {{ Φ; Φret }})
+    ⊢ WP e1 @ E {{ Φ; Φret }}.
+  Proof. iIntros (??) "H". rewrite wp_unfold /wp_pre; auto. Qed.
+
+  Lemma wp_lift_estep E Φ Φret e1 :
+    (∀ σ1, reducible (cure e1) σ1) →
+    (▷ ∀ e2 σ, ⌜ estep e1 e2 σ ⌝ →
+                WP (cure e2) @ E {{ Φ ; Φret }})
+      ⊢ WP cure e1 @ E {{ Φ ; Φret }}.
+  Proof.
+    iIntros (Hsafe) "H".
+    iApply wp_lift_step;
+      [by eapply reducible_not_val, (Hsafe inhabitant) |
+       by eapply reducible_not_ret_val, (Hsafe inhabitant)|].    
+    iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ?).
+    iMod "Hclose"; iModIntro.
+    inversion H0. subst. iFrame. by iApply "H".
+  Qed.
+
   Lemma wp_assign {E l v v'} t Φ Φret:
     typeof t v' →
     ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
-  Admitted.
+  .
 
   Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 Φ Φret:
     typeof t2 v2' → sizeof t1 = off →

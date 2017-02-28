@@ -422,3 +422,17 @@ Lemma fill_step_inv σ σ' e c' Kes Ks:
   cstep (curs (fill_stmts (fill_ectxs e Kes) Ks)) σ c' σ' →
   (∃ e', c' = curs (fill_stmts (fill_ectxs e' Kes) Ks) ∧ estep e e' σ ∧ σ = σ').
 Admitted.
+
+Definition reducible cur σ := ∃ cur' σ', cstep cur σ cur' σ'.
+
+Lemma lift_reducible e Kes Ks σ:
+  reducible (cure e) σ → reducible (curs(fill_stmts (fill_ectxs e Kes) Ks)) σ.
+Admitted.
+
+Lemma reducible_not_val c σ: reducible c σ → to_val c = None.
+Admitted.
+
+Lemma reducible_not_ret_val c σ: reducible c σ → to_ret_val c = None.
+Admitted.
+
+Instance state_inhabited: Inhabited state := populate ∅.
