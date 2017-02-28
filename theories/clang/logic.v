@@ -10,7 +10,7 @@ Import uPred.
 
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
-  clangG_memG :> gen_heapG block (list byteval) Σ
+  clangG_memG :> gen_heapG addr byteval Σ
 }.
 
 Section wp.
@@ -34,10 +34,16 @@ Section wp.
     repeat (f_contractive || f_equiv); apply Hwp.
   Qed.
 
-  Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
-    (∃ bytes bytes',
-       mapsto (l.1) q bytes ∗
-       ⌜ encode_val t v = bytes' ∧ take (length bytes') (drop (l.2) bytes) = bytes' ⌝)%I.
+  Fixpoint mapstobytes l q bytes: iProp Σ :=
+    let '(b, o) := l in
+    (match bytes with
+       | byte::bs' => mapsto l q byte ∗ mapstobytes (b, o + 1)%nat q bs'
+       | _ => True
+     end)%I.
+
+  Definition mapstoval (l: addr) (q: Qp) (v: val) : iProp Σ :=
+    mapstobytes l q (encode_val v).
+
   Definition wp_def :
     coPset → cureval → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
   Definition wp_aux : { x | x = @wp_def }. by eexists. Qed.
@@ -79,11 +85,11 @@ Notation "'{{{' P } } } e @ E {{{ 'RET' pat ; Q ; Φret } } }" :=
     (at level 20,
      format "{{{  P  } } }  e  @  E  {{{  RET  pat ;  Q ;  Φret } } }") : C_scope.
 
-Notation "l ↦{ q } v @ t" := (mapstoval l q v t)
-  (at level 20, q at level 50, format "l  ↦{ q }  v  @  t") : uPred_scope.
-Notation "l ↦ v @ t" :=
-  (mapstoval l 1%Qp v t) (at level 20) : uPred_scope.
-Notation "l ↦{ q } -" := (∃ v t, l ↦{q} v @ t)%I
+Notation "l ↦{ q } v" := (mapstoval l q v)
+  (at level 20, q at level 50, format "l  ↦{ q }  v") : uPred_scope.
+Notation "l ↦ v" :=
+  (mapstoval l 1%Qp v) (at level 20) : uPred_scope.
+Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -") : uPred_scope.
 Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : uPred_scope.
 
@@ -212,11 +218,50 @@ Section rules.
     by iApply wp_value.
   Qed.
 
-  Lemma wp_assign {E l v v'} t Φ Φret:
-    typeof t v' →
-    ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t -∗ Φ Vvoid)
+  Lemma take_drop_app {A} (xs ys: list A) n:
+    length xs ≥ n → drop n (take n xs ++ ys) = ys.
+  Admitted.
+
+  Lemma take_app {A} (xs ys: list A):
+    take (length xs) (xs ++ ys) = xs.
+  Admitted.
+
+  Local Hint Extern 0 (reducible _ _) => eexists _, _; simpl.
+
+  Local Hint Constructors cstep sstep estep.
+
+  Lemma gen_heap_update_bytes σ:
+    ∀ bs l bs',
+      length bs = length bs' →
+      gen_heap_ctx σ -∗ mapstobytes l 1 bs ==∗
+      (gen_heap_ctx (storebytes l bs' σ) ∗ mapstobytes l 1 bs').
+  Proof.
+    induction bs; destruct l.
+    - intros []=>//. intros _. iIntros "$ _"=>//.
+    - induction bs'=>//. simpl. intros [=].
+      iIntros "Hσ [Ha Hbs]".
+      iMod (IHbs with "Hσ Hbs") as "[Hσ' Hbs']"=>//.
+      iMod (@gen_heap_update with "Hσ' Ha") as "[$ Ha']".
+      by iFrame.
+  Qed.
+
+  Lemma wp_assign {E l v v'} Φ Φret:
+    sizeof (type_infer_v v) = sizeof (type_infer_v v') → (* typing info is higher -- though encode_val plays *)
+    l ↦ v ∗ ▷ (l ↦ v' -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
-  .
+  Proof.
+    iIntros (?) "[Hl HΦ]".
+    iApply wp_lift_sstep=>//.
+    iIntros (σ1) "Hσ !>".
+    rewrite /mapstoval.
+    iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
+    { by repeat (rewrite size_of_encode_val). }
+    iSplit; first eauto.
+    iNext; iIntros (v2 σ2 Hstep).
+    inversion Hstep. subst. inversion H2. subst.
+    inversion H2. subst. iMod "H" as "[Hσ' Hv']".
+    iModIntro. iFrame. by iApply "HΦ".
+  Qed.
 
   Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 Φ Φret:
     typeof t2 v2' → sizeof t1 = off →

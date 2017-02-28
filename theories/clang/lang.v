@@ -24,6 +24,16 @@ Inductive val : Set :=
 | Vptr (p: addr)
 | Vpair (v1 v2: val).
 
+Fixpoint type_infer_v (v: val) : type :=
+  match v with
+    | Vnull => Tnull
+    | Vvoid => Tvoid
+    | Vint8 _ => Tint8
+    | Vint32 _ => Tint32
+    | Vptr _ => Tptr Tvoid (* XXX *)
+    | Vpair v1 v2 => Tprod (type_infer_v v1) (type_infer_v v2)
+  end.
+
 Instance int_eq_dec : EqDecision int.
 Proof. apply Int.eq_dec. Defined.
 
@@ -135,15 +145,14 @@ Definition proj_pointer (vl: list byteval) : option val :=
     | _ => None
   end.
 
-Fixpoint encode_val (t: type) (v: val) : list byteval :=
-  match v, t with
-    | Vint32 n, Tint8  => inj_bytes (encode_int 1%nat (Int.unsigned n))
-    | Vint32 n, Tint32 => inj_bytes (encode_int 4%nat (Int.unsigned n))
-    | Vptr p, Tptr _ => inj_pointer 4%nat p
-    | Vnull, Tnull => list_repeat 4 BVnull
-    | Vnull, Tptr _ => list_repeat 4 BVnull
-    | Vpair v1 v2, Tprod t1 t2 => encode_val t1 v1 ++ encode_val t1 v2
-    | _, _ => list_repeat (sizeof t) BVundef
+Fixpoint encode_val (v: val) : list byteval :=
+  match v with
+    | Vint32 n => inj_bytes (encode_int 4%nat (Int.unsigned n))
+    | Vint8 n => inj_bytes (encode_int 1%nat (Byte.unsigned n))
+    | Vptr p => inj_pointer 4%nat p
+    | Vnull => list_repeat 4 BVnull
+    | Vpair v1 v2 => encode_val v1 ++ encode_val v2
+    | _ => list_repeat (sizeof (type_infer_v v)) BVundef
   end.
 
 Fixpoint decode_val (t: type) (vl: list byteval) : option val :=
@@ -246,16 +255,6 @@ Inductive cureval :=
 
 Definition env : Type := gmap ident (type * addr).
 
-Fixpoint type_infer_v (v: val) : type :=
-  match v with
-    | Vnull => Tnull
-    | Vvoid => Tvoid
-    | Vint8 _ => Tint8
-    | Vint32 _ => Tint32
-    | Vptr _ => Tptr Tvoid (* XXX *)
-    | Vpair v1 v2 => Tprod (type_infer_v v1) (type_infer_v v2)
-  end.
-
 Fixpoint type_infer (ev: env) (e: expr) : option type :=
   match e with
     | Evalue v => Some (type_infer_v v)
@@ -309,7 +308,7 @@ Definition fill_ctx (e: expr) (K: context) : stmts :=
 
 Definition fill_ectxs := foldl fill_expr.
 
-Definition mem := gmap block (list byteval).
+Definition mem := gmap addr byteval.
 
 Definition state := mem.
 
@@ -349,17 +348,20 @@ Inductive estep : expr → expr → state → Prop :=
 (* | EKcast (t: type). *)
 .
 
+Fixpoint storebytes l bs (σ: mem) :=
+  match bs with
+    | byte::bs' => let '(b, o) := l in <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
+    | _ => σ
+  end.
+
 (* Offset is ignored *)
 Inductive sstep : stmts → state → stmts → state → Prop :=
 | SSassign:
-    ∀ t rv bytes bytes' σ b off,
-      typeof t rv →
-      encode_val t rv = bytes' →
-      σ !! b = Some bytes →
-      sstep (Sassign (Evalue (Vptr (b, off))) (Evalue rv))
+    ∀ l v σ,
+      sstep (Sassign (Evalue (Vptr l)) (Evalue v))
             σ
             Sskip
-            (<[ b := take off bytes ++ take (length bytes - off) bytes' ]> σ)
+            (storebytes l (encode_val v) σ)
 (* | SKif (s1 s2: stmts) *)
 (* | SKwhile (s: stmts). *)
 .
@@ -436,3 +438,7 @@ Lemma reducible_not_ret_val c σ: reducible c σ → to_ret_val c = None.
 Admitted.
 
 Instance state_inhabited: Inhabited state := populate ∅.
+
+Lemma size_of_encode_val v:
+  length (encode_val v) = sizeof (type_infer_v v).
+Proof. induction v=>//. simpl. rewrite app_length. omega. Qed.
