@@ -42,7 +42,7 @@ Section wp.
      end)%I.
 
   Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
-    (⌜ typeof v t ⌝ ∧ mapstobytes l q (encode_val v))%I.
+    (⌜ typeof v t ⌝ ∗ mapstobytes l q (encode_val v))%I.
 
   Definition wp_def :
     coPset → cureval → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
@@ -184,7 +184,7 @@ Section rules.
     ⊢ WP e1 @ E {{ Φ; Φret }}.
   Proof. iIntros (??) "H". rewrite wp_unfold /wp_pre; auto. Qed.
 
-  Lemma wp_lift_estep E Φ Φret e1 :
+  Lemma wp_lift_pure_step E Φ Φret e1 :
     (∀ σ1, reducible (cure e1) σ1) →
     (▷ ∀ e2 σ, ⌜ estep e1 e2 σ ⌝ →
                 WP (cure e2) @ E {{ Φ ; Φret }})
@@ -200,16 +200,16 @@ Section rules.
     inversion H0. subst. iFrame. by iApply "H".
   Qed.
 
-  Lemma wp_lift_sstep {E Φ Φret} s1 :
-    to_val (curs s1) = None → to_ret_val (curs s1) = None →
+  Lemma wp_lift_atomic_step {E Φ Φret} s1 :
+    to_val s1 = None → to_ret_val s1 = None →
     (∀ σ1, gen_heap_ctx σ1 ={E}=∗
-      ⌜reducible (curs s1) σ1⌝ ∗
-      ▷ ∀ s2 σ2, ⌜cstep (curs s1) σ1 s2 σ2⌝ ={E}=∗
+      ⌜reducible s1 σ1⌝ ∗
+      ▷ ∀ s2 σ2, ⌜cstep s1 σ1 s2 σ2⌝ ={E}=∗
         gen_heap_ctx σ2 ∗
         default False (to_val s2) Φ)
-    ⊢ WP curs s1 @ E {{ Φ ; Φret }}.
+    ⊢ WP s1 @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (??) "H". iApply (wp_lift_step E _ _ (curs s1))=>//; iIntros (σ1) "Hσ1".
+    iIntros (??) "H". iApply (wp_lift_step E _ _ s1)=>//; iIntros (σ1) "Hσ1".
     iMod ("H" $! σ1 with "Hσ1") as "[$ H]".
     iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
     iModIntro; iNext; iIntros (s2 σ2) "%". iMod "Hclose" as "_".
@@ -251,7 +251,7 @@ Section rules.
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
   Proof.
     iIntros (??) "[Hl HΦ]".
-    iApply wp_lift_sstep=>//.
+    iApply wp_lift_atomic_step=>//.
     iIntros (σ1) "Hσ !>".
     rewrite /mapstoval. iSplit; first eauto.
     iNext; iIntros (v2 σ2 Hstep).
@@ -291,7 +291,7 @@ Section rules.
     ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
   Proof.
     iIntros (???) "[Hl HΦ]".
-    iApply wp_lift_sstep=>//.
+    iApply wp_lift_atomic_step=>//.
     iIntros (σ1) "Hσ !>".
     rewrite /mapstoval. iSplit; first eauto.
     iNext; iIntros (s2 σ2 Hstep).
@@ -355,21 +355,56 @@ Section rules.
       by iApply "IH".
   Admitted.
 
-  Lemma wp_unseq E s1 s2 Φ Φret:
-    WP curs (Sseq s1 s2) @ E {{ Φ ; Φret }}
-    ⊢ WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}.
+  Lemma mapsto_readbytes q σ:
+    ∀ bs l, mapstobytes l q bs ∗ gen_heap_ctx σ ⊢ ⌜ readbytes l bs σ ⌝.
+  Proof.
+    induction bs.
+    - iIntros (?) "(Hp & Hσ)". done.
+    - destruct l. simpl. iIntros "((Ha & Hp) & Hσ)".
+      iDestruct (@gen_heap_valid with "Hσ Ha") as %?.
+      iDestruct (IHbs with "[Hp Hσ]") as %?; first iFrame.
+      iPureIntro. auto.
+  Qed.
+
+  Lemma  same_type_encode_inj σ:
+    ∀ t v v' p,
+      typeof v t → typeof v' t →
+      readbytes p (encode_val v) σ →
+      readbytes p (encode_val v') σ →
+      v = v'.
+  Proof.
+    (* This holds for me .. *)
   Admitted.
   
-  Lemma wp_load E Φ p v t q Φret:
-    ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
-    ⊢ WP cure (Ederef (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
-  Admitted.
+  Lemma wp_load {E} Φ p v t q Φret:
+    p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
+    ⊢ WP cure (Ederef_typed t (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
+  Proof.
+    iIntros "[Hl HΦ]".
+    iApply wp_lift_atomic_step=>//.
+    iIntros (σ1) "Hσ".
+    unfold mapstoval. iDestruct "Hl" as "[% Hl]".
+    iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
+    iModIntro. iSplit; first eauto.
+    iNext; iIntros (s2 σ2 Hstep).
+    iModIntro.
+    inversion Hstep. subst.
+    inversion H3. subst. simpl. iFrame.
+    rewrite (same_type_encode_inj σ2 t v v0 p)=>//. 
+    iApply "HΦ".
+    iSplit=>//.
+  Qed.
 
   Lemma wp_op E op v1 v2 v' Φ Φret:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP cure (Ebinop op (Evalue v1) (Evalue v2)) @ E {{ Φ ; Φret }}.
-  Admitted.
-
+  Proof.
+    iIntros (?) "HΦ". iApply wp_lift_pure_step=>//; first eauto.
+    iNext. iIntros (e2 σ2 Estep).
+    inversion Estep; subst.
+    simplify_eq. iApply wp_value=>//.
+  Qed.
+  
   Lemma wp_ret E v Φ Φret:
     Φret v ⊢ WP curs (Srete (Evalue v)) @ E {{ Φ; Φret }}.
   Admitted.

@@ -45,6 +45,11 @@ Inductive typeof: val → type → Prop :=
 | typeof_null_ptr: ∀ t, typeof Vnull (Tptr t)
 | typeof_ptr: ∀ l t, typeof (Vptr l) (Tptr t).
 
+Lemma null_typeof v: typeof v Tnull → v = Vnull. Proof. induction v; inversion 1=>//. Qed.
+Lemma void_typeof v: typeof v Tvoid → v = Vvoid. Proof. induction v; inversion 1=>//. Qed.
+Lemma int8_typeof v: typeof v Tint8 → (∃ i, v = Vint8 i). Proof. induction v; inversion 1=>//. eauto. Qed.
+Lemma int32_typeof v: typeof v Tint32 → (∃ i, v = Vint32 i). Proof. induction v; inversion 1=>//. eauto. Qed.
+
 Lemma typeof_any_ptr l t1 t2:
   typeof l (Tptr t1) → typeof l (Tptr t2).
 Proof. induction l; inversion 1; subst=>//; constructor. Qed.
@@ -196,6 +201,7 @@ Inductive expr :=
 | Evar (x: ident)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
 | Ederef (e: expr)
+| Ederef_typed (t: type) (e: expr) (* not in source *)
 | Eaddrof (e: expr)
 | Efst (e: expr)
 | Esnd (e: expr)
@@ -235,7 +241,7 @@ Inductive exprctx :=
 | EKid
 | EKbinopr (op: bop) (re: expr)
 | EKbinopl (op: bop) (lv: val)
-| EKderef
+| EKderef_typed (t: type)
 | EKaddrof
 | EKfst
 | EKsnd
@@ -268,6 +274,7 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
          | Some (Tptr t) => Some t
          | _ => None
        end)
+    | Ederef_typed t _ => Some t
     | Eaddrof e' => Tptr <$> type_infer ev e'
     | Efst e' =>
       (match type_infer ev e' with
@@ -289,7 +296,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKid => e
     | EKbinopr op re => Ebinop op e re
     | EKbinopl op lv => Ebinop op (Evalue lv) e
-    | EKderef => Ederef e
+    | EKderef_typed t => Ederef_typed t e
     | EKaddrof => Eaddrof e
     | EKfst => Efst e
     | EKsnd => Esnd e
@@ -339,6 +346,12 @@ Definition evalbop (op: bop) v1 v2 : option val :=
     | oneq => if decide (v1 = v2) then Some vfalse else Some vtrue
   end.
 
+Fixpoint readbytes l bs (σ: mem) :=
+  match bs with
+    | byte::bs' => let '(b, o) := l in σ !! l = Some byte ∧ readbytes (b, o + 1)%nat bs' σ
+    | _ => True
+  end.
+
 (* expr *can* have side-effect *)
 Inductive estep : expr → expr → state → Prop :=
 | ESbinop: ∀ lv rv op σ v',
@@ -346,7 +359,12 @@ Inductive estep : expr → expr → state → Prop :=
              estep (Ebinop op (Evalue lv) (Evalue rv))
                    (Evalue v')
                    σ
-(* | EKderef *)
+| ESderef:
+    ∀ σ l v t,
+      typeof v t →
+      readbytes l (encode_val v) σ →
+      estep (Ederef_typed t (Evalue (Vptr l)))
+            (Evalue v) σ
 (* | ekaddrof *)
 (* | EKcast (t: type). *)
 .
