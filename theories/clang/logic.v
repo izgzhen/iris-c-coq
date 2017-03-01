@@ -41,8 +41,8 @@ Section wp.
        | _ => True
      end)%I.
 
-  Definition mapstoval (l: addr) (q: Qp) (v: val) : iProp Σ :=
-    mapstobytes l q (encode_val v).
+  Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
+    (⌜ typeof v t ⌝ ∧ mapstobytes l q (encode_val v))%I.
 
   Definition wp_def :
     coPset → cureval → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
@@ -85,13 +85,13 @@ Notation "'{{{' P } } } e @ E {{{ 'RET' pat ; Q ; Φret } } }" :=
     (at level 20,
      format "{{{  P  } } }  e  @  E  {{{  RET  pat ;  Q ;  Φret } } }") : C_scope.
 
-Notation "l ↦{ q } v" := (mapstoval l q v)
-  (at level 20, q at level 50, format "l  ↦{ q }  v") : uPred_scope.
-Notation "l ↦ v" :=
-  (mapstoval l 1%Qp v) (at level 20) : uPred_scope.
-Notation "l ↦{ q } -" := (∃ v, l ↦{q} v)%I
-  (at level 20, q at level 50, format "l  ↦{ q }  -") : uPred_scope.
-Notation "l ↦ -" := (l ↦{1} -)%I (at level 20) : uPred_scope.
+Notation "l ↦{ q } v @ t" := (mapstoval l q v t)%I
+  (at level 20, q at level 50, format "l  ↦{ q }  v  @  t") : uPred_scope.
+Notation "l ↦ v @ t" :=
+  (mapstoval l 1%Qp v t)%I (at level 20) : uPred_scope.
+Notation "l ↦{ q } - @ t" := (∃ v, l ↦{q} v @ t)%I
+  (at level 20, q at level 50, format "l  ↦{ q }  -  @  t") : uPred_scope.
+Notation "l ↦ - @ t" := (l ↦{1} - @ t)%I (at level 20) : uPred_scope.
 
 Section rules.
   Context `{clangG Σ}.
@@ -245,30 +245,33 @@ Section rules.
       by iFrame.
   Qed.
 
-  Definition same_size v v' := sizeof (type_infer_v v) = sizeof (type_infer_v v').
-  
-  Lemma wp_assign {E l v v'} Φ Φret:
-    same_size v v' → (* typing info is higher -- though encode_val plays *)
-    ▷ l ↦ v ∗ ▷ (l ↦ v' -∗ Φ Vvoid)
+  Lemma wp_assign {E l v v'} t t' Φ Φret:
+    typeof v' t' → assign_type_compatible t t' →
+    ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr l)) (Evalue v')) @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (?) "[Hl HΦ]".
+    iIntros (??) "[Hl HΦ]".
     iApply wp_lift_sstep=>//.
     iIntros (σ1) "Hσ !>".
-    rewrite /mapstoval.
-    iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
-    { by repeat (rewrite size_of_encode_val). }
-    iSplit; first eauto.
+    rewrite /mapstoval. iSplit; first eauto.
     iNext; iIntros (v2 σ2 Hstep).
-    inversion Hstep. subst. inversion H2. subst.
-    inversion H2. subst. iMod "H" as "[Hσ' Hv']".
-    iModIntro. iFrame. by iApply "HΦ".
+    iDestruct "Hl" as "[% Hl]".
+    iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
+    {
+      rewrite -(typeof_preserves_size v t)=>//.
+      rewrite -(typeof_preserves_size v' t')=>//.
+      by apply assign_preserves_size. }
+    inversion Hstep. subst. inversion H4. subst.
+    inversion H4. subst. iMod "H" as "[Hσ' Hv']".
+    iModIntro. iFrame. iApply "HΦ".
+    iSplit=>//.
+    iPureIntro. by apply (assign_preserves_typeof t t').
   Qed.
 
-  Lemma wp_assign_offset {E b o off v1 v2 v2'} Φ Φret:
-    same_size v2 v2' → sizeof (type_infer_v v1) = off →
-    ▷ (b, o) ↦ Vpair v1 v2∗
-    ▷ ((b, o) ↦ Vpair v1 v2' -∗ Φ Vvoid)
+  Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 t2' Φ Φret:
+    typeof v2' t2' → assign_type_compatible t2 t2' → sizeof t1 = off →
+    ▷ (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2 ∗
+    ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2 -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
   Admitted.
   
@@ -282,8 +285,8 @@ Section rules.
     ⊢ WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}.
   Admitted.
   
-  Lemma wp_load E Φ p v q Φret:
-    ▷ p ↦{q} v ∗ ▷ (p ↦{q} v -∗ Φ v)
+  Lemma wp_load E Φ p v t q Φret:
+    ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP cure (Ederef (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
   Admitted.
 
@@ -334,14 +337,14 @@ Section rules.
   
   Fixpoint params_match (params: decls) (vs: list val) :=
     match params, vs with
-      | (_, t)::params, v::vs => typeof t v ∧ params_match params vs
+      | (_, t)::params, v::vs => typeof v t ∧ params_match params vs
       | [], [] => True
       | _, _ => False
     end.
 
-  Fixpoint alloc_params (addrs: list addr) (vs: list val) :=
+  Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=
     (match addrs, vs with
-       | l::params, v::vs => l ↦ v ∗ alloc_params params vs
+       | (t, l)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
        | [], [] => True
        | _, _ => False
      end)%I.
@@ -433,7 +436,7 @@ Section rules.
     (∀ ls f_body',
        ⌜ length ls = length vs ∧
          instantiate_f_body (add_params_to_env ∅ params ls) f_body = Some f_body' ⌝ -∗
-       alloc_params ls vs -∗
+       alloc_params (zip (params.*2) ls) vs -∗
        WP curs f_body' {{ _, True; Φ }})
     ⊢ WP curs (Scall f es) {{ Φ; Φret }}.
   Admitted.

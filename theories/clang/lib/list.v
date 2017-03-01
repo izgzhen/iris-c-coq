@@ -14,18 +14,18 @@ Section proof.
     match xs with
       | [] => (⌜ l = null ⌝)%I
       | x::xs' => (∃ p l',
-                     ⌜ l = Vptr p ∧ typeof t x ∧ typeof (tlist t) l' ⌝ ∗
-                     p ↦ Vpair x l' ∗ isList l' xs' t)%I
+                     ⌜ l = Vptr p ∧ typeof x t ∧ typeof l' (tlist t) ⌝ ∗
+                     p ↦ Vpair x l' @ tcell t ∗ isList l' xs' t)%I
     end.
 
   Lemma isList_ptr (l: val) (xs: list val) (t: type) :
-    isList l xs t ⊢ ⌜ typeof (Tptr Tvoid) l ⌝.
+    isList l xs t ⊢ ⌜ typeof l (Tptr Tvoid) ⌝.
   Proof.
     destruct xs as [|x xs'].
-    - iIntros "%". iPureIntro. subst. solve_typeof.
+    - iIntros "%". iPureIntro. subst. constructor.
     - simpl. iIntros "H".
       iDestruct "H" as (??) "(% & ? & _)".
-      destruct H2 as (?&?&?). subst. iPureIntro. solve_typeof.
+      destruct H2 as (?&?&?). subst. iPureIntro. constructor.
   Qed.
   
   Parameter py pt px: addr.
@@ -42,9 +42,9 @@ Section proof.
   Lemma rev_spec Φ Φret body xs:
     ∀ lx ly ys,
     instantiate_f_body {[ x := (tlist Tint32, px) ]} (rev_list Tint32) = Some body →
-    isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ (∃ v: addr, pt ↦ v) ∗
-    px ↦ lx ∗ py ↦ ly ∗
-    (∀ ly', py ↦ ly' ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
+    isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - @ Tptr Tvoid ∗
+    px ↦ lx @ tlist Tint32 ∗ py ↦ ly @ tlist Tint32 ∗
+    (∀ ly', py ↦ ly' @ tlist Tint32 ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
     ⊢ WP curs body {{ Φ; Φret }}.
   Proof.
     induction xs as [|x xs' IHxs'];
@@ -66,9 +66,7 @@ Section proof.
       simpl. wp_load. wp_bind (Esnd _).
       iApply wp_snd. iNext. iApply wp_value=>//.
       iDestruct "Ht" as (?) "Ht".
-      iApply (@wp_assign _ _ _ _ H0 l').
-      { admit. } iFrame. iIntros "!> Ht".
-      repeat (iApply wp_seq).
+      wp_run.
       iApply (wp_bind [EKbinopr _ _] (SKassignr _)).
       iApply wp_load. iFrame. iIntros "!> ?".
       simpl. iApply (wp_bind [] (SKassignr _)).
@@ -76,25 +74,17 @@ Section proof.
       iApply wp_op=>//. simpl.
       rewrite /offset_by_byte.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
-      wp_load. iDestruct (isList_ptr with "Hlr") as "%".
-      iApply (@wp_assign_offset _ _ _ _ _ _ x l' ly)=>//.
-      { admit. } { admit. }
-      iFrame. iIntros "!> ?".
-      wp_load. iApply (@wp_assign _ _ _ _ ly (Vptr (pb, po))).
-      { admit. }
-      iFrame. iIntros "!> ?".
-      wp_load. iApply (@wp_assign _ _ _ _ (Vptr (pb, po)) l')=>//.
-      { admit. }
-      iFrame. iIntros "!> ?".
+      wp_load. iDestruct (isList_ptr with "Hlr") as "%". wp_run=>//.
+      unfold tlist. (* XXX: automatically unfold into Tptr? *) wp_assign.
+      wp_load. wp_assign.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)).
       { unfold_f_inst. destruct (decide (proof.x = proof.x))=>//. }
-      iFrame. simpl.
-      iSplitL "~1 Hlr".
+      iFrame.
+      iSplitL "Hp Hlr".
       { iExists (pb, po), ly. iFrame.
-        iPureIntro. repeat (split; first done).
-        by eapply typeof_any_ptr. }
-      iSplitL "Ht"; first admit.
+        iPureIntro. repeat (split; first done). by eapply typeof_any_ptr. }
+      iSplitL "Ht"; first eauto.
       replace (rev xs' ++ x :: ys) with ((rev xs' ++ [x]) ++ ys); first done; last by rewrite -app_assoc.
-  Admitted.
+  Qed.
   
 End proof.

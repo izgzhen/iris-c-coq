@@ -34,6 +34,15 @@ Fixpoint type_infer_v (v: val) : type :=
     | Vpair v1 v2 => Tprod (type_infer_v v1) (type_infer_v v2)
   end.
 
+Inductive typeof: val → type → Prop :=
+| typeof_infer: ∀ v, typeof v (type_infer_v v)
+| typeof_null_ptr: ∀ t, typeof Vnull (Tptr t)
+| typeof_ptr: ∀ l t, typeof (Vptr l) (Tptr t).
+
+Lemma typeof_any_ptr l t1 t2:
+  typeof l (Tptr t1) → typeof l (Tptr t2).
+Proof. induction l; inversion 1; subst=>//; constructor. Qed.
+
 Instance int_eq_dec : EqDecision int.
 Proof. apply Int.eq_dec. Defined.
 
@@ -55,18 +64,6 @@ Fixpoint sizeof (t : type) : nat :=
     | Tptr _ => 4 % nat
     | Tprod t1 t2 => sizeof t1 + sizeof t2
   end.
-
-Inductive typeof : type → val → Prop :=
-| typeof_void: typeof Tvoid Vvoid
-| typeof_null: typeof Tnull Vnull
-| typeof_null_ptr: ∀ t, typeof (Tptr t) Vnull
-| typeof_int32_to_int8:
-    ∀ v: int32, (Int.unsigned v) <=? Byte.max_unsigned → typeof Tint8 (Vint32 v)
-| typeof_int8_to_int32: ∀ v: int8, typeof Tint32 (Vint8 v)
-| typeof_int8: ∀ i, typeof Tint8 (Vint8 i)
-| typeof_int32: ∀ i, typeof Tint32 (Vint32 i)
-| typeof_ptr: ∀ t l, typeof (Tptr t) (Vptr l)
-| typeof_prod: ∀ t1 t2 v1 v2, typeof t1 v2 → typeof t2 v2 → typeof (Tprod t1 t2) (Vpair v1 v2).
 
 Inductive bop:=
 | oplus
@@ -442,3 +439,28 @@ Instance state_inhabited: Inhabited state := populate ∅.
 Lemma size_of_encode_val v:
   length (encode_val v) = sizeof (type_infer_v v).
 Proof. induction v=>//. simpl. rewrite app_length. omega. Qed.
+
+Lemma typeof_preserves_size v t:
+  typeof v t → sizeof t = length (encode_val v).
+Admitted.
+
+Inductive assign_type_compatible : type → type → Prop :=
+| assign_id: ∀ t, assign_type_compatible t t
+| assign_null_ptr: ∀ t, assign_type_compatible (Tptr t) Tnull
+| assign_ptr_ptr: ∀ t1 t2, assign_type_compatible (Tptr t1) (Tptr t2).
+
+Lemma assign_preserves_size t1 t2:
+  assign_type_compatible t1 t2 → sizeof t1 = sizeof t2.
+Admitted.
+
+Lemma assign_preserves_typeof t1 t2 v:
+  assign_type_compatible t1 t2 → typeof v t2 → typeof v t1.
+Proof.
+  inversion 1=>//.
+  { subst. intros. inversion H0.
+    subst. destruct v=>//. constructor. }
+  { intros. inversion H2.
+    + subst. destruct v=>//. constructor.
+    + constructor.
+    + constructor. }
+Qed.
