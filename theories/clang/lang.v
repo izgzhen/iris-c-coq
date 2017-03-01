@@ -365,8 +365,10 @@ Inductive sstep : stmts → state → stmts → state → Prop :=
             σ
             Sskip
             (storebytes l (encode_val v) σ)
-(* | SKif (s1 s2: stmts) *)
+| SSseq: ∀ s σ, sstep (Sseq Sskip s) σ s σ
 (* | SKwhile (s: stmts). *)
+| SSseq_head:
+    ∀ s1 s1' s2 σ σ', sstep s1 σ s1' σ' → sstep (Sseq s1 s2) σ (Sseq s1' s2) σ'
 .
 
 Bind Scope val_scope with val.

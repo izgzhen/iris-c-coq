@@ -311,10 +311,48 @@ Section rules.
     iPureIntro. constructor=>//.
     by eapply assign_preserves_typeof.
   Qed.
-  
+
+  Lemma wp_seq_skip E s2 Φ Φret:
+    (|={E}=> WP curs s2 @ E {{ v, Φ v;Φret }})%I
+    ⊢ WP curs (Sseq Sskip s2) @ E {{ v, Φ v;Φret }}.
+  Proof.
+    iIntros "H".
+    rewrite !wp_unfold /wp_pre. iRight; iRight; iSplit=>//.
+    iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iModIntro. iSplit; first eauto.
+    iNext; iIntros (e2 σ2 ?).
+    iMod "Hclose". inversion H0. subst. inversion H2. subst. iFrame.
+    - rewrite !wp_unfold /wp_pre. done.
+    - subst. inversion H7.
+  Qed.
+
+  Lemma wp_seq_ret E s1 s2 rv Φ Φret:
+    to_ret_val (curs s1) = Some rv →
+    (|={E}=> Φret rv)%I
+    ⊢ WP curs (Sseq s1 s2) @ E {{ v, Φ v;Φret }}.
+  Admitted.
+
   Lemma wp_seq E s1 s2 Φ Φret:
     WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}
     ⊢ WP curs (Sseq s1 s2) @ E {{ Φ ; Φret }}.
+  Proof.
+    iIntros "H". iLöb as "IH" forall (E s1 Φ). rewrite wp_unfold /wp_pre.
+    iDestruct "H" as "[Hv|[Hrv|[% H]]]".
+    - iDestruct "Hv" as (v) "[Hev Hv]". iDestruct "Hev" as "%".
+      destruct s1=>//.
+      iApply (wp_seq_skip E s2 Φ Φret with "Hv").
+    - iDestruct "Hrv" as (rv) "[% Hv]".
+      by iApply (wp_seq_ret E s1 s2 rv Φ Φret with "Hv").
+    - rewrite (wp_unfold E (curs (Sseq s1 s2)) Φ Φret) /wp_pre. iRight; iRight; iSplit.
+      { eauto using fill_not_val, fill_not_ret_val. }
+      iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
+      iModIntro. iSplitL "". { iPureIntro. admit. }
+      iNext; iIntros (e2 σ2 Hstep).
+      destruct H0. assert (∃ s1', cstep (curs s1) σ1 (curs s1') σ2 ∧ e2 = (curs (Sseq s1' s2))) as Hs1.
+      { admit. }
+      destruct Hs1 as [s1' [Hs1 ?]]. subst.
+      iMod ("H" $! _ σ2 with "[#]") as "[$ H]"=>//.
+      by iApply "IH".
   Admitted.
 
   Lemma wp_unseq E s1 s2 Φ Φret:
