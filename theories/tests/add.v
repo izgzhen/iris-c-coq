@@ -41,7 +41,7 @@ Section example.
   Proof.
     iIntros (Hpf) "(#? & #? & Hp & Hsc & HΦ)".
     iApply (wp_call _ _ [Vint32 vx])=>//.
-    { simpl. split=>//. apply typeof_int32. }
+    { simpl. split=>//. constructor. }
     iIntros (ls) "% Hls".
     destruct ls as [|? [|? ls]].
     - simpl. iDestruct "Hls" as "%"=>//. by iIntros "%".

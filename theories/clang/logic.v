@@ -268,12 +268,49 @@ Section rules.
     iPureIntro. by apply (assign_preserves_typeof t t').
   Qed.
 
+  Lemma mapstobytes_prod b:
+    ∀ v1 o v2,
+      mapstobytes (b, o) 1 (encode_val (Vpair v1 v2)) ⊣⊢
+      mapstobytes (b, o) 1 (encode_val v1) ∗
+      mapstobytes (b, o + length (encode_val v1))%nat 1 (encode_val v2).
+  Proof.
+    intro v1. simpl. induction (encode_val v1); intros; iSplit.
+    - iIntros "?". simpl. iSplit; first done. by rewrite Nat.add_0_r.
+    - simpl. iIntros "[_ ?]". by rewrite Nat.add_0_r.
+    - simpl. iIntros "[$ ?]". replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
+      by iApply IHl.
+    - simpl. iIntros "[[$ ?] ?]".
+      replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
+      iApply IHl. iFrame.
+  Qed.
+ 
   Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 t2' Φ Φret:
     typeof v2' t2' → assign_type_compatible t2 t2' → sizeof t1 = off →
     ▷ (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2 ∗
     ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2 -∗ Φ Vvoid)
     ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
-  Admitted.
+  Proof.
+    iIntros (???) "[Hl HΦ]".
+    iApply wp_lift_sstep=>//.
+    iIntros (σ1) "Hσ !>".
+    rewrite /mapstoval. iSplit; first eauto.
+    iNext; iIntros (s2 σ2 Hstep).
+    iDestruct "Hl" as "[% Hl]". inversion H3; subst.
+    iDestruct (mapstobytes_prod with "Hl") as "[Hl1 Hl2]".
+    iDestruct (gen_heap_update_bytes _ (encode_val v2) _ (encode_val v2') with "Hσ Hl2") as "H".
+    {
+      rewrite -(typeof_preserves_size v2 t2)=>//.
+      rewrite -(typeof_preserves_size v2' t2')=>//.
+      by apply assign_preserves_size.
+    }
+    inversion Hstep. subst. inversion H4. subst.
+    inversion H4. subst. iMod "H" as "[Hσ' Hv']".
+    iDestruct (mapstobytes_prod with "[Hv' Hl1]") as "?"; first iFrame.
+    rewrite -(typeof_preserves_size v1 t1)=>//. iFrame.
+    iApply "HΦ". iSplit=>//.
+    iPureIntro. constructor=>//.
+    by eapply assign_preserves_typeof.
+  Qed.
   
   Lemma wp_seq E s1 s2 Φ Φret:
     WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}

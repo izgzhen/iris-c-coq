@@ -35,7 +35,13 @@ Fixpoint type_infer_v (v: val) : type :=
   end.
 
 Inductive typeof: val → type → Prop :=
-| typeof_infer: ∀ v, typeof v (type_infer_v v)
+| typeof_null: typeof Vnull Tnull
+| typeof_void: typeof Vvoid Tvoid
+| typeof_int8: ∀ i, typeof (Vint8 i) Tint8
+| typeof_int32: ∀ i, typeof (Vint32 i) Tint32
+| typeof_prod:
+    ∀ v1 v2 t1 t2,
+      typeof v1 t1 → typeof v2 t2 → typeof (Vpair v1 v2) (Tprod t1 t2)
 | typeof_null_ptr: ∀ t, typeof Vnull (Tptr t)
 | typeof_ptr: ∀ l t, typeof (Vptr l) (Tptr t).
 
@@ -444,6 +450,10 @@ Lemma typeof_preserves_size v t:
   typeof v t → sizeof t = length (encode_val v).
 Admitted.
 
+Lemma type_infer_preserves_size v:
+  sizeof (type_infer_v v) = length (encode_val v).
+Admitted.
+
 Inductive assign_type_compatible : type → type → Prop :=
 | assign_id: ∀ t, assign_type_compatible t t
 | assign_null_ptr: ∀ t, assign_type_compatible (Tptr t) Tnull
@@ -457,10 +467,6 @@ Lemma assign_preserves_typeof t1 t2 v:
   assign_type_compatible t1 t2 → typeof v t2 → typeof v t1.
 Proof.
   inversion 1=>//.
-  { subst. intros. inversion H0.
-    subst. destruct v=>//. constructor. }
-  { intros. inversion H2.
-    + subst. destruct v=>//. constructor.
-    + constructor.
-    + constructor. }
+  { subst. intros. inversion H0; subst. constructor. }
+  { intros. inversion H2; subst; constructor. }
 Qed.

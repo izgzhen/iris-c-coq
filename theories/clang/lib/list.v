@@ -74,9 +74,8 @@ Section proof.
       iApply wp_op=>//. simpl.
       rewrite /offset_by_byte.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
-      wp_load. iDestruct (isList_ptr with "Hlr") as "%". wp_run=>//.
-      unfold tlist. (* XXX: automatically unfold into Tptr? *) wp_assign.
-      wp_load. wp_assign.
+      wp_load. iDestruct (isList_ptr with "Hlr") as "%".
+      wp_assign=>//. wp_load. wp_assign. wp_load. wp_assign.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)).
       { unfold_f_inst. destruct (decide (proof.x = proof.x))=>//. }
       iFrame.
