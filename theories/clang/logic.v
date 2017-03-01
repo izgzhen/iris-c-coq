@@ -326,6 +326,10 @@ Section rules.
     - subst. inversion H7.
   Qed.
 
+  Lemma wp_ret E v Φ Φret:
+    Φret v ⊢ WP curs (Srete (Evalue v)) @ E {{ Φ; Φret }}.
+  Admitted.
+
   Lemma wp_seq_ret E s1 s2 rv Φ Φret:
     to_ret_val (curs s1) = Some rv →
     (|={E}=> Φret rv)%I
@@ -404,10 +408,6 @@ Section rules.
     inversion Estep; subst.
     simplify_eq. iApply wp_value=>//.
   Qed.
-  
-  Lemma wp_ret E v Φ Φret:
-    Φret v ⊢ WP curs (Srete (Evalue v)) @ E {{ Φ; Φret }}.
-  Admitted.
 
   Lemma wp_while_true E cond s Φ Φret:
     ▷ WP curs (Sseq s (Swhile cond cond s)) {{ Φ; Φret }}
@@ -437,13 +437,22 @@ Section rules.
   Lemma wp_fst v1 v2 Φ Φret:
     ▷ WP cure (Evalue v1) {{ Φ; Φret }}
     ⊢ WP cure (Efst (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
-  Admitted.
+  Proof.
+    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto.
+    iNext. iIntros (e2 σ2 Estep).
+    inversion Estep; subst.
+    by simplify_eq.
+  Qed.
 
   Lemma wp_snd v1 v2 Φ Φret:
     ▷ WP cure (Evalue v2) {{ Φ; Φret }}
     ⊢ WP cure (Esnd (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
-  Admitted.
-
+  Proof.
+    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto.
+    iNext. iIntros (e2 σ2 Estep).
+    inversion Estep; subst.
+    by simplify_eq.
+  Qed.
   
   Fixpoint params_match (params: decls) (vs: list val) :=
     match params, vs with

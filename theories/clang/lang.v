@@ -365,7 +365,12 @@ Inductive estep : expr → expr → state → Prop :=
       readbytes l (encode_val v) σ →
       estep (Ederef_typed t (Evalue (Vptr l)))
             (Evalue v) σ
-(* | ekaddrof *)
+| ESfst:
+    ∀ v1 v2 σ,
+      estep (Efst (Evalue (Vpair v1 v2))) (Evalue v1) σ
+| ESsnd:
+    ∀ v1 v2 σ,
+      estep (Esnd (Evalue (Vpair v1 v2))) (Evalue v2) σ
 (* | EKcast (t: type). *)
 .
 
