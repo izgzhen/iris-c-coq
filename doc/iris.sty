@@ -399,6 +399,7 @@
 
 \newcommand{\ecast}[2]{{#1} \, \texttt{as} \, {#2}}
 \newcommand{\deref}[1]{\,!\,{#1}}
+\newcommand{\dereft}[2]{\,!_{#1}\,{#2}}
 \newcommand{\efst}[1]{{#1}.1}
 \newcommand{\esnd}[1]{{#1}.2}
 
@@ -427,6 +428,14 @@
 
 % Misc
 \newcommand{\tychk}[2]{\vdash_{\text{tychk}} {#1} : {#2}}
+\newcommand{\tyinf}[2]{\vdash_{\text{tyinf}} {#1} : {#2}}
+
+\newcommand{\estep}[3]{{#3} \vdash {#1} \ra_{\Expr} {#2}}
+\newcommand{\sstep}[4]{({#1}, {#2}) \ra_{\Stmts} ({#3}, {#4})}
+\newcommand{\cstep}[4]{({#1}, {#2}) \ra_{\text{cur}} ({#3}, {#4})}
+
+\newcommand{\reslhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{LHS}}}
+\newcommand{\resrhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{RHS}}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STANDARD DERIVED CONSTRUCTIONS

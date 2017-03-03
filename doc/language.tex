@@ -18,7 +18,7 @@ Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, 
         \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l \mid (v, v)
 \\
     e : \Expr \bnfdef{}&
-        v \mid x \mid e \oplus e \mid \deref{e} \mid \& e \mid \ecast{e}{\tau} \mid \efst{e} \mid \esnd{e}
+        v \mid x \mid e \oplus e \mid \deref{e} \mid \dereft{\tau}{e} \mid \& e \mid \ecast{e}{\tau} \mid \efst{e} \mid \esnd{e}
 \\
     p : \Prim \bnfdef{}&
         \pcli \mid \psti
@@ -28,6 +28,8 @@ Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, 
         \sret \mid \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid s ; s
 \\
 \end{align*}
+
+XXX: Explain two type of dereference.
 
 \paragraph{Program.}
 
@@ -69,15 +71,48 @@ Next, we define byte-size value and memory model:
 
 \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
 
-We define state $\sigma: \State \eqdef [ b \gmapsto [\bval] ]$,
-i.e. a heap in which every block maps to a list of byte-size values.
+We define state $\sigma: \State \eqdef [ l \gmapsto \bval ]$,
+i.e. a heap in which every address maps to a byte-level value.
 
 You may notice the difference between $\Val$ and $\byteval$, it is intentional to create a layer of abstraction for
 easier manipulation of spatial assertions and also a clean, unified language syntax.
 
 \paragraph{Small-Step Operational Semantics.}
 
-TODO.
+We define the HNF small step semantics for both expression ($\estep{e}{e'}{\sigma}$) and statements ($\sstep{s}{\sigma}{s'}{\sigma'}$),
+and then combine them together ($\cstep{e^\dag}{\sigma}{e'^\dag}{\sigma}$, $\cstep{s^\dag}{\sigma}{s'^\dag}{\sigma'}$).
+
+\begin{figure}
+\begin{mathpar}
+
+\infer[ES-BINOP]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{v'}{\sigma}}
+
+\infer[ES-DEREF]{\tychk{v}{t} \quad \sigma \vdash l \mapsto \encode(v)}{\estep{\dereft{\tau}{l}}{v}{\sigma}}
+
+\infer[ES-FST]{}{\estep{\efst{(v_1, v_2)}}{v_1}{\sigma}}
+
+\infer[ES-SND]{}{\estep{\esnd{(v_1, v_2)}}{v_2}{\sigma}}
+
+\end{mathpar}
+\caption{Semantics of expression evaluation}
+\end{figure}
+
+\begin{figure}
+\begin{mathpar}
+
+\infer[SS-ASSIGN]{}{\sstep{l \la v}{\sigma}{\sskip}{\sigma[ l \mapsto \encode(v) ]}}
+
+\infer[SS-SEQ]{}{\sstep{\sskip ; s}{\sigma}{s}{\sigma}}
+
+\infer[SS-SEQ-HEAD]{\sstep{s_1}{\sigma}{s_1'}{\sigma'}}{\sstep{s_1; s_2}{\sigma}{s_1'; s_2}{\sigma'}}
+
+\end{mathpar}
+\caption{Semantics of statements execution}
+\end{figure}
+
+
+
+XXX: Define $\sigma \vdash l \mapsto \vec \bval$
 
 \subsection{Type System and Environment}
 
@@ -85,7 +120,7 @@ TODO.
 
 The types are defined in \Sref{p:type}, and all values in $\val$ can be \emph{locally} typed trivially (since $\val$ is introduced to reflect type structure in some sense). Nevertheless, due to the fact that language of study is weakly-typed in the vein of C, we still have some ``weird'' rules worth documenting.
 
-Here we define local typing judgement $\tychk{v}{\tau}$ for values.
+Here we define local typing judgment $\tychk{v}{\tau}$ for values.
 
 \begin{mathpar}
 \infer[tychk-void]{}{\tychk{\void}{\tyvoid}}
@@ -96,15 +131,9 @@ Here we define local typing judgement $\tychk{v}{\tau}$ for values.
 
 \infer[tychk-int32]{}{\tychk{i \in [0, 2^{32})}{\tyword}}
 
-\infer[tychk-int8-to-32]{\tychk{v}{\tybyte}}{\tychk{v}{\tyword}}
-
-\infer[tychk-int32-to-8]{\tychk{i \in [0, 2^8)}{\tyword}}{\tychk{i}{\tybyte}}
-
 \infer[tychk-null-ptr]{}{\All \tau. \tychk{\vnull}{\typtr{\tau}}}
 
 \infer[tychk-ptr]{}{\All \tau, l. \tychk{l}{\typtr{\tau}}}
-
-\infer[tychk-ptr-cast]{\tychk{v}{\typtr{\tau}}}{\tychk{v}{\typtr{\tau'}}}
 
 \infer[tychk-prod]{\tychk{v_1}{\tau_1} \quad \tychk{v_2}{\tau_2}}{\tychk{(v_1, v_2)}{\tau_1 \times \tau_2}}
 
@@ -119,12 +148,27 @@ In Iris-OS, variables are all unfolded before the running the function body,
 which saves the program logic from caring about the lexical environment.
 During this unfolding, we will replace variables with either their location (left-hand side)
 or the dereference of their location (right-hand side). And we will also produce a pointer arithmetic
-expression when processing the left-hand side expression, which requires type inference.
+expression when processing the left-hand side expression, which requires type inference $\tyinf{e}{\tau}$
+(since it is standard and trivial, we will leave out the details here).
 
-Here we first define the type inference rules. Although it is written in an axiomatic way,
-it is a direct translation of our monadic algorithm (TODO).
+Then we define the rules for ``interpreting'' left-hand side expression ($\reslhs{e}$ or $\reslhs{s}$)
+and right-hand side expression ($\resrhs{e}$ or $\resrhs{s}$). In all rules below, a $\Gamma$ is implicitly
+captured, and if any operation on $\Gamma$ failed, then the rule will be returning ``invalid'' in implementation.
 
-Then we define the rules for ``interpreting'' left-hand side expression (TODO).
+\begin{align*}
+\reslhs{e_1 \la e_2} =&\, \reslhs{e_1} \la e_2\\
+\reslhs{x} =&\, \Gamma(x).l \\
+\reslhs{\deref{e}} =&\, \resrhs{e} \\
+\reslhs{\efst{e}} =&\, \reslhs{e} \\
+\reslhs{\esnd{e}} =&\, \reslhs{e} + \sizeof(\tau) \quad \text{if } \tyinf{\reslhs{e}}{\typtr{(\tau_1 \times \tau_2)}}\\
+\reslhs{l} =&\, l\\
+\\
+\resrhs{e_1 \la e_2} =&\, e_1 \la \resrhs{e_2}\\
+\resrhs{x} =&\, \dereft{\Gamma(x).t}{\Gamma(x).l} \\
+\resrhs{\deref{e}} =&\, \dereft{\tau}{\resrhs{e}} \quad \text{if } \tyinf{e}{\typtr{\tau}}
+\end{align*}
+
+The cases not covered are defined recursively (and trivially)
 
 %%% Local Variables:
 %%% mode: latex
