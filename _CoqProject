@@ -3,9 +3,12 @@ theories/lib/Integers.v
 theories/lib/Coqlib.v
 theories/lib/gmap_solve.v
 theories/lib/smap.v
+theories/lib/prelude.v
 theories/clang/memory.v
 theories/clang/lang.v
+theories/clang/types.v
 theories/clang/logic.v
+theories/clang/opsem.v
 theories/clang/tactics.v
 theories/clang/notations.v
 theories/clang/lib/list.v

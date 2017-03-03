@@ -1,6 +1,7 @@
-Require Import clang.logic.
+Require Import iris_os.clang.logic.
 From iris.proofmode Require Import coq_tactics tactics.
-Require Import lib.gmap_solve.
+Require Import iris_os.lib.gmap_solve.
+
 Set Default Proof Using "Type".
 Import uPred.
 
@@ -29,7 +30,7 @@ Ltac reshape_expr e tac :=
   | Ebinop ?op ?e1 ?e2 => go (EKbinopr op e2 :: K) e1
   | Efst ?e => go (EKfst :: K) e
   | Esnd ?e => go (EKsnd :: K) e
-  | Ederef ?e => go (EKderef :: K) e
+  | Ederef_typed ?e => go (EKderef_typed :: K) e
   end in go (@nil exprctx) e.
 
 Ltac reshape_stmts s tac :=
@@ -96,7 +97,7 @@ Lemma tac_wp_load Δ Δ' E i l q v t Φ Φret:
   IntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, l ↦{q} v @ t)%I →
   (Δ' ⊢ Φ v) →
-  Δ ⊢ WP (cure (Ederef (Evalue (Vptr l)))) @ E {{ Φ ; Φret }}.
+  Δ ⊢ WP (cure (Ederef_typed t (Evalue (Vptr l)))) @ E {{ Φ ; Φret }}.
 Proof.
   intros. eapply wand_apply.
   { iIntros "HP HQ". iApply wp_load. iSplitL "HP"; eauto. }
@@ -145,8 +146,8 @@ Tactic Notation "wp_load" :=
   | |- _ ⊢ wp ?E (curs ?s) ?P ?Q =>
     first
       [reshape_stmts s ltac:(fun Kes Ks e' =>
-         match eval hnf in e' with Ederef _ => wp_bind_core Kes Ks end)
-      |fail 1 "wp_load: cannot find 'Ederef' in" s];
+         match eval hnf in e' with Ederef_typed _ _ => wp_bind_core Kes Ks end)
+      |fail 1 "wp_load: cannot find 'Ederef_typed' in" s];
     eapply tac_wp_load;
       [apply _
       |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in

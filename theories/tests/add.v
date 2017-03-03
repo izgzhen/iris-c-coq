@@ -8,8 +8,10 @@ Section example.
   Context `{clangG Σ, specG Σ} {N: namespace}.
 
   Parameter py: addr.
-  Parameter x Y lock unlock: ident.
-  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.  
+  Definition x: ident := 1.
+  Definition y: ident := 3.
+  Definition Y: ident := 2.
+  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.
 
   Definition invs (prio: nat) : iProp Σ :=
     match prio with
@@ -21,8 +23,8 @@ Section example.
 
   Definition f_body : stmts :=
     cli ;;
-    py <- !py + x ;;
-    x <- !py ;;
+    y <- y + x ;;
+    x <- y ;;
     sti ;;
     rete x.
 
@@ -40,13 +42,12 @@ Section example.
     ⊢ WP curs (Scall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}.
   Proof.
     iIntros (Hpf) "(#? & #? & Hp & Hsc & HΦ)".
-    iApply (wp_call _ _ [Vint32 vx])=>//.
+    iApply (wp_call _ [(y, (Tint32, py))] _ [Vint32 vx])=>//.
     { simpl. split=>//. constructor. }
     iIntros (ls) "% Hls".
     destruct ls as [|? [|? ls]].
     - simpl. iDestruct "Hls" as "%"=>//. by iIntros "%".
     - unfold_f_inst. gmap_rewrite.
-      destruct (decide (x = x))=>//.
       iDestruct "Hls" as "[_ %]".
       inversion H1; subst.
       iIntros "[Hvx _]".
@@ -63,7 +64,7 @@ Section example.
         iPureIntro. apply spec_step_rel. unfold f_rel.
         exists vy. gmap_simplify=>//. by gmap_rewrite. }
       (* close invariant *)
-      iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
+      iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.      
       wp_run. iApply sti_spec.
       iFrame. iFrame "#".  iSplitL "Hss' Hy".
       { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }

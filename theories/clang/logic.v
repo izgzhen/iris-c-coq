@@ -1,6 +1,6 @@
 (* Program Logic *)
 
-Require Export lang.
+From iris_os.clang Require Export lang.
 From iris.base_logic Require Import gen_heap big_op.
 From iris.algebra Require Export gmap agree auth.
 From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
@@ -379,19 +379,30 @@ Section rules.
   Proof.
     (* This holds for me .. *)
   Admitted.
-  
+
+  Instance timeless_mapstobytes q bs p: TimelessP (mapstobytes p q bs)%I.
+  Proof.
+    generalize bs p.
+    induction bs0; destruct p0; first apply _.
+    simpl. assert (TimelessP (mapstobytes (b, (n + 1)%nat) q bs0)) as ?; first done.
+    apply _.
+  Qed.
+
+  Instance timeless_mapstoval p q v t : TimelessP (p ↦{q} v @ t)%I.
+  Proof. rewrite /mapstoval. apply _. Qed.
+
   Lemma wp_load {E} Φ p v t q Φret:
-    p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
+    ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP cure (Ederef_typed t (Evalue (Vptr p))) @ E {{ Φ ; Φret }}.
   Proof.
     iIntros "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
     iIntros (σ1) "Hσ".
-    unfold mapstoval. iDestruct "Hl" as "[% Hl]".
+    unfold mapstoval.
+    iDestruct "Hl" as "[>% >Hl]".
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
     iModIntro. iSplit; first eauto.
-    iNext; iIntros (s2 σ2 Hstep).
-    iModIntro.
+    iNext; iIntros (s2 σ2 Hstep). iModIntro.
     inversion Hstep. subst.
     inversion H3. subst. simpl. iFrame.
     rewrite (same_type_encode_inj σ2 t v v0 p)=>//. 
@@ -468,54 +479,78 @@ Section rules.
        | _, _ => False
      end)%I.
 
-  Fixpoint subst_e (x: ident) (es: expr) (e: expr) : expr :=
-    match e with
-      | Evar x' => if decide (x' = x) then es else e
-      | Ebinop op e1 e2 => Ebinop op (subst_e x es e1) (subst_e x es e2)
-      | Ederef e => Ederef (subst_e x es e)
-      | Eaddrof e => Eaddrof (subst_e x es e)
-      | Ecast e t => Ecast (subst_e x es e) t
-      | Efst e => Efst (subst_e x es e)
-      | Esnd e => Esnd (subst_e x es e)
-      | _ => e
+  Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
+    match l with
+      | Some x :: l' => (x ::) <$> lift_list_option l'
+      | None :: _ => None
+      | _ => Some []
     end.
   
-  Fixpoint subst_s (x: ident) (es: expr) (s: stmts) : stmts :=
+  Fixpoint resolve_rhs_e (ev: env) (e: expr) : option expr :=
+    match e with
+      | Evar x => (* closed-ness? *)
+        (match sget x ev with
+          | Some (t, l) => Some $ Ederef_typed t (Evalue (Vptr l))
+          | None => None
+         end)
+      | Ebinop op e1 e2 =>
+        match resolve_rhs_e ev e1, resolve_rhs_e ev e2 with
+          | Some e1', Some e2' => Some (Ebinop op e1' e2')
+          | _, _ => None
+        end
+      | Ederef e =>
+        match type_infer ev e, resolve_rhs_e ev e with
+          | Some (Tptr t), Some e' => Some (Ederef_typed t e') 
+          | _, _ => None
+        end
+      | Eaddrof e => Eaddrof <$> resolve_rhs_e ev e
+      | Ecast e t => e' ← resolve_rhs_e ev e; Some (Ecast e' t)
+      | Efst e => Efst <$> resolve_rhs_e ev e
+      | Esnd e => Esnd <$> resolve_rhs_e ev e
+      | _ => Some e
+    end.
+  
+  Fixpoint resolve_rhs (ev: env) (s: stmts) : option stmts :=
     match s with
-      | Sskip => Sskip
-      | Sprim p => Sprim p
-      | Sassign e1 e2 => Sassign e1 (subst_e x es e2)
-      | Sif e s1 s2 => Sif (subst_e x es e) (subst_s x es s1) (subst_s x es s2)
-      | Swhile c e s => Swhile (subst_e x es c) (subst_e x es e) (subst_s x es s)
-      | Srete e => Srete (subst_e x es e)
-      | Sret => Sret
-      | Scall f args => Scall f (map (subst_e x es) args)
-      | Sseq s1 s2 => Sseq (subst_s x es s1) (subst_s x es s2)
+      | Sskip => Some Sskip
+      | Sprim p => Some $ Sprim p
+      | Sassign e1 e2 => Sassign e1 <$> resolve_rhs_e ev e2
+      | Sif e s1 s2 =>
+        match resolve_rhs_e ev e, resolve_rhs ev s1, resolve_rhs ev s2 with
+          | Some e', Some s1', Some s2' => Some $ Sif e' s1' s2'
+          | _, _, _ => None
+        end
+      | Swhile c e s =>
+        match resolve_rhs_e ev c, resolve_rhs_e ev e, resolve_rhs ev s with
+          | Some c', Some e', Some s' => Some $ Swhile c' e' s'
+          | _, _, _ => None
+        end
+      | Srete e => Srete <$> resolve_rhs_e ev e
+      | Sret => Some Sret
+      | Scall f args => Scall f <$> lift_list_option (map (resolve_rhs_e ev) args)
+      | Sseq s1 s2 =>
+        match resolve_rhs ev s1, resolve_rhs ev s2 with
+          | Some s1', Some s2' => Some (Sseq s1' s2')
+          | _, _ => None
+        end
     end.
-
-  Fixpoint substs (m: list (ident * (type * addr))) (s: stmts) : stmts :=
-    match m with
-      | (i, (_, l))::m => substs m (subst_s i (Ederef (Evalue (Vptr l))) s)
-      | [] => s
-    end.
-
-  Definition resolve_rhs (e: env) (s: stmts) : stmts :=
-    substs (map_to_list e) s.
 
   Fixpoint resolve_lhs_e (ev: env) (e: expr) : option expr :=
     match e with
       | Evar x =>
-        (match ev !! x with
+        (match sget x ev with
            | Some (_, l) => Some (Evalue (Vptr l))
            | None => None
          end)
-      | Ederef e' => Ederef <$> resolve_lhs_e ev e'
+      | Ederef e' => resolve_rhs_e ev e'
       | Efst e' => resolve_lhs_e ev e'
+      (* FIXME: this will be a bug someday -- assignment should be typed as well *)
       | Esnd e' =>
-        (match type_infer ev e', resolve_lhs_e ev e' with
-           | Some (Tprod t1 _), Some e'' =>
+        (e'' ← resolve_lhs_e ev e';
+         match type_infer ev e'' with
+           | Some (Tptr (Tprod t1 _)) =>
              Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
-           | _, _ => None
+           | _ => None
          end)
       | Ecast e' _ => resolve_lhs_e ev e' (* XXX *)
       | Evalue (Vptr l) => Some e
@@ -541,20 +576,20 @@ Section rules.
 
   Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
     match params, ls with
-      | (x, t)::ps, l::ls' => add_params_to_env (<[ x := (t, l) ]> e) ps ls'
+      | (x, t)::ps, l::ls' => add_params_to_env (sset x (t, l) e) ps ls'
       | _, _ => e
     end.
 
   Definition instantiate_f_body (ev: env) (s: stmts) : option stmts :=
-    resolve_lhs ev (resolve_rhs ev s).
-  
-  Lemma wp_call (p: program) es vs params f_body f retty Φ Φret:
+     (resolve_rhs ev s ≫= resolve_lhs ev).
+
+  Lemma wp_call (p: program) (ev: env) es vs params f_body f retty Φ Φret:
     p f = Some (retty, params, f_body) →
     es = map Evalue vs →
     params_match params vs →
     (∀ ls f_body',
        ⌜ length ls = length vs ∧
-         instantiate_f_body (add_params_to_env ∅ params ls) f_body = Some f_body' ⌝ -∗
+         instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' ⌝ -∗
        alloc_params (zip (params.*2) ls) vs -∗
        WP curs f_body' {{ _, True; Φ }})
     ⊢ WP curs (Scall f es) {{ Φ; Φret }}.
