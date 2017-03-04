@@ -97,8 +97,7 @@ Section rules.
   Context `{clangG Σ}.
 
   Lemma wp_unfold E c Φ Φret: WP c @ E {{ Φ; Φret }} ⊣⊢ wp_pre wp E c Φ Φret.
-    (* Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed. *)
-  Admitted. (* XXX: just too slow ... *)
+  Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed.
 
   Lemma wp_skip Φ Φret E: Φ Vvoid ⊢ WP curs Sskip @ E {{ Φ; Φret }}.
   Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
@@ -284,18 +283,18 @@ Section rules.
       iApply IHl. iFrame.
   Qed.
  
-  Lemma wp_assign_offset {E b o off v1 v2 v2'} t1 t2 t2' Φ Φret:
-    typeof v2' t2' → assign_type_compatible t2 t2' → sizeof t1 = off →
+  Lemma wp_assign_offset {E b o v1 v2 v2'} t1 t2 t2' Φ Φret:
+    typeof v2' t2' → assign_type_compatible t2 t2' →
     ▷ (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2 ∗
     ▷ ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2 -∗ Φ Vvoid)
-    ⊢ WP curs (Sassign (Evalue (Vptr (b, o + off)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
+    ⊢ WP curs (Sassign (Evalue (Vptr (b, o + sizeof t1)%nat)) (Evalue v2')) @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (???) "[Hl HΦ]".
+    iIntros (??) "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
     iIntros (σ1) "Hσ !>".
     rewrite /mapstoval. iSplit; first eauto.
     iNext; iIntros (s2 σ2 Hstep).
-    iDestruct "Hl" as "[% Hl]". inversion H3; subst.
+    iDestruct "Hl" as "[% Hl]". inversion H2; subst.
     iDestruct (mapstobytes_prod with "Hl") as "[Hl1 Hl2]".
     iDestruct (gen_heap_update_bytes _ (encode_val v2) _ (encode_val v2') with "Hσ Hl2") as "H".
     {
@@ -571,7 +570,11 @@ Section rules.
           | Some s1', Some s2' => Some (Sseq s1' s2')
           | _, _ => None
         end
-      | _ => Some s
+      | Sret => Some Sret
+      | Srete e => Some (Srete e)
+      | Scall f es => Some $ Scall f es
+      | Sprim p => Some $ Sprim p
+      | Sskip => Some Sskip
     end.
 
   Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=

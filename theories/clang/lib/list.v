@@ -79,7 +79,8 @@ Section proof.
       rewrite /offset_by_byte. 
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
       wp_load. iDestruct (isList_ptr with "Hlr") as "%".
-      wp_assign=>//.
+      unfold tcell.
+      wp_assign.
       wp_load.
       assert (typeof (Vptr (pb, po)) (Tptr Tvoid)).
       { constructor. }
