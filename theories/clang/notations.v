@@ -13,9 +13,9 @@ Notation "'true'" := vtrue : expr_scope.
 Notation "'false'" := vfalse : expr_scope.
 Notation "# v" := (Evalue v) (at level 8) : expr_scope.
 Notation "! e" := (Ederef e%E) (at level 9, right associativity) : expr_scope.
+Notation "!! e : t" := (Ederef_typed t e%E) (at level 9, right associativity) : expr_scope.
 Notation "'fst' e" := (Efst e%E) (at level 9, right associativity) : expr_scope.
 Notation "'snd' e" := (Esnd e%E) (at level 9, right associativity) : expr_scope.
-Notation "! e" := (Ederef e%E) (at level 9, right associativity) : expr_scope.
 Notation "& e" := (Eaddrof e%E)
   (at level 30, right associativity) : expr_scope.
 Notation "e1 + e2" := (Ebinop oplus e1%E e2%E)

@@ -64,23 +64,18 @@ Section proof.
       wp_load. iDestruct "Hl" as (p l') "(% & Hp & Hl')".
       destruct H0 as [? [? ?]]. subst.
       wp_op. iApply wp_while_true.
-      iNext. repeat (iApply wp_seq).
-      iApply (wp_bind [EKderef_typed _; EKsnd] (SKassignl _)). (* TODO: Some bug in tactic *)
-      iApply wp_load. iFrame. iIntros "!> Hbo".
-      simpl. wp_load. wp_bind (Esnd _).
-      iApply wp_snd. iNext. iApply wp_value=>//.
+      iNext. repeat (iApply wp_seq). wp_load.
+      wp_load.
+      wp_bind (Esnd _). iApply wp_snd. iNext. iApply wp_value=>//.
       iDestruct "Ht" as (?) "Ht".
-      wp_run.
-      iApply (wp_bind [EKbinopr _ _] (SKassignr _)).
-      iApply wp_load. iFrame. iIntros "!> ?".
-      simpl. iApply (wp_bind [] (SKassignr _)).
+      wp_assign. wp_load.   
       destruct p as [pb po].
-      iApply wp_op=>//. simpl.
-      rewrite /offset_by_byte. 
+      wp_op.
+      rewrite /offset_by_byte.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
       wp_load. iDestruct (isList_ptr with "Hlr") as "%".
       unfold tcell.
-      wp_run.
+      wp_assign. wp_load. wp_assign. wp_load. wp_assign.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)); first by unfold_f_inst.
       iFrame. iSplitL "Hp Hlr".
       { iExists (pb, po), ly. iFrame.

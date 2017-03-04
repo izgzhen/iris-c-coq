@@ -25,18 +25,20 @@ for each possible decomposition until [tac] succeeds. *)
 Ltac reshape_expr e tac :=
   let rec go K e :=
   match e with
-  | _ => tac (reverse K) e
+  | _ => tac K e
   | Ebinop ?op (Evalue ?v1) ?e2 => go (EKbinopl op v1 :: K) e2
   | Ebinop ?op ?e1 ?e2 => go (EKbinopr op e2 :: K) e1
   | Efst ?e => go (EKfst :: K) e
   | Esnd ?e => go (EKsnd :: K) e
-  | Ederef_typed ?e => go (EKderef_typed :: K) e
+  | Ederef_typed ?t ?e => go (EKderef_typed t :: K) e
   end in go (@nil exprctx) e.
 
 Ltac reshape_stmts s tac :=
   match s with
     | Sassign (Evalue (Vptr ?l)) ?e =>
       reshape_expr e ltac:(fun Kes e' => tac Kes (SKassignl l) e')
+    | Sassign ?e1 ?e2 =>
+      reshape_expr e1 ltac:(fun Kes e' => tac Kes (SKassignr e2) e')
     | Srete ?e =>
       reshape_expr e ltac:(fun Kes e' => tac Kes SKrete e')
     | Swhile ?c ?e ?s =>
@@ -58,6 +60,22 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
     | efoc => unify e' efoc; wp_bind_core Kes Ks
     end) || fail "wp_bind: cannot find" efoc "in" s
   | _ => fail "wp_bind: not a 'wp'"
+  end.
+
+Ltac wp_bind_e_core K :=
+  lazymatch eval hnf in K with
+  | [] => idtac
+  | _ => etrans; [|fast_by apply (wp_bind_e K)]; simpl
+  end.
+
+Tactic Notation "wp_bind_e" open_constr(efoc) :=
+  iStartProof;
+  lazymatch goal with
+  | |- _ ⊢ wp ?E (cure ?e) ?Q ?P => reshape_expr e ltac:(fun K e' =>
+    match e' with
+    | efoc => unify e' efoc; wp_bind_e_core K
+    end) || fail "wp_bind_e: cannot find" efoc "in" e
+  | _ => fail "wp_bind_e: not a 'wp'"
   end.
 
 Section heap.
@@ -149,7 +167,7 @@ Tactic Notation "wp_load" :=
   | |- _ ⊢ wp ?E (curs ?s) ?P ?Q =>
     first
       [reshape_stmts s ltac:(fun Kes Ks e' =>
-         match eval hnf in e' with Ederef_typed _ _ => wp_bind_core Kes Ks end)
+         match eval hnf in e' with Ederef_typed _ (Evalue _) => wp_bind_core Kes Ks end)
       |fail 1 "wp_load: cannot find 'Ederef_typed' in" s];
     eapply tac_wp_load;
       [apply _

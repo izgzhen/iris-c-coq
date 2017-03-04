@@ -169,9 +169,10 @@ Section rules.
   Qed.
 
   (* NOTE: it looks not very useful ... *)
-  (* Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret: *)
-  (*   WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }} *)
-  (*   ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}. *)
+  Lemma wp_bind_e {E e} (K: list exprctx) Φ Φret:
+    WP cure e @ E {{ v, WP cure (fill_ectxs (Evalue v) K) {{ Φ ; Φret }} ; Φret }}
+    ⊢ WP cure (fill_ectxs e K) @ E {{ Φ ; Φret }}.
+  Admitted.
 
   Lemma wp_lift_step E Φ Φret e1 :
     to_val e1 = None →
