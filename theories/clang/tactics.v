@@ -127,7 +127,7 @@ End heap.
 
 Tactic Notation "wp_assign" :=
   iStartProof;
-  try (iApply wp_seq);
+  repeat (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs (Sassign (Evalue (Vptr (?b, (?o + ?off)%nat))) _)) ?P ?Q =>
     iMatchHyp (fun H P => match P with ((b, o) ↦{_} _ @ (Tprod ?t ?t2))%I =>
@@ -162,7 +162,7 @@ Tactic Notation "wp_assign" :=
 
 Tactic Notation "wp_load" :=
   iStartProof;
-  try (iApply wp_seq);
+  repeat (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs ?s) ?P ?Q =>
     first
@@ -179,7 +179,7 @@ Tactic Notation "wp_load" :=
 
 Tactic Notation "wp_op" :=
   iStartProof;
-  try (iApply wp_seq);
+  repeat (iApply wp_seq);
   lazymatch goal with
   | |- _ ⊢ wp ?E (curs ?s) ?P ?Q => reshape_stmts s ltac:(fun Kes Ks e' =>
     lazymatch eval hnf in e' with

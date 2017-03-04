@@ -35,8 +35,8 @@ Section proof.
 
   Definition rev_list (telem: type) : stmts :=
     while [ x != null ] ( x != null ) <{
-      t <- snd (!x) ;;
-      snd (!x) <- y ;;
+      t <- snd (!?x) ;;
+      snd (!?x) <- y ;;
       y <- x ;;
       x <- t
     }>.
@@ -64,11 +64,10 @@ Section proof.
       wp_load. iDestruct "Hl" as (p l') "(% & Hp & Hl')".
       destruct H0 as [? [? ?]]. subst.
       wp_op. iApply wp_while_true.
-      iNext. repeat (iApply wp_seq). wp_load.
-      wp_load.
-      wp_bind (Esnd _). iApply wp_snd. iNext. iApply wp_value=>//.
+      iNext. wp_load. wp_load. wp_bind (Esnd _). iApply wp_snd. iNext.
+      iApply wp_value=>//.
       iDestruct "Ht" as (?) "Ht".
-      wp_assign. wp_load.   
+      wp_assign. wp_load.  
       destruct p as [pb po].
       wp_op.
       rewrite /offset_by_byte.
