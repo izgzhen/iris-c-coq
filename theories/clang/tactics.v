@@ -123,10 +123,14 @@ Tactic Notation "wp_assign" :=
         |env_cbv; reflexivity
         | auto (* wp_finish *)]
     end)
-  | |- _ ⊢ wp ?E (curs (Sassign (Evalue (Vptr ?l)) _)) ?P ?Q =>
+  | |- _ ⊢ wp ?E (curs (Sassign (Evalue (Vptr ?l)) (Evalue ?rv))) ?P ?Q =>
     iMatchHyp (fun H P => match P with (l ↦{_} _ @ ?t)%I =>
-      eapply tac_wp_assign;
-        [let v := match goal with |- typeof ?t ?v => v end in
+      (match goal with
+         | [ H : typeof rv _ |- _ ] => idtac
+         | _ => assert (typeof rv t) by constructor
+      end);
+        eapply tac_wp_assign;
+        [let v := match goal with |- typeof ?v ?t => v end in
          wp_done || fail "wp_store:" v "doesn't type check"
         |solve_assign_type t || fail "wp_assign: assignment types are not compatible"
         |apply _

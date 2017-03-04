@@ -80,14 +80,7 @@ Section proof.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
       wp_load. iDestruct (isList_ptr with "Hlr") as "%".
       unfold tcell.
-      wp_assign.
-      wp_load.
-      assert (typeof (Vptr (pb, po)) (Tptr Tvoid)).
-      { constructor. }
-      iApply (wp_assign (Tptr Tvoid) (Tptr Tvoid)).
-      { done. } { constructor. }
-      iFrame. iIntros "!> ?".  
-      wp_load. wp_assign.
+      wp_run.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)); first by unfold_f_inst.
       iFrame. iSplitL "Hp Hlr".
       { iExists (pb, po), ly. iFrame.
