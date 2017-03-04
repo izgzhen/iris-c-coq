@@ -8,11 +8,10 @@ This section describes how to build a program logic for the C language (\cf \Sre
 Using the standard Iris assertions and the ownership of ghost heap resource, we can define some basic custom assertions:
 
 \begin{align*}
-\vaddr{b}{o} \mapsto_q v : t \eqdef{}& \Exists bs, bs'. b \mapsto_q bs * (\encode \footnotemark (t, v) = bs' \land bs' = bs[o..o + |bs'|\,]) \\
+l \mapsto_q v : t \eqdef{}&  l \mapsto_q \encode(v) \land \tychk{v}{t} \\
 l \mapsto v : t              \eqdef{}& l \mapsto_1 v : t\\
-l \mapsto_q -                \eqdef{}& \Exists v, t. l \mapsto_q v : t
+l \mapsto_q - : t            \eqdef{}& \Exists v. l \mapsto_q v : t
 \end{align*}
-\footnotetext{see Coq implementation for details}
 
 \subsection{Weakest Precondition}
 
@@ -26,12 +25,11 @@ For our heap state, $S(\sigma) \eqdef \ownPhys{\authfull \fmap (\lambda v. (1, \
 
 \begin{align*}
   \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, \cureval, \pred, \predret. \\
-        & (\cureval = \sskip^\dag \land \pvs[\mask] \pred(\void)) \lor {}\\
-        & (\Exists v. \cureval = v^\dag \land \pvs[\mask] \pred (v)) \lor {}\\
-        & (\cureval = \sret^\dag \land \pvs[\mask] \predret (\void)) \lor {}\\
-        & (\Exists v. \cureval = \srete{v}^\dag \land \pvs[\mask] \predret (v)) \lor {}\\
-        & \Bigl(\All \state. S(\state) \vsW[\mask][\emptyset] {}\\
-        &\qquad \later\All \cureval', \state'. (\cureval, \state \step \cureval', \state') \vsW[\emptyset][\mask] {}\\
+        & (\Exists v. \toval(\cureval) = v \land \pvs[\mask] \pred(v)) \lor {}\\
+        & (\Exists v. \toretval(\cureval) = v \land \pvs[\mask] \predret (v)) \lor {}\\
+        & \Bigl(\toval(\cureval) = \bot \land \toretval(\cureval) = \bot \land \\
+        &\qquad \All \state. S(\state) \vsW[\mask][\emptyset] {}\\
+        &\qquad \red(e, \state) * \later\All \cureval', \state'. (\cureval, \state \step \cureval', \state') \vsW[\emptyset][\mask] {}\\
         &\qquad\qquad S(\state') * \textdom{wp}(\mask, \cureval', \pred, \predret)\Bigr) \\
 \end{align*}
 
@@ -56,15 +54,16 @@ The following rules can all be derived:
 {}{\predret(v) \proves \wpre{\srete{v}}[\mask]{\pred}{\predret}}
 
 
-% \infer[wp-mono]
-% {\mask_1 \subseteq \mask_2 \and \vctx,\var:\textlog{val}\mid\prop \proves \propB}
-% {\vctx\mid\wpre\expr[\mask_1]{\Ret\var.\prop} \proves \wpre\expr[\mask_2]{\Ret\var.\propB}}
+\infer[wp-strong-mono]
+{\mask_1 \subseteq \mask_2}
+{((\All v. \Phi(v) \pvs[\mask_2] \Psi(v)) \land (\All v. \predret(v) \pvs[\mask_2] \Psi_\text{ret}(v))) * \wpre\cureval[\mask_1]{\pred}{\predret}
+ \proves \wpre\cureval[\mask_2]{\Psi}{\Psi_\text{ret}}}
 
-% \infer[fup-wp]
-% {}{\pvs[\mask] \wpre\expr[\mask]{\Ret\var.\prop} \proves \wpre\expr[\mask]{\Ret\var.\prop}}
+\infer[fup-wp]
+{}{\pvs[\mask] \wpre\cureval[\mask]{\pred}{\predret} \proves \wpre\cureval[\mask]{\pred}{\predret}}
 
-% \infer[wp-fup]
-% {}{\wpre\expr[\mask]{\Ret\var.\pvs[\mask] \prop} \proves \wpre\expr[\mask]{\Ret\var.\prop}}
+\infer[wp-fup]
+{}{\wpre\cureval[\mask]{\Ret\var.\pvs[\mask] \pred(\var)}{\Ret\var.\pvs[\mask] \predret(\var)} \proves \wpre\expr[\mask]{\pred}{\predret}}
 
 % \infer[wp-atomic]
 % {\physatomic{\expr}}
@@ -84,12 +83,6 @@ The following rules can all be derived:
  \proves 
  \wpre{\ctx(\expr)}[\mask]{\pred}{\predret}}
 
-\infer[wp-bind-e]
-{}
-{\wpre\expr[\mask]{\Ret\var. \wpre{\ctx_e(\var)}[\mask]{\pred}{\predret}}{\predret}
- \proves 
- \wpre{\ctx_e(\expr)}[\mask]{\pred}{\predret}}
-
  \infer[wp-op]
 {\llbracket oplus \rrbracket (v_1, v_2) = v'}
 {\pred(v')
@@ -97,13 +90,13 @@ The following rules can all be derived:
  \wpre{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
 
  \infer[wp-assign]
-{\tychk{v}{\tau}}
+{\tychk{v}{\tau'} \quad \assigncomp{\tau}{\tau'}}
 { l \mapsto - : \tau * (l \mapsto v : \tau \wand \pred)
  \proves
  \wpre{l \la v}[\mask]{\pred}{\predret}}
 
  \infer[wp-assign-offset]
-{\tychk{v_2}{\tau_2}}
+{\tychk{v_2}{\tau_2'} \quad \assigncomp{\tau_2}{\tau_2'}}
 { \vaddr{b}{o} \mapsto (v_1, -) : \tau_1 \times \tau_2 *
   (\vaddr{b}{o} \mapsto (v_1, v_2) : \tau_1 \times \tau_2 \wand \pred)
  \proves
@@ -112,15 +105,30 @@ The following rules can all be derived:
 
  \infer[wp-load]
 {}
-{ l \mapsto_q v : t  * (l \mapsto_q v : t \wand \pred (v))
+{ l \mapsto_q v : \tau  * (l \mapsto_q v : \tau \wand \pred (v))
  \proves
- \wpre{\deref{l}}[\mask]{\pred}{\predret}}
+ \wpre{\dereft{\tau}{l}}[\mask]{\pred}{\predret}}
 
 \infer[wp-seq]
 {}
 {\wpre{s_1}[\mask]{\wpre{s_2}[\mask]{\pred}{\predret}}{\predret} 
  \proves
  \wpre{s_1 ; s_2}[\mask]{\pred}{\predret}}
+
+\infer[wp-while-true]
+{\wpre{s; \swhile{e}{e}{s}}[\mask]{\pred}{\predret}}
+{\wpre{\swhile{e}{\vtrue}{s}}[\mask]{\pred}{\predret}}
+
+\infer[wp-while-false]
+{\pred(\void)}
+{\wpre{\swhile{e}{\vfalse}{s}}[\mask]{\pred}{\predret}}
+
+\infer[wp-while-inv]
+{\begin{inbox}
+ \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{e}{\pred}{\TRUE} \\
+ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}{\predret}
+ \end{inbox}}
+{I \proves \wpre{\swhile{e}{e}{s}}{Q}{\predret}}
 
 \end{mathpar}
 

@@ -350,6 +350,8 @@
 
 \newcommand{\TRUE}{\textlog{True}}
 \newcommand{\FALSE}{\textlog{False}}
+\newcommand{\vtrue}{\textlog{true}}
+\newcommand{\vfalse}{\textlog{false}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % GENERIC LANGUAGE SYNTAX AND SEMANTICS
@@ -365,7 +367,8 @@
 \newcommand{\lctx}{K}
 \newcommand{\Lctx}{\textdom{Ctx}}
 
-\newcommand{\toval}{\mathrm{expr\any to\any val}}
+\newcommand{\toval}{\mathrm{to \any val}}
+\newcommand{\toretval}{\mathrm{to \any ret \any val}}
 \newcommand{\ofval}{\mathrm{val\any to\any expr}}
 \newcommand{\typeof}{\mathrm{typeof}}
 \newcommand{\encode}{\mathrm{encode}}
@@ -407,7 +410,7 @@
 
 \newcommand{\sskip}{\texttt{skip}}
 \newcommand{\sif}[3]{\texttt{if}({#1})\,\{{#2}\}\,\texttt{else}\,\{{#3}\}}
-\newcommand{\swhile}[2]{\texttt{while}({#1})\,\{{#2}\}}
+\newcommand{\swhile}[3]{\texttt{while}_{#1}({#2})\,\{{#3}\}}
 \newcommand{\sret}{\texttt{return}}
 \newcommand{\srete}[1]{\texttt{return}\,{#1}}
 \newcommand{\scall}[2]{{#1}({#2})}
@@ -436,6 +439,8 @@
 
 \newcommand{\reslhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{LHS}}}
 \newcommand{\resrhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{RHS}}}
+
+\newcommand{\assigncomp}[2]{\surd({#1} \la {#2})}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STANDARD DERIVED CONSTRUCTIONS

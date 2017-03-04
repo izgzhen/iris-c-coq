@@ -24,7 +24,7 @@ Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, 
         \pcli \mid \psti
 \\
     s : \Stmts \bnfdef{}&
-        \sskip \mid p \mid e \la e \mid \sif{e}{s}{s} \mid \swhile{e}{s} \mid \\&
+        \sskip \mid p \mid e \la e \mid \sif{e}{s}{s} \mid \swhile{e}{e}{s} \mid \\&
         \sret \mid \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid s ; s
 \\
 \end{align*}
@@ -50,7 +50,7 @@ $\ctx_e, \ctx_s$ for both $\Expr$ and $\Stmts$:
         \efst{\emptyctx} \mid \esnd{\emptyctx}
 \\
     \ctx_s : \sctx \eqdef{}&
-        \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{s}{s} \mid \swhile{\emptyctx}{s} \mid \\&
+        \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{s}{s} \mid \swhile{e}{\emptyctx}{s} \mid \\&
          \srete{\emptyctx} \mid \scall{f}{v_1, ..., \emptyctx, e_1, ...}
 \end{align*}
 
