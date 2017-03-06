@@ -74,9 +74,14 @@ Section proof.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
       wp_load. iDestruct (isList_ptr with "Hlr") as "%".
       unfold tcell.
+      iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
       wp_assign. wp_load. wp_assign. wp_load. wp_assign.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)); first by unfold_f_inst.
-      iFrame. iSplitL "Hp Hlr".
+      iFrame.
+      (* replace (po + 4) with (po + sizeof Tint32)=>//. *)
+      iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".
+      { iSplitL "Hp1"; by simpl. }
+      iSplitL "Hp Hlr".
       { iExists (pb, po), ly. iFrame.
         iPureIntro. repeat (split; first done). by eapply typeof_any_ptr. }
       iSplitL "Ht"; first eauto.

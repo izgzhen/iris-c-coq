@@ -96,20 +96,20 @@ Proof.
   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
 Qed.
 
-Lemma tac_wp_assign_offset Δ Δ' Δ'' E i b (o: nat) (v1 v2 v2': val) (t1 t2 t2': type) Φ Φret:
-  typeof v2' t2' → assign_type_compatible t2 t2' →
-  IntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2)%I →
-  envs_simple_replace i false (Esnoc Enil i ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2)) Δ' = Some Δ'' →
-  (Δ'' ⊢ Φ Vvoid) →
-  Δ ⊢ WP curs (Sassign (Evalue (Vptr (b, (o + sizeof t1)%nat))) (Evalue v2')) @ E {{ Φ ; Φret }}.
-Proof.
-  intros. eapply wand_apply.
-  { iIntros "HP HQ". iApply wp_assign_offset; [done|done|].
-    iSplitL "HP"; eauto. }
-  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
-  rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
-Qed.
+(* Lemma tac_wp_assign_offset Δ Δ' Δ'' E i b (o: nat) (v1 v2 v2': val) (t1 t2 t2': type) Φ Φret: *)
+(*   typeof v2' t2' → assign_type_compatible t2 t2' → *)
+(*   IntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, (b, o) ↦ Vpair v1 v2 @ Tprod t1 t2)%I → *)
+(*   envs_simple_replace i false (Esnoc Enil i ((b, o) ↦ Vpair v1 v2' @ Tprod t1 t2)) Δ' = Some Δ'' → *)
+(*   (Δ'' ⊢ Φ Vvoid) → *)
+(*   Δ ⊢ WP curs (Sassign (Evalue (Vptr (b, (o + sizeof t1)%nat))) (Evalue v2')) @ E {{ Φ ; Φret }}. *)
+(* Proof. *)
+(*   intros. eapply wand_apply. *)
+(*   { iIntros "HP HQ". iApply wp_assign_offset; [done|done|]. *)
+(*     iSplitL "HP"; eauto. } *)
+(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//. *)
+(* Qed. *)
 
 Lemma tac_wp_load Δ Δ' E i l q v t Φ Φret:
   IntoLaterNEnvs 1 Δ Δ' →
@@ -129,18 +129,6 @@ Tactic Notation "wp_assign" :=
   iStartProof;
   repeat (iApply wp_seq);
   lazymatch goal with
-  | |- _ ⊢ wp ?E (curs (Sassign (Evalue (Vptr (?b, (?o + ?off)%nat))) _)) ?P ?Q =>
-    iMatchHyp (fun H P => match P with ((b, o) ↦{_} _ @ (Tprod ?t ?t2))%I =>
-      eapply tac_wp_assign_offset with (t1:=t);
-        [let v := match goal with |- typeof ?t ?v => v end in
-         wp_done || fail "wp_store:" v "doesn't type check"
-        |solve_assign_type t2 || fail "wp_assign: assignment types are not compatible"
-        |apply _
-        |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
-         iAssumptionCore || fail "wp_assign: cannot find" l "↦ ?"
-        |env_cbv; reflexivity
-        | auto (* wp_finish *)]
-    end)
   | |- _ ⊢ wp ?E (curs (Sassign (Evalue (Vptr ?l)) (Evalue ?rv))) ?P ?Q =>
     iMatchHyp (fun H P => match P with (l ↦{_} _ @ ?t)%I =>
       (match goal with
