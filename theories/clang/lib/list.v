@@ -78,7 +78,6 @@ Section proof.
       wp_assign. wp_load. wp_assign. wp_load. wp_assign.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)); first by unfold_f_inst.
       iFrame.
-      (* replace (po + 4) with (po + sizeof Tint32)=>//. *)
       iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".
       { iSplitL "Hp1"; by simpl. }
       iSplitL "Hp Hlr".
