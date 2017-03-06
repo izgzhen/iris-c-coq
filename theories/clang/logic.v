@@ -484,7 +484,7 @@ Section rules.
   Fixpoint resolve_rhs_e (ev: env) (e: expr) : option expr :=
     match e with
       | Evar x => (* closed-ness? *)
-        (match sget x ev with
+        (match sget x (lenv ev) with
           | Some (t, l) => Some $ Ederef_typed t (Evalue (Vptr l))
           | None => None
          end)
@@ -499,9 +499,9 @@ Section rules.
           | _, _ => None
         end
       | Eaddrof e => Eaddrof <$> resolve_rhs_e ev e
-      | Ecast e t => e' ← resolve_rhs_e ev e; Some (Ecast e' t)
       | Efst e => Efst <$> resolve_rhs_e ev e
       | Esnd e => Esnd <$> resolve_rhs_e ev e
+      | Ecall f args => Ecall f <$> lift_list_option (map (resolve_rhs_e ev) args)
       | _ => Some e
     end.
   
@@ -522,7 +522,6 @@ Section rules.
         end
       | Srete e => Srete <$> resolve_rhs_e ev e
       | Sret => Some Sret
-      | Scall f args => Scall f <$> lift_list_option (map (resolve_rhs_e ev) args)
       | Sseq s1 s2 =>
         match resolve_rhs ev s1, resolve_rhs ev s2 with
           | Some s1', Some s2' => Some (Sseq s1' s2')
@@ -533,13 +532,12 @@ Section rules.
   Fixpoint resolve_lhs_e (ev: env) (e: expr) : option expr :=
     match e with
       | Evar x =>
-        (match sget x ev with
+        (match sget x (lenv ev) with
            | Some (_, l) => Some (Evalue (Vptr l))
            | None => None
          end)
       | Ederef e' => resolve_rhs_e ev e'
       | Efst e' => resolve_lhs_e ev e'
-      (* FIXME: this will be a bug someday -- assignment should be typed as well *)
       | Esnd e' =>
         (e'' ← resolve_lhs_e ev e';
          match type_infer ev e'' with
@@ -547,8 +545,8 @@ Section rules.
              Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
            | _ => None
          end)
-      | Ecast e' _ => resolve_lhs_e ev e' (* XXX *)
       | Evalue (Vptr l) => Some e
+      | Ecall f es => Some $ Ecall f es
       | _ => None
     end.
   
@@ -568,14 +566,13 @@ Section rules.
         end
       | Sret => Some Sret
       | Srete e => Some (Srete e)
-      | Scall f es => Some $ Scall f es
       | Sprim p => Some $ Sprim p
       | Sskip => Some Sskip
     end.
 
   Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
     match params, ls with
-      | (x, t)::ps, l::ls' => add_params_to_env (sset x (t, l) e) ps ls'
+      | (x, t)::ps, l::ls' => add_params_to_env (Env (sset x (t, l) (lenv e)) (fenv e)) ps ls'
       | _, _ => e
     end.
 
@@ -591,7 +588,7 @@ Section rules.
          instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' ⌝ -∗
        alloc_params (zip (params.*2) ls) vs -∗
        WP curs f_body' {{ _, True; Φ }})
-    ⊢ WP curs (Scall f es) {{ Φ; Φret }}.
+    ⊢ WP cure (Ecall f es) {{ Φ; Φret }}.
   Admitted.
 
 End rules.

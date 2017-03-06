@@ -21,11 +21,12 @@ Inductive expr :=
 | Eaddrof (e: expr)
 | Efst (e: expr)
 | Esnd (e: expr)
-| Ecast (e: expr) (t: type).
-(* | Eindex (e: expr) (e: expr). *)
+| Ecall (fid: ident) (args: list expr).
+(* | Ecast (e: expr) (t: type) *) (* NOTE: either cast or index are not essential, we'll do it later *)
 
 Definition tid := nat.
 
+(* TODO: Parameterize it *)
 Inductive prim :=
 | Pcli | Psti | Pswitch (i: tid).
 
@@ -37,8 +38,6 @@ Inductive stmts :=
 | Swhile (cond: expr) (curcond: expr) (s: stmts)
 | Sret
 | Srete (e: expr)
-| Scall (fid: ident) (args: list expr)
-(* | Scalle (lhs: expr) (fid: ident) (args: list expr) *)
 | Sseq (s1 s2: stmts).
 (* | Sprint (e: expr) *)
 (* | Sfree *)
@@ -47,7 +46,6 @@ Inductive stmts :=
 Definition decls := list (ident * type).
 
 Definition function : Type := (type * decls * stmts).
-(* (type * decls * decls * stmts). *) (* no local vars *)
 
 Definition program := ident → option function.
 
@@ -61,29 +59,31 @@ Inductive exprctx :=
 | EKaddrof
 | EKfst
 | EKsnd
-| EKcast (t: type).
+| EKcall (fid: ident) (vargs: list val) (args: list expr).
+(* | EKcast (t: type) *)
 
 Inductive stmtsctx :=
 | SKassignr (rhs: expr)
 | SKassignl (lhs: addr)
 | SKif (s1 s2: stmts)
 | SKwhile (cond: expr) (s: stmts)
-| SKrete
-| SKcall (fid: ident) (vargs: list val) (args: list expr).
-(* | SKcaller (fid: ident) (args: list expr) *)
-(* | SKcallel (lhs: addr) (fid: ident) (vargs: list val) (args: list expr) (args: list expr). *)
+| SKrete.
 
 Definition context : Type := (exprctx * stmtsctx).
 
 Inductive cureval :=
 | curs (s: stmts) | cure (e: expr).
 
-Definition env : Type := smap (type * addr).
+Record env :=
+  Env {
+      lenv: smap (type * addr);
+      fenv: smap type
+    }.
 
 Fixpoint type_infer (ev: env) (e: expr) : option type :=
   match e with
     | Evalue v => Some (type_infer_v v)
-    | Evar x => p ← sget x ev; Some (p.1)
+    | Evar x => p ← sget x (lenv ev); Some (p.1)
     | Ebinop _ e1 _ => type_infer ev e1 (* FIXME *)
     | Ederef e' =>
       (match type_infer ev e' with
@@ -102,7 +102,7 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
          | Some (Tprod _ t2) => Some t2
          | _ => None
        end)
-    | Ecast _ t => Some t (* FIXME *)
+    | Ecall f args => sget f (fenv ev)
   end.
 
 Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
@@ -114,7 +114,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKaddrof => Eaddrof e
     | EKfst => Efst e
     | EKsnd => Esnd e
-    | EKcast t => Ecast e t
+    | EKcall f vargs args => Ecall f (map Evalue vargs ++ e :: args)
   end.
 
 Definition fill_stmts (e : expr) (Ks : stmtsctx) : stmts :=
@@ -123,7 +123,6 @@ Definition fill_stmts (e : expr) (Ks : stmtsctx) : stmts :=
     | SKassignl lhs => Sassign (Evalue (Vptr lhs)) e
     | SKif s1 s2 => Sif e s1 s2
     | SKwhile c s => Swhile c e s
-    | SKcall f vargs args => Scall f (map Evalue vargs ++ e :: args)
     | SKrete => Srete e
   end.
 
@@ -173,7 +172,7 @@ Inductive estep : expr → expr → state → Prop :=
              estep (Ebinop op (Evalue lv) (Evalue rv))
                    (Evalue v')
                    σ
-| ESderef:
+| ESderef_typed:
     ∀ σ l v t,
       typeof v t →
       readbytes l (encode_val v) σ →
@@ -185,7 +184,6 @@ Inductive estep : expr → expr → state → Prop :=
 | ESsnd:
     ∀ v1 v2 σ,
       estep (Esnd (Evalue (Vpair v1 v2))) (Evalue v2) σ
-(* | EKcast (t: type). *)
 .
 
 Fixpoint storebytes l bs (σ: mem) :=

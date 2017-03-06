@@ -35,14 +35,16 @@ Section example.
 
   Definition int_ctx := @int_ctx _ _ invs i.
 
+  Definition ev := Env [(y, (Tint32, py))] [].
+  
   Lemma f_spec (p: program) γ γp f vx Φ Φret:
     p f = Some (Tint32, [(x, Tint32)], f_body) →
     int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φ)
-    ⊢ WP curs (Scall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}.
+    ⊢ WP cure (Ecall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}.
   Proof.
     iIntros (Hpf) "(#? & #? & Hp & Hsc & HΦ)".
-    iApply (wp_call _ [(y, (Tint32, py))] _ [Vint32 vx])=>//.
+    iApply (wp_call _ ev _ [Vint32 vx])=>//.
     { simpl. split=>//. constructor. }
     iIntros (ls) "% Hls".
     destruct ls as [|? [|? ls]].

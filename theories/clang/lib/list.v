@@ -40,22 +40,23 @@ Section proof.
       y <- x ;;
       x <- t
     }>.
+
+  Definition ev :=
+    Env [(x, (Tptr (tcell Tint32), px));
+         (y, (Tptr Tvoid, py));
+         (t, (Tptr (tcell Tint32), pt))]
+        [].
   
   Lemma rev_spec Φ Φret body xs:
     ∀ lx ly ys,
-      instantiate_f_body
-        [(x, (Tptr (tcell Tint32), px));
-         (y, (Tptr Tvoid, py));
-         (t, (Tptr (tcell Tint32), pt))]
-        (rev_list Tint32) = Some body →
-    isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - @ Tptr (tcell Tint32) ∗
-    px ↦ lx @ Tptr (tcell Tint32) ∗ py ↦ ly @ Tptr Tvoid ∗
-    (∀ ly', py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
-    ⊢ WP curs body {{ Φ; Φret }}.
+      instantiate_f_body ev (rev_list Tint32) = Some body →
+      isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - @ Tptr (tcell Tint32) ∗
+      px ↦ lx @ Tptr (tcell Tint32) ∗ py ↦ ly @ Tptr Tvoid ∗
+      (∀ ly', py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
+      ⊢ WP curs body {{ Φ; Φret }}.
   Proof.
-    induction xs as [|x xs' IHxs'];
-    unfold_f_inst;
-    intros ??? [=]; destruct px; subst.
+    unfold_f_inst; destruct px; subst;
+    induction xs as [|x xs' IHxs']; intros ??? [=]; subst.
     - iIntros "(% & Hlr & Ht & Hpx & Hpy & HΦ)".
       subst. wp_load. wp_op.
       iApply wp_while_false.

@@ -26,8 +26,8 @@ Notation "e1 == e2" := (Ebinop oequals e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
 Notation "e1 != e2" := (Ebinop oneq e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
-Notation "e 'as' t" := (Ecast e%E t)
-  (at level 50, left associativity) : expr_scope.
+Notation "f < e1 , e2 , .. , en >" := (Ecall f (cons e1%E (cons e2%E .. (cons en%E nil) .. )))
+  (at level 50) : expr_scope.
 
 Notation "e1 <- e2" := (Sassign e1%E e2%E) (at level 80) : stmts_scope.
 Notation "'if' ( e ) { s1 } 'else' { s2 }" := (Sif e%E s1%S s2%S)
@@ -38,8 +38,6 @@ Notation "s1 ;; s2" := (Sseq s1%S s2%S)
   (at level 100, s2 at level 200, format "s1  ;;  s2") : stmts_scope.
 Notation "'ret'" := Sret (at level 80): stmts_scope.
 Notation "'rete' e" := (Srete e%E) (at level 80): stmts_scope.
-Notation "f < e1 , e2 , .. , en >" := (Scall f (cons e1%E (cons e2%E .. (cons en%E nil) .. )))
-  (at level 80) : stmts_scope.
 Notation "'skip'" := (Sskip) (at level 200) : stmts_scope.
 
 Notation "'cli'" := (Sprim Pcli) (at level 80) : stmts_scope.
