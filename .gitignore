@@ -16,3 +16,5 @@ cscope.*
 *~
 Makefile.coq
 Makefile.coq.bak
+
+.lia.cache

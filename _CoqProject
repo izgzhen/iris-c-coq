@@ -4,6 +4,7 @@ theories/lib/Coqlib.v
 theories/lib/gmap_solve.v
 theories/lib/smap.v
 theories/lib/prelude.v
+theories/lib/CpdtTactics.v
 theories/clang/memory.v
 theories/clang/lang.v
 theories/clang/types.v

@@ -30,19 +30,19 @@ Structure reent_lock Σ `{!clangG Σ} := ReentLock {
   (* -- operation specs -- *)
   newlock_spec N (R : iProp Σ) Φ Φret:
     R ∗ (∀ lk γ, is_lock N γ lk R -∗ Φ lk)
-    ⊢ WP curs (Scall newlock []) {{ Φ; Φret }};
+    ⊢ WP cure (Ecall newlock []) {{ Φ; Φret }};
   acquire0_spec N γ lk R Φ Φret:
     is_lock N γ lk R ∗ (locked γ 0 -∗ R -∗ Φ)
-    ⊢ WP curs (Scall acquire [Evalue lk]) {{ _, Φ; Φret }};
+    ⊢ WP cure (Ecall acquire [Evalue lk]) {{ _, Φ; Φret }};
   acquiren_spec γ N R n lk Φ Φret:
     is_lock N γ lk R ∗ locked γ n ∗ (locked γ (n + 1) -∗ Φ)
-    ⊢ WP curs (Scall acquire [Evalue lk]) {{ _, Φ; Φret }};
+    ⊢ WP cure (Ecall acquire [Evalue lk]) {{ _, Φ; Φret }};
   release0_spec N γ lk R Φ Φret:
     is_lock N γ lk R ∗ locked γ 0 ∗ R ∗ (True -∗ Φ)
-    ⊢ WP curs (Scall release [Evalue lk]) {{ _, Φ; Φret }};
+    ⊢ WP cure (Ecall release [Evalue lk]) {{ _, Φ; Φret }};
   releasen_spec N γ n lk R Φ Φret:
     is_lock N γ lk R ∗ locked γ (S n) ∗ (locked γ n -∗ Φ)
-    ⊢ WP curs (Scall release [Evalue lk]) {{ _, Φ; Φret }}
+    ⊢ WP cure (Ecall release [Evalue lk]) {{ _, Φ; Φret }}
 }.
 
 Arguments newlock {_ _} _.
