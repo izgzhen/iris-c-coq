@@ -225,11 +225,18 @@ Definition to_val (c: cureval) :=
 Lemma of_to_val e v : to_val (cure e) = Some v → e = Evalue v.
 Admitted.
 
+Fixpoint s_to_ret_val (s: stmts) :=
+  match s with
+    | Sret => Some Vvoid
+    | Srete (Evalue v) => Some v
+    | Sseq s1 s2 => s_to_ret_val s1
+    | _ => None
+  end.
+
 Definition to_ret_val (c: cureval) :=
   match c with
-    | curs Sret => Some Vvoid
-    | curs (Srete (Evalue v)) => Some v
-    | _ => None
+    | curs s => s_to_ret_val s
+    | cure _ => None
   end.
 
 Lemma fill_not_val Kes Ks e: to_val (curs (fill_stmts (fill_ectxs e Kes) Ks)) = None.
@@ -254,27 +261,27 @@ Proof. intros ?. destruct c as [[]|[]]=>//. Qed.
 
 (* Definition of_val (v: val) := Evalue v. *)
 
-Inductive cstep: cureval → state → cureval → state → Prop :=
-| CSestep: ∀ e e' σ, estep e e' σ → cstep (cure e) σ (cure e') σ
-| CSsstep: ∀ s s' σ σ', sstep s σ s' σ' → cstep (curs s) σ (curs s') σ'.
+Inductive cstep: cureval → state → list context → cureval → state → list context → Prop :=
+| CSestep: ∀ e e' σ ks, estep e e' σ → cstep (cure e) σ ks (cure e') σ ks
+| CSsstep: ∀ s s' σ σ' ks, sstep s σ s' σ' → cstep (curs s) σ ks (curs s') σ' ks.
 
-Lemma fill_step_inv σ σ' e c' Kes Ks:
+Lemma fill_step_inv σ σ' ks ks' e c' Kes Ks:
   to_val (cure e) = None →
   to_ret_val (cure e) = None →
-  cstep (curs (fill_stmts (fill_ectxs e Kes) Ks)) σ c' σ' →
-  (∃ e', c' = curs (fill_stmts (fill_ectxs e' Kes) Ks) ∧ estep e e' σ ∧ σ = σ').
+  cstep (curs (fill_stmts (fill_ectxs e Kes) Ks)) σ ks c' σ' ks' →
+  (∃ e', c' = curs (fill_stmts (fill_ectxs e' Kes) Ks) ∧ estep e e' σ ∧ σ = σ' ∧ ks = ks').
 Admitted.
 
-Definition reducible cur σ := ∃ cur' σ', cstep cur σ cur' σ'.
+Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
 
-Lemma lift_reducible e Kes Ks σ:
-  reducible (cure e) σ → reducible (curs(fill_stmts (fill_ectxs e Kes) Ks)) σ.
+Lemma lift_reducible e Kes Ks σ ks:
+  reducible (cure e) σ ks → reducible (curs (fill_stmts (fill_ectxs e Kes) Ks)) σ ks.
 Admitted.
 
-Lemma reducible_not_val c σ: reducible c σ → to_val c = None.
+Lemma reducible_not_val c σ ks: reducible c σ ks → to_val c = None.
 Admitted.
 
-Lemma reducible_not_ret_val c σ: reducible c σ → to_ret_val c = None.
+Lemma reducible_not_ret_val c σ ks: reducible c σ ks → to_ret_val c = None.
 Admitted.
 
 Instance state_inhabited: Inhabited state := populate ∅.
@@ -295,3 +302,11 @@ Proof.
   { subst. intros. inversion H0; subst. constructor. }
   { intros. inversion H2; subst; constructor. }
 Qed.
+
+Lemma fill_seq_inv s1 s2 ks1 ks2 σ1 σ2 e2:
+  to_val (curs s1) = None →
+  to_ret_val (curs s1) = None →
+  cstep (curs (Sseq s1 s2)) σ1 ks1 e2 σ2 ks2 →
+  (∃ s1',
+     cstep (curs s1) σ1 ks1 (curs s1') σ2 ks2 ∧ e2 = curs (Sseq s1' s2)).
+Admitted.

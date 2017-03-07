@@ -23,9 +23,9 @@ Section wp.
      (∃ v, ⌜ to_val cur = Some v ⌝ ∧ |={E}=> Φ v) ∨
      (∃ v, ⌜ to_ret_val cur = Some v ⌝ ∧ |={E}=> Φret v) ∨
      (⌜ to_val cur = None ∧ to_ret_val cur = None ⌝ ∧
-         (∀ (σ: mem),
-          gen_heap_ctx σ ={E,∅}=∗ ⌜ reducible cur σ ⌝ ∗
-            ▷ (∀ cur' σ', ⌜cstep cur σ cur' σ'⌝ ={∅,E}=∗
+         (∀ (σ: mem) ks,
+          gen_heap_ctx σ ={E,∅}=∗ ⌜ reducible cur σ ks ⌝ ∗
+            ▷ (∀ cur' σ' ks', ⌜cstep cur σ ks cur' σ' ks'⌝ ={∅,E}=∗
                         gen_heap_ctx σ' ∗ wp E cur' Φ Φret))))%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
@@ -120,12 +120,12 @@ Section rules.
       iDestruct "HΦ" as "[HΦ _]". iApply ("HΦ" with ">[-]"). by iApply (fupd_mask_mono E1 _).
     - iRight. iLeft. iDestruct "Hrv" as (v) "[% Hrv]". iExists v; iSplit; first done.
       iDestruct "HΦ" as "[_ HΦret]".
-      iApply ("HΦret" with ">[-]"). by iApply (fupd_mask_mono E1 _). (* XXX: Boilerplate? *)
-    - iRight. iRight. iSplit; [done|]; iIntros (σ1) "Hσ".
+      iApply ("HΦret" with ">[-]"). by iApply (fupd_mask_mono E1 _).
+    - iRight. iRight. iSplit; [done|]; iIntros (σ1 ks1) "Hσ".
       iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done.
-      iMod ("H" $! σ1 with "Hσ") as "[$ H]".
-      iModIntro. iNext. iIntros (e2 σ2 Hstep).
-      iMod ("H" $! e2 σ2 with "[#]") as "($ & H)"; auto.
+      iMod ("H" $! _ _ with "Hσ") as "[$ H]".
+      iModIntro. iNext. iIntros (e2 σ2 ks2 Hstep).
+      iMod ("H" $! _ _ _ with "[#]") as "($ & H)"; auto.
       iMod "Hclose" as "_". iApply ("IH" $! e2 with "HΦ H").
   Qed.
 
@@ -140,7 +140,7 @@ Section rules.
     - iRight. iLeft. iExists retv; iSplit; first done.
       iMod "H" as "[H|[H|[% ?]]]"; try iDestruct "H" as (v') "[% ?]"; try (by inversion H0).
     - iRight. iRight. iSplit; first done.
-      iIntros (σ1) "Hσ1". iMod "H" as "[H|[H|[% H]]]".
+      iIntros (σ1 ks1) "Hσ1". iMod "H" as "[H|[H|[% H]]]".
       + iDestruct "H" as (v') "[% ?]"; simplify_eq.
       + iDestruct "H" as (v') "[% ?]"; simplify_eq.
       + by iApply "H".
@@ -161,11 +161,11 @@ Section rules.
     - iDestruct "Hrv" as (rv) "[% Hv]". inversion H0.
     - rewrite wp_unfold /wp_pre. iRight; iRight; iSplit.
       { eauto using fill_not_val, fill_not_ret_val. }
-      iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
+      iIntros (σ1 ks1) "Hσ". iMod ("H" $! _ _ with "Hσ") as "[% H]".
       iModIntro. iSplitL "". { iPureIntro. by apply lift_reducible. }
-      iNext; iIntros (e2 σ2 Hstep).
-      destruct H0. destruct (fill_step_inv σ1 σ2 e e2 Kes Ks) as (e2'&->&[]); auto.
-      subst. iMod ("H" $! (cure e2') σ2 with "[#]") as "($ & H)".
+      iNext; iIntros (e2 σ2 ks2 Hstep).
+      destruct H0. destruct (fill_step_inv σ1 σ2 ks1 ks2 e e2 Kes Ks) as (e2'&->&[]); auto.
+      destruct H4. subst. iMod ("H" $! (cure e2') σ2 ks2 with "[#]") as "($ & H)".
       { iPureIntro. by apply CSestep. }
       by iApply "IH".
   Qed.
@@ -179,48 +179,48 @@ Section rules.
   Lemma wp_lift_step E Φ Φret e1 :
     to_val e1 = None →
     to_ret_val e1 = None →
-    (∀ σ1, gen_heap_ctx σ1 ={E,∅}=∗
-      ⌜reducible e1 σ1⌝ ∗
-      ▷ ∀ e2 σ2, ⌜cstep e1 σ1 e2 σ2⌝ ={∅,E}=∗
+    (∀ σ1 ks1, gen_heap_ctx σ1 ={E,∅}=∗
+      ⌜reducible e1 σ1 ks1⌝ ∗
+      ▷ ∀ e2 σ2 ks2, ⌜cstep e1 σ1 ks1 e2 σ2 ks2⌝ ={∅,E}=∗
         gen_heap_ctx σ2 ∗ WP e2 @ E {{ Φ; Φret }})
     ⊢ WP e1 @ E {{ Φ; Φret }}.
   Proof. iIntros (??) "H". rewrite wp_unfold /wp_pre; auto. Qed.
 
   Lemma wp_lift_pure_step E Φ Φret e1 :
-    (∀ σ1, reducible (cure e1) σ1) →
+    (∀ σ1 ks1, reducible (cure e1) σ1 ks1) →
     (▷ ∀ e2 σ, ⌜ estep e1 e2 σ ⌝ →
                 WP (cure e2) @ E {{ Φ ; Φret }})
       ⊢ WP cure e1 @ E {{ Φ ; Φret }}.
   Proof.
     iIntros (Hsafe) "H".
     iApply wp_lift_step;
-      [by eapply reducible_not_val, (Hsafe inhabitant) |
-       by eapply reducible_not_ret_val, (Hsafe inhabitant)|].
-    iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
-    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ?).
+      [by eapply reducible_not_val, (Hsafe inhabitant [])|
+       by eapply reducible_not_ret_val, (Hsafe inhabitant[])|].
+    iIntros (σ1 ks1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ? ?).
     iMod "Hclose"; iModIntro.
     inversion H0. subst. iFrame. by iApply "H".
   Qed.
 
   Lemma wp_lift_atomic_step {E Φ Φret} s1 :
     to_val s1 = None → to_ret_val s1 = None →
-    (∀ σ1, gen_heap_ctx σ1 ={E}=∗
-      ⌜reducible s1 σ1⌝ ∗
-      ▷ ∀ s2 σ2, ⌜cstep s1 σ1 s2 σ2⌝ ={E}=∗
+    (∀ σ1 ks1, gen_heap_ctx σ1 ={E}=∗
+      ⌜reducible s1 σ1 ks1⌝ ∗
+      ▷ ∀ s2 σ2 ks2, ⌜cstep s1 σ1 ks1 s2 σ2 ks2⌝ ={E}=∗
         gen_heap_ctx σ2 ∗
         default False (to_val s2) Φ)
     ⊢ WP s1 @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (??) "H". iApply (wp_lift_step E _ _ s1)=>//; iIntros (σ1) "Hσ1".
-    iMod ("H" $! σ1 with "Hσ1") as "[$ H]".
+    iIntros (??) "H". iApply (wp_lift_step E _ _ s1)=>//; iIntros (σ1 ks1) "Hσ1".
+    iMod ("H" $! σ1 ks1 with "Hσ1") as "[$ H]".
     iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
-    iModIntro; iNext; iIntros (s2 σ2) "%". iMod "Hclose" as "_".
-    iMod ("H" $! s2 σ2 with "[#]") as "($ & H)"=>//.
+    iModIntro; iNext; iIntros (s2 σ2 ks2) "%". iMod "Hclose" as "_".
+    iMod ("H" $! _ _ _ with "[#]") as "($ & H)"=>//.
     destruct (to_val s2) eqn:?; last by iExFalso.
     by iApply wp_value.
   Qed.
   
-  Local Hint Extern 0 (reducible _ _) => eexists _, _; simpl.
+  Local Hint Extern 0 (reducible _ _ _) => eexists _, _, _; simpl.
 
   Local Hint Constructors cstep sstep estep.
 
@@ -246,9 +246,9 @@ Section rules.
   Proof.
     iIntros (??) "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
-    iIntros (σ1) "Hσ !>".
+    iIntros (σ1 ks1) "Hσ !>".
     rewrite /mapstoval. iSplit; first eauto.
-    iNext; iIntros (v2 σ2 Hstep).
+    iNext; iIntros (v2 σ2 ks2 Hstep).
     iDestruct "Hl" as "[% Hl]".
     iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
     {
@@ -307,9 +307,9 @@ Section rules.
   Proof.
     iIntros "H".
     rewrite !wp_unfold /wp_pre. iRight; iRight; iSplit=>//.
-    iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iIntros (σ1 ks1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit; first eauto.
-    iNext; iIntros (e2 σ2 ?).
+    iNext; iIntros (e2 σ2 ? ?).
     iMod "Hclose". inversion H0. subst. inversion H2. subst. iFrame.
     - rewrite !wp_unfold /wp_pre. done.
     - subst. inversion H7.
@@ -317,13 +317,12 @@ Section rules.
 
   Lemma wp_ret E v Φ Φret:
     Φret v ⊢ WP curs (Srete (Evalue v)) @ E {{ Φ; Φret }}.
-  Admitted.
+  Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iRight. iLeft. eauto. Qed.
 
-  Lemma wp_seq_ret E s1 s2 rv Φ Φret:
+  Lemma wp_seq_ret E s1 s2 Φ Φret rv:
     to_ret_val (curs s1) = Some rv →
-    (|={E}=> Φret rv)%I
-    ⊢ WP curs (Sseq s1 s2) @ E {{ v, Φ v;Φret }}.
-  Admitted.
+    (|={E}=> Φret rv) ⊢ WP curs (Sseq s1 s2) @ E {{ v, Φ v;Φret }}.
+  Proof. iIntros (?) "Hret". rewrite !wp_unfold /wp_pre. iRight; iLeft. eauto. Qed.
 
   Lemma wp_seq E s1 s2 Φ Φret:
     WP curs s1 @ E {{ _, WP curs s2 @ E {{ Φ ; Φret }} ; Φret }}
@@ -335,18 +334,24 @@ Section rules.
       destruct s1=>//.
       iApply (wp_seq_skip E s2 Φ Φret with "Hv").
     - iDestruct "Hrv" as (rv) "[% Hv]".
-      by iApply (wp_seq_ret E s1 s2 rv Φ Φret with "Hv").
+      by iApply (wp_seq_ret E s1 s2 Φ Φret rv with "Hv").
     - rewrite (wp_unfold E (curs (Sseq s1 s2)) Φ Φret) /wp_pre. iRight; iRight; iSplit.
-      { eauto using fill_not_val, fill_not_ret_val. }
-      iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
-      iModIntro. iSplitL "". { iPureIntro. admit. }
-      iNext; iIntros (e2 σ2 Hstep).
-      destruct H0. assert (∃ s1', cstep (curs s1) σ1 (curs s1') σ2 ∧ e2 = (curs (Sseq s1' s2))) as Hs1.
-      { admit. }
-      destruct Hs1 as [s1' [Hs1 ?]]. subst.
-      iMod ("H" $! _ σ2 with "[#]") as "[$ H]"=>//.
+      { eauto using fill_not_val, fill_not_ret_val.
+        iPureIntro.
+        by destruct H0.
+      }
+      iIntros (σ1 ks) "Hσ". iMod ("H" $! _ _ with "Hσ") as "[% H]".
+      iModIntro. iSplitL "".
+      { iPureIntro. inversion H1.
+        destruct H2 as (?&?&?).
+        inversion H2. subst.
+        eexists _, _, _. apply CSsstep. eauto. }
+      iNext; iIntros (e2 σ2 ks2 Hstep).
+      destruct H0.
+      destruct (fill_seq_inv _ _ _ _ _ _ _ e e0 Hstep) as [s1' [Hs1 ?]]. subst.
+      iMod ("H" $! _ σ2 _ with "[#]") as "[$ H]"=>//.
       by iApply "IH".
-  Admitted.
+  Qed.
 
   Lemma mapsto_readbytes q σ:
     ∀ bs l, mapstobytes l q bs ∗ gen_heap_ctx σ ⊢ ⌜ readbytes l bs σ ⌝.
@@ -386,12 +391,12 @@ Section rules.
   Proof.
     iIntros "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
-    iIntros (σ1) "Hσ".
+    iIntros (σ1 ks1) "Hσ".
     unfold mapstoval.
     iDestruct "Hl" as "[>% >Hl]".
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
     iModIntro. iSplit; first eauto.
-    iNext; iIntros (s2 σ2 Hstep). iModIntro.
+    iNext; iIntros (s2 σ2 ks2 Hstep). iModIntro.
     inversion Hstep. subst.
     inversion H3. subst. simpl. iFrame.
     rewrite (same_type_encode_inj σ2 t v v0 p)=>//. 
