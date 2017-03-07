@@ -21,7 +21,8 @@ Inductive expr :=
 | Eaddrof (e: expr)
 | Efst (e: expr)
 | Esnd (e: expr)
-| Ecall (fid: ident) (args: list expr).
+| Ecall (fid: ident) (args: list expr)
+| Ealloc (t: type) (e: expr).
 (* | Ecast (e: expr) (t: type) *) (* NOTE: either cast or index are not essential, we'll do it later *)
 
 Definition tid := nat.
@@ -41,7 +42,6 @@ Inductive stmts :=
 | Sseq (s1 s2: stmts).
 (* | Sprint (e: expr) *)
 (* | Sfree *)
-(* | Salloc *)
 
 Definition decls := list (ident * type).
 
@@ -59,7 +59,8 @@ Inductive exprctx :=
 | EKaddrof
 | EKfst
 | EKsnd
-| EKcall (fid: ident) (vargs: list val) (args: list expr).
+| EKcall (fid: ident) (vargs: list val) (args: list expr)
+| EKalloc (t: type).
 (* | EKcast (t: type) *)
 
 Inductive stmtsctx :=
@@ -103,6 +104,7 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
          | _ => None
        end)
     | Ecall f args => sget f (fenv ev)
+    | Ealloc t _ => Some (Tptr t)
   end.
 
 Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
@@ -115,6 +117,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKfst => Efst e
     | EKsnd => Esnd e
     | EKcall f vargs args => Ecall f (map Evalue vargs ++ e :: args)
+    | EKalloc t => Ealloc t e
   end.
 
 Definition fill_stmts (e : expr) (Ks : stmtsctx) : stmts :=
@@ -165,32 +168,37 @@ Fixpoint readbytes l bs (σ: mem) :=
     | _ => True
   end.
 
+Fixpoint storebytes l bs (σ: mem) :=
+  match bs with
+    | byte::bs' => let '(b, o) := l in <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
+    | _ => σ
+  end.
+
 (* expr *can* have side-effect *)
-Inductive estep : expr → expr → state → Prop :=
+Inductive estep : expr → state → expr → state → Prop :=
 | ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
-             estep (Ebinop op (Evalue lv) (Evalue rv))
+             estep (Ebinop op (Evalue lv) (Evalue rv)) σ
                    (Evalue v')
                    σ
 | ESderef_typed:
     ∀ σ l v t,
       typeof v t →
       readbytes l (encode_val v) σ →
-      estep (Ederef_typed t (Evalue (Vptr l)))
+      estep (Ederef_typed t (Evalue (Vptr l))) σ
             (Evalue v) σ
 | ESfst:
     ∀ v1 v2 σ,
-      estep (Efst (Evalue (Vpair v1 v2))) (Evalue v1) σ
+      estep (Efst (Evalue (Vpair v1 v2))) σ (Evalue v1) σ
 | ESsnd:
     ∀ v1 v2 σ,
-      estep (Esnd (Evalue (Vpair v1 v2))) (Evalue v2) σ
+      estep (Esnd (Evalue (Vpair v1 v2))) σ (Evalue v2) σ
+| ESalloc:
+    ∀ t v σ b o,
+      typeof v t →
+      (∀ o', σ !! (b, o') = None) →
+      estep (Ealloc t (Evalue v)) σ (Evalue (Vptr (b, o))) (storebytes (b, o) (encode_val v) σ)
 .
-
-Fixpoint storebytes l bs (σ: mem) :=
-  match bs with
-    | byte::bs' => let '(b, o) := l in <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
-    | _ => σ
-  end.
 
 (* Offset is ignored *)
 Inductive sstep : stmts → state → stmts → state → Prop :=
@@ -262,14 +270,14 @@ Proof. intros ?. destruct c as [[]|[]]=>//. Qed.
 (* Definition of_val (v: val) := Evalue v. *)
 
 Inductive cstep: cureval → state → list context → cureval → state → list context → Prop :=
-| CSestep: ∀ e e' σ ks, estep e e' σ → cstep (cure e) σ ks (cure e') σ ks
+| CSestep: ∀ e e' σ σ' ks, estep e σ e' σ' → cstep (cure e) σ ks (cure e') σ' ks
 | CSsstep: ∀ s s' σ σ' ks, sstep s σ s' σ' → cstep (curs s) σ ks (curs s') σ' ks.
 
 Lemma fill_step_inv σ σ' ks ks' e c' Kes Ks:
   to_val (cure e) = None →
   to_ret_val (cure e) = None →
   cstep (curs (fill_stmts (fill_ectxs e Kes) Ks)) σ ks c' σ' ks' →
-  (∃ e', c' = curs (fill_stmts (fill_ectxs e' Kes) Ks) ∧ estep e e' σ ∧ σ = σ' ∧ ks = ks').
+  (∃ e', c' = curs (fill_stmts (fill_ectxs e' Kes) Ks) ∧ estep e σ e' σ' ∧ ks = ks').
 Admitted.
 
 Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
@@ -308,5 +316,5 @@ Lemma fill_seq_inv s1 s2 ks1 ks2 σ1 σ2 e2:
   to_ret_val (curs s1) = None →
   cstep (curs (Sseq s1 s2)) σ1 ks1 e2 σ2 ks2 →
   (∃ s1',
-     cstep (curs s1) σ1 ks1 (curs s1') σ2 ks2 ∧ e2 = curs (Sseq s1' s2)).
+     cstep (curs s1) σ1 ks1 (curs s1') σ2 ks2 ∧ e2 = curs (Sseq s1' s2) ∧ ks1 = ks2).
 Admitted.

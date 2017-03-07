@@ -165,7 +165,7 @@ Section rules.
       iModIntro. iSplitL "". { iPureIntro. by apply lift_reducible. }
       iNext; iIntros (e2 σ2 ks2 Hstep).
       destruct H0. destruct (fill_step_inv σ1 σ2 ks1 ks2 e e2 Kes Ks) as (e2'&->&[]); auto.
-      destruct H4. subst. iMod ("H" $! (cure e2') σ2 ks2 with "[#]") as "($ & H)".
+      destruct H4. subst. iMod ("H" $! (cure e2') σ2 _ with "[#]") as "($ & H)".
       { iPureIntro. by apply CSestep. }
       by iApply "IH".
   Qed.
@@ -188,18 +188,19 @@ Section rules.
 
   Lemma wp_lift_pure_step E Φ Φret e1 :
     (∀ σ1 ks1, reducible (cure e1) σ1 ks1) →
-    (▷ ∀ e2 σ, ⌜ estep e1 e2 σ ⌝ →
+    (∀ σ1 σ2 e2, estep e1 σ1 e2 σ2 → σ1 = σ2) →
+    (▷ ∀ e2 σ1 σ2, ⌜ estep e1 σ1 e2 σ2 ⌝ →
                 WP (cure e2) @ E {{ Φ ; Φret }})
       ⊢ WP cure e1 @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (Hsafe) "H".
+    iIntros (Hsafe ?) "H".
     iApply wp_lift_step;
       [by eapply reducible_not_val, (Hsafe inhabitant [])|
        by eapply reducible_not_ret_val, (Hsafe inhabitant[])|].
     iIntros (σ1 ks1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ? ?).
-    iMod "Hclose"; iModIntro.
-    inversion H0. subst. iFrame. by iApply "H".
+    iMod "Hclose"; iModIntro. 
+    inversion H1. subst. specialize (H0 _ _ _ H3). subst. iFrame. by iApply "H".
   Qed.
 
   Lemma wp_lift_atomic_step {E Φ Φret} s1 :
@@ -348,7 +349,7 @@ Section rules.
         eexists _, _, _. apply CSsstep. eauto. }
       iNext; iIntros (e2 σ2 ks2 Hstep).
       destruct H0.
-      destruct (fill_seq_inv _ _ _ _ _ _ _ e e0 Hstep) as [s1' [Hs1 ?]]. subst.
+      destruct (fill_seq_inv _ _ _ _ _ _ _ e e0 Hstep) as [s1' [Hs1 [? ?]]]. subst.
       iMod ("H" $! _ σ2 _ with "[#]") as "[$ H]"=>//.
       by iApply "IH".
   Qed.
@@ -408,8 +409,8 @@ Section rules.
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP cure (Ebinop op (Evalue v1) (Evalue v2)) @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (?) "HΦ". iApply wp_lift_pure_step=>//; first eauto.
-    iNext. iIntros (e2 σ2 Estep).
+    iIntros (?) "HΦ". iApply wp_lift_pure_step=>//; first eauto; first by inversion 1.
+    iNext. iIntros (e2 σ1 σ2 Estep).
     inversion Estep; subst.
     simplify_eq. iApply wp_value=>//.
   Qed.
@@ -443,8 +444,8 @@ Section rules.
     ▷ WP cure (Evalue v1) {{ Φ; Φret }}
     ⊢ WP cure (Efst (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
   Proof.
-    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto.
-    iNext. iIntros (e2 σ2 Estep).
+    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto; first by inversion 1.
+    iNext. iIntros (e2 σ1 σ2 Estep).
     inversion Estep; subst.
     by simplify_eq.
   Qed.
@@ -453,8 +454,8 @@ Section rules.
     ▷ WP cure (Evalue v2) {{ Φ; Φret }}
     ⊢ WP cure (Esnd (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
   Proof.
-    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto.
-    iNext. iIntros (e2 σ2 Estep).
+    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto; first by inversion 1.
+    iNext. iIntros (e2 σ1 σ2 Estep).
     inversion Estep; subst.
     by simplify_eq.
   Qed.
@@ -589,5 +590,74 @@ Section rules.
        WP curs f_body' {{ _, True; Φ }})
     ⊢ WP cure (Ecall f es) {{ Φ; Φret }}.
   Admitted.
+
+  Definition fresh_block (σ: mem) : block :=
+    let addrst : list addr := elements (dom _ σ : gset addr) in
+    let blockset : gset block := foldr (λ l, ({[ l.1 ]} ∪)) ∅ addrst in
+    fresh blockset.
+
+  Lemma is_fresh_block σ i: σ !! (fresh_block σ, i) = None.
+  Proof.
+    assert (∀ (l: addr) ls (X : gset block),
+              l ∈ ls → l.1 ∈ foldr (λ l, ({[ l.1 ]} ∪)) X ls) as help.
+    { induction 1; set_solver. }
+    rewrite /fresh_block /= -not_elem_of_dom -elem_of_elements.
+    move=> /(help _ _ ∅) /=. apply is_fresh.
+  Qed.
+  
+  Lemma alloc_fresh σ v t:
+    let l := (fresh_block σ, 0)%nat in
+    typeof v t →
+    estep (Ealloc t (Evalue v)) σ (Evalue (Vptr l)) (storebytes l (encode_val v) σ).
+  Proof.
+    intros l ?. apply ESalloc. auto.
+    intros o'. apply (is_fresh_block _ o').
+  Qed.
+  
+  Lemma fresh_store σ1 b o bs:
+    ∀ a : nat,
+      a > 0 →
+      σ1 !! (b, o) = None →
+      storebytes (b, (o + a)%nat) bs σ1 !! (b, o) = None.
+  Proof.
+    induction bs=>//.
+    intros. simpl.
+    apply lookup_insert_None.
+    split. rewrite -Nat.add_assoc.
+    apply IHbs=>//. induction a0; crush.
+    intros [=]. omega.
+  Qed.
+  
+  Lemma gen_heap_update_block bs:
+    ∀ σ1 b o,
+      (∀ o' : offset, σ1 !! (b, o') = None) →
+      gen_heap_ctx σ1 ⊢ |==> gen_heap_ctx (storebytes (b, o) bs σ1) ∗ mapstobytes (b, o) 1 bs.
+  Proof.
+    induction bs.
+    - simpl. iIntros (????) "Hσ". eauto.
+    - simpl. iIntros (????) "Hσ".
+      iMod (IHbs with "Hσ") as "[Hσ' Hbo]"=>//.
+      iFrame. iMod (gen_heap_alloc _ (b, o) with "Hσ'") as "[Hσ Hbo]".
+      apply fresh_store=>//.
+      by iFrame.
+  Qed.
+  
+  Lemma wp_alloc E v t Φ Φret:
+    typeof v t →
+    (∀ l, l ↦ v @ t -∗ Φ (Vptr l))
+    ⊢ WP cure (Ealloc t (Evalue v)) @ E {{ Φ; Φret }}.
+  Proof.
+    iIntros (?) "HΦ".
+    rewrite wp_unfold /wp_pre.
+    iRight. iRight. iSplit=>//.
+    iIntros (σ1 ks1) "Hσ1". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _. apply CSestep. by apply alloc_fresh. }
+    iNext. iIntros (e2 σ2 ? ?).
+    iMod "Hclose". inversion H1. subst. inversion H3. subst.
+    iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//.
+    iFrame. iModIntro. iApply wp_value=>//.
+    iApply "HΦ". by iFrame.
+  Qed.
 
 End rules.
