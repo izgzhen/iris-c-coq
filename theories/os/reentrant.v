@@ -11,9 +11,6 @@ Require Import logic.
   
 Structure reent_lock Σ `{!clangG Σ} := ReentLock {
   (* -- operations -- *)
-  newlock_f : function;
-  acquire_f : function;
-  release_f : function;
   newlock : ident;
   acquire : ident;
   release : ident;

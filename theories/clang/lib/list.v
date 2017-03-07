@@ -41,11 +41,11 @@ Section proof.
       x <- t
     }>.
 
-  Definition ev :=
-    Env [(x, (Tptr (tcell Tint32), px));
-         (y, (Tptr Tvoid, py));
-         (t, (Tptr (tcell Tint32), pt))]
-        [].
+  Definition ev : @env (fspec Σ) :=
+    Env _ [(x, (Tptr (tcell Tint32), px));
+           (y, (Tptr Tvoid, py));
+           (t, (Tptr (tcell Tint32), pt))]
+          [].
   
   Lemma rev_spec Φ Φret body xs:
     ∀ lx ly ys,

@@ -8,6 +8,8 @@ Inductive type : Set :=
 | Tptr (t: type)
 | Tprod (t1 t2: type).
 
+Instance equiv_type: Equiv type := (=).
+
 Fixpoint type_infer_v (v: val) : type :=
   match v with
     | Vnull => Tnull

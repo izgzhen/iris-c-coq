@@ -12,6 +12,8 @@ Inductive bop :=
 | oequals
 | oneq.
 
+Definition decls := list (ident * type).
+
 Inductive expr :=
 | Evalue (v: val)
 | Evar (x: ident)
@@ -40,14 +42,15 @@ Inductive stmts :=
 | Sret
 | Srete (e: expr)
 | Sseq (s1 s2: stmts).
-(* | Sprint (e: expr) *)
-(* | Sfree *)
 
-Definition decls := list (ident * type).
+Record function (def_t: Type) :=
+  Function {
+      f_retty: type;
+      f_params: decls;
+      f_def: def_t
+    }.
 
-Definition function : Type := (type * decls * stmts).
-
-Definition program := ident → option function.
+Definition program (t: Type) := ident → option (function t).
 
 (* Operational Semantics *)
 
@@ -75,13 +78,13 @@ Definition context : Type := (exprctx * stmtsctx).
 Inductive cureval :=
 | curs (s: stmts) | cure (e: expr).
 
-Record env :=
+Record env {t: Type} :=
   Env {
       lenv: smap (type * addr);
-      fenv: smap type
+      fenv: smap (function t)
     }.
 
-Fixpoint type_infer (ev: env) (e: expr) : option type :=
+Fixpoint type_infer {t: Type} (ev: env) (e: expr) : option type :=
   match e with
     | Evalue v => Some (type_infer_v v)
     | Evar x => p ← sget x (lenv ev); Some (p.1)
@@ -103,7 +106,7 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
          | Some (Tprod _ t2) => Some t2
          | _ => None
        end)
-    | Ecall f args => sget f (fenv ev)
+    | Ecall f args => f_retty t <$> sget f (fenv ev)
     | Ealloc t _ => Some (Tptr t)
   end.
 
@@ -134,9 +137,14 @@ Definition fill_ctx (e: expr) (K: context) : stmts :=
 
 Definition fill_ectxs := foldl fill_expr.
 
-Definition mem := gmap addr byteval.
+Definition heap := gmap addr byteval.
+Definition text := gmap ident (function stmts).
 
-Definition state := mem.
+Record state :=
+  State {
+      s_heap : heap;
+      s_text : text
+    }.
 
 Definition offset_by_int32 (o: nat) (i: int32) : nat := o + Z.to_nat (Int.intval i).
 Definition offset_by_byte (o: nat) (i: byte) : nat := o + Z.to_nat (Byte.intval i).
@@ -162,13 +170,13 @@ Definition evalbop (op: bop) v1 v2 : option val :=
     | oneq => if decide (v1 = v2) then Some vfalse else Some vtrue
   end.
 
-Fixpoint readbytes l bs (σ: mem) :=
+Fixpoint readbytes l bs (σ: heap) :=
   match bs with
     | byte::bs' => let '(b, o) := l in σ !! l = Some byte ∧ readbytes (b, o + 1)%nat bs' σ
     | _ => True
   end.
 
-Fixpoint storebytes l bs (σ: mem) :=
+Fixpoint storebytes l bs (σ: heap) :=
   match bs with
     | byte::bs' => let '(b, o) := l in <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
     | _ => σ
@@ -179,12 +187,11 @@ Inductive estep : expr → state → expr → state → Prop :=
 | ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
              estep (Ebinop op (Evalue lv) (Evalue rv)) σ
-                   (Evalue v')
-                   σ
+                   (Evalue v') σ
 | ESderef_typed:
     ∀ σ l v t,
       typeof v t →
-      readbytes l (encode_val v) σ →
+      readbytes l (encode_val v) (s_heap σ) →
       estep (Ederef_typed t (Evalue (Vptr l))) σ
             (Evalue v) σ
 | ESfst:
@@ -196,9 +203,19 @@ Inductive estep : expr → state → expr → state → Prop :=
 | ESalloc:
     ∀ t v σ b o,
       typeof v t →
-      (∀ o', σ !! (b, o') = None) →
-      estep (Ealloc t (Evalue v)) σ (Evalue (Vptr (b, o))) (storebytes (b, o) (encode_val v) σ)
-.
+      (∀ o', (s_heap σ) !! (b, o') = None) →
+      estep (Ealloc t (Evalue v)) σ (Evalue (Vptr (b, o)))
+            (State (storebytes (b, o) (encode_val v) (s_heap σ)) (s_text σ)).
+(* | EScall: *)
+(*     ∀ t v σ  *)
+(*     es = map Evalue vs → *)
+(*     params_match params vs → *)
+(*     (∀ ls f_body', *)
+(*        ⌜ length ls = length vs ∧ *)
+(*          instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' ⌝ -∗ *)
+(*        alloc_params (zip (params.*2) ls) vs -∗ *)
+(*        WP curs f_body' {{ _, True; Φ }}) *)
+(*     ⊢ WP cure (Ecall f es) {{ Φ; Φret }}. *)
 
 (* Offset is ignored *)
 Inductive sstep : stmts → state → stmts → state → Prop :=
@@ -207,9 +224,8 @@ Inductive sstep : stmts → state → stmts → state → Prop :=
       sstep (Sassign (Evalue (Vptr l)) (Evalue v))
             σ
             Sskip
-            (storebytes l (encode_val v) σ)
+            (State (storebytes l (encode_val v) (s_heap σ)) (s_text σ))
 | SSseq: ∀ s σ, sstep (Sseq Sskip s) σ s σ
-(* | SKwhile (s: stmts). *)
 | SSseq_head:
     ∀ s1 s1' s2 σ σ', sstep s1 σ s1' σ' → sstep (Sseq s1 s2) σ (Sseq s1' s2) σ'
 .
@@ -292,7 +308,7 @@ Admitted.
 Lemma reducible_not_ret_val c σ ks: reducible c σ ks → to_ret_val c = None.
 Admitted.
 
-Instance state_inhabited: Inhabited state := populate ∅.
+Instance state_inhabited: Inhabited state := populate (State ∅ ∅).
 
 Inductive assign_type_compatible : type → type → Prop :=
 | assign_id: ∀ t, assign_type_compatible t t

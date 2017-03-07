@@ -8,14 +8,34 @@ From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
+Definition fspec Σ : ofeT :=
+  prodC (list addr -c> iPreProp Σ) (val -c> iPreProp Σ).
+
+Instance equiv_type_decls: Equiv (type * decls) := (=).
+
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
-  clangG_memG :> gen_heapG addr byteval Σ
+  clangG_heapG :> gen_heapG addr byteval Σ;
+  clangG_textG :> inG Σ (gmapUR ident (agreeR (prodC (discreteC (type * decls)) (fspec Σ))));
+  clangG_textG_name : gname
 }.
+
+Definition map_funCF {Σ} (t: Type) (P: t → iProp Σ) : (t -c> iPreProp Σ) :=
+  cFunctor_map (ofe_funCF t idCF) (@iProp_fold Σ, iProp_unfold) P.
 
 Section wp.
   Context `{clangG Σ}.
 
+  Definition fspec_prop (f: ident) (t: type) (dls: decls) (P: list addr → iProp Σ) (Q: val → iProp Σ) :=
+    own clangG_textG_name {[ f := to_agree ((t, dls) : discreteC (type * decls),
+                                            (map_funCF (list addr) P, map_funCF val Q)) ]}.
+  
+  Definition fspec_interp (f: ident) (x: function stmts) :=
+    (∃ (P: list addr → iProp Σ) (Q: val → iProp Σ), fspec_prop f (f_retty _ x) (f_params _ x) P Q)%I.
+  
+  Definition state_interp (s: state) : iProp Σ:=
+    (gen_heap_ctx (s_heap s) ∗ ([∗ map] k ↦ x ∈ (s_text s), fspec_interp k x))%I.
+  
   Definition wp_pre
            (wp: coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ) :
     coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ :=
@@ -23,10 +43,10 @@ Section wp.
      (∃ v, ⌜ to_val cur = Some v ⌝ ∧ |={E}=> Φ v) ∨
      (∃ v, ⌜ to_ret_val cur = Some v ⌝ ∧ |={E}=> Φret v) ∨
      (⌜ to_val cur = None ∧ to_ret_val cur = None ⌝ ∧
-         (∀ (σ: mem) ks,
-          gen_heap_ctx σ ={E,∅}=∗ ⌜ reducible cur σ ks ⌝ ∗
+         (∀ (σ: state) ks,
+           state_interp σ ={E,∅}=∗ ⌜ reducible cur σ ks ⌝ ∗
             ▷ (∀ cur' σ' ks', ⌜cstep cur σ ks cur' σ' ks'⌝ ={∅,E}=∗
-                        gen_heap_ctx σ' ∗ wp E cur' Φ Φret))))%I.
+                        state_interp σ' ∗ wp E cur' Φ Φret))))%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
   Proof.
@@ -99,7 +119,6 @@ Section rules.
   Lemma wp_unfold E c Φ Φret: WP c @ E {{ Φ; Φret }} ⊣⊢ wp_pre wp E c Φ Φret.
     (* Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed. *) (* XXX: too slow *)
   Admitted.
-  
 
   Lemma wp_skip Φ Φret E: Φ Vvoid ⊢ WP curs Sskip @ E {{ Φ; Φret }}.
   Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
@@ -179,10 +198,10 @@ Section rules.
   Lemma wp_lift_step E Φ Φret e1 :
     to_val e1 = None →
     to_ret_val e1 = None →
-    (∀ σ1 ks1, gen_heap_ctx σ1 ={E,∅}=∗
+    (∀ σ1 ks1, state_interp σ1 ={E,∅}=∗
       ⌜reducible e1 σ1 ks1⌝ ∗
       ▷ ∀ e2 σ2 ks2, ⌜cstep e1 σ1 ks1 e2 σ2 ks2⌝ ={∅,E}=∗
-        gen_heap_ctx σ2 ∗ WP e2 @ E {{ Φ; Φret }})
+        state_interp σ2 ∗ WP e2 @ E {{ Φ; Φret }})
     ⊢ WP e1 @ E {{ Φ; Φret }}.
   Proof. iIntros (??) "H". rewrite wp_unfold /wp_pre; auto. Qed.
 
@@ -205,10 +224,10 @@ Section rules.
 
   Lemma wp_lift_atomic_step {E Φ Φret} s1 :
     to_val s1 = None → to_ret_val s1 = None →
-    (∀ σ1 ks1, gen_heap_ctx σ1 ={E}=∗
+    (∀ σ1 ks1, state_interp σ1 ={E}=∗
       ⌜reducible s1 σ1 ks1⌝ ∗
       ▷ ∀ s2 σ2 ks2, ⌜cstep s1 σ1 ks1 s2 σ2 ks2⌝ ={E}=∗
-        gen_heap_ctx σ2 ∗
+        state_interp σ2 ∗
         default False (to_val s2) Φ)
     ⊢ WP s1 @ E {{ Φ ; Φret }}.
   Proof.
@@ -247,10 +266,10 @@ Section rules.
   Proof.
     iIntros (??) "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
-    iIntros (σ1 ks1) "Hσ !>".
+    iIntros (σ1 ks1) "[Hσ HΓ] !>".
     rewrite /mapstoval. iSplit; first eauto.
     iNext; iIntros (v2 σ2 ks2 Hstep).
-    iDestruct "Hl" as "[% Hl]".
+    iDestruct "Hl" as "[% Hl]". 
     iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
     {
       rewrite -(typeof_preserves_size v t)=>//.
@@ -392,7 +411,7 @@ Section rules.
   Proof.
     iIntros "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
-    iIntros (σ1 ks1) "Hσ".
+    iIntros (σ1 ks1) "[Hσ HΓ]".
     unfold mapstoval.
     iDestruct "Hl" as "[>% >Hl]".
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
@@ -400,7 +419,7 @@ Section rules.
     iNext; iIntros (s2 σ2 ks2 Hstep). iModIntro.
     inversion Hstep. subst.
     inversion H3. subst. simpl. iFrame.
-    rewrite (same_type_encode_inj σ2 t v v0 p)=>//. 
+    rewrite (same_type_encode_inj (s_heap σ2) t v v0 p)=>//. 
     iApply "HΦ".
     iSplit=>//.
   Qed.
@@ -459,139 +478,10 @@ Section rules.
     inversion Estep; subst.
     by simplify_eq.
   Qed.
+
+  (* Freshness and memory allocation *)
   
-  Fixpoint params_match (params: decls) (vs: list val) :=
-    match params, vs with
-      | (_, t)::params, v::vs => typeof v t ∧ params_match params vs
-      | [], [] => True
-      | _, _ => False
-    end.
-
-  Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=
-    (match addrs, vs with
-       | (t, l)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
-       | [], [] => True
-       | _, _ => False
-     end)%I.
-
-  Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
-    match l with
-      | Some x :: l' => (x ::) <$> lift_list_option l'
-      | None :: _ => None
-      | _ => Some []
-    end.
-  
-  Fixpoint resolve_rhs_e (ev: env) (e: expr) : option expr :=
-    match e with
-      | Evar x => (* closed-ness? *)
-        (match sget x (lenv ev) with
-          | Some (t, l) => Some $ Ederef_typed t (Evalue (Vptr l))
-          | None => None
-         end)
-      | Ebinop op e1 e2 =>
-        match resolve_rhs_e ev e1, resolve_rhs_e ev e2 with
-          | Some e1', Some e2' => Some (Ebinop op e1' e2')
-          | _, _ => None
-        end
-      | Ederef e =>
-        match type_infer ev e, resolve_rhs_e ev e with
-          | Some (Tptr t), Some e' => Some (Ederef_typed t e') 
-          | _, _ => None
-        end
-      | Eaddrof e => Eaddrof <$> resolve_rhs_e ev e
-      | Efst e => Efst <$> resolve_rhs_e ev e
-      | Esnd e => Esnd <$> resolve_rhs_e ev e
-      | Ecall f args => Ecall f <$> lift_list_option (map (resolve_rhs_e ev) args)
-      | _ => Some e
-    end.
-  
-  Fixpoint resolve_rhs (ev: env) (s: stmts) : option stmts :=
-    match s with
-      | Sskip => Some Sskip
-      | Sprim p => Some $ Sprim p
-      | Sassign e1 e2 => Sassign e1 <$> resolve_rhs_e ev e2
-      | Sif e s1 s2 =>
-        match resolve_rhs_e ev e, resolve_rhs ev s1, resolve_rhs ev s2 with
-          | Some e', Some s1', Some s2' => Some $ Sif e' s1' s2'
-          | _, _, _ => None
-        end
-      | Swhile c e s =>
-        match resolve_rhs_e ev c, resolve_rhs_e ev e, resolve_rhs ev s with
-          | Some c', Some e', Some s' => Some $ Swhile c' e' s'
-          | _, _, _ => None
-        end
-      | Srete e => Srete <$> resolve_rhs_e ev e
-      | Sret => Some Sret
-      | Sseq s1 s2 =>
-        match resolve_rhs ev s1, resolve_rhs ev s2 with
-          | Some s1', Some s2' => Some (Sseq s1' s2')
-          | _, _ => None
-        end
-    end.
-
-  Fixpoint resolve_lhs_e (ev: env) (e: expr) : option expr :=
-    match e with
-      | Evar x =>
-        (match sget x (lenv ev) with
-           | Some (_, l) => Some (Evalue (Vptr l))
-           | None => None
-         end)
-      | Ederef e' => resolve_rhs_e ev e'
-      | Efst e' => resolve_lhs_e ev e'
-      | Esnd e' =>
-        (e'' ← resolve_lhs_e ev e';
-         match type_infer ev e'' with
-           | Some (Tptr (Tprod t1 _)) =>
-             Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
-           | _ => None
-         end)
-      | Evalue (Vptr l) => Some e
-      | Ecall f es => Some $ Ecall f es
-      | _ => None
-    end.
-  
-  Fixpoint resolve_lhs (e: env) (s: stmts) : option stmts :=
-    match s with
-      | Sassign e1 e2 => e'' ← resolve_lhs_e e e1; Some (Sassign e'' e2)
-      | Sif ex s1 s2 =>
-        match resolve_lhs e s1, resolve_lhs e s2 with
-          | Some s1', Some s2' => Some (Sif ex s1' s2')
-          | _, _ => None
-        end
-      | Swhile c ex s => Swhile c ex <$> resolve_lhs e s
-      | Sseq s1 s2 =>
-        match resolve_lhs e s1, resolve_lhs e s2 with
-          | Some s1', Some s2' => Some (Sseq s1' s2')
-          | _, _ => None
-        end
-      | Sret => Some Sret
-      | Srete e => Some (Srete e)
-      | Sprim p => Some $ Sprim p
-      | Sskip => Some Sskip
-    end.
-
-  Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
-    match params, ls with
-      | (x, t)::ps, l::ls' => add_params_to_env (Env (sset x (t, l) (lenv e)) (fenv e)) ps ls'
-      | _, _ => e
-    end.
-
-  Definition instantiate_f_body (ev: env) (s: stmts) : option stmts :=
-     (resolve_rhs ev s ≫= resolve_lhs ev).
-
-  Lemma wp_call (p: program) (ev: env) es vs params f_body f retty Φ Φret:
-    p f = Some (retty, params, f_body) →
-    es = map Evalue vs →
-    params_match params vs →
-    (∀ ls f_body',
-       ⌜ length ls = length vs ∧
-         instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' ⌝ -∗
-       alloc_params (zip (params.*2) ls) vs -∗
-       WP curs f_body' {{ _, True; Φ }})
-    ⊢ WP cure (Ecall f es) {{ Φ; Φret }}.
-  Admitted.
-
-  Definition fresh_block (σ: mem) : block :=
+  Definition fresh_block (σ: heap) : block :=
     let addrst : list addr := elements (dom _ σ : gset addr) in
     let blockset : gset block := foldr (λ l, ({[ l.1 ]} ∪)) ∅ addrst in
     fresh blockset.
@@ -605,10 +495,10 @@ Section rules.
     move=> /(help _ _ ∅) /=. apply is_fresh.
   Qed.
   
-  Lemma alloc_fresh σ v t:
+  Lemma alloc_fresh σ Γ v t:
     let l := (fresh_block σ, 0)%nat in
     typeof v t →
-    estep (Ealloc t (Evalue v)) σ (Evalue (Vptr l)) (storebytes l (encode_val v) σ).
+    estep (Ealloc t (Evalue v)) (State σ Γ) (Evalue (Vptr l)) (State (storebytes l (encode_val v) σ) Γ).
   Proof.
     intros l ?. apply ESalloc. auto.
     intros o'. apply (is_fresh_block _ o').
@@ -650,7 +540,7 @@ Section rules.
     iIntros (?) "HΦ".
     rewrite wp_unfold /wp_pre.
     iRight. iRight. iSplit=>//.
-    iIntros (σ1 ks1) "Hσ1". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+    iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit.
     { iPureIntro. eexists _, _, _. apply CSestep. by apply alloc_fresh. }
     iNext. iIntros (e2 σ2 ? ?).
@@ -659,5 +549,148 @@ Section rules.
     iFrame. iModIntro. iApply wp_value=>//.
     iApply "HΦ". by iFrame.
   Qed.
+
+  (* Call *)
+  
+  Fixpoint params_match (params: decls) (vs: list val) :=
+    match params, vs with
+      | (_, t)::params, v::vs => typeof v t ∧ params_match params vs
+      | [], [] => True
+      | _, _ => False
+    end.
+
+  Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=
+    (match addrs, vs with
+       | (t, l)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
+       | [], [] => True
+       | _, _ => False
+     end)%I.
+
+  Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
+    match l with
+      | Some x :: l' => (x ::) <$> lift_list_option l'
+      | None :: _ => None
+      | _ => Some []
+    end.
+  
+  Fixpoint resolve_rhs_e {t: Type} (ev: @env t) (e: expr) : option expr :=
+    match e with
+      | Evar x => (* closed-ness? *)
+        (match sget x (lenv ev) with
+          | Some (t, l) => Some $ Ederef_typed t (Evalue (Vptr l))
+          | None => None
+         end)
+      | Ebinop op e1 e2 =>
+        match resolve_rhs_e ev e1, resolve_rhs_e ev e2 with
+          | Some e1', Some e2' => Some (Ebinop op e1' e2')
+          | _, _ => None
+        end
+      | Ederef e =>
+        match type_infer ev e, resolve_rhs_e ev e with
+          | Some (Tptr t), Some e' => Some (Ederef_typed t e') 
+          | _, _ => None
+        end
+      | Eaddrof e => Eaddrof <$> resolve_rhs_e ev e
+      | Efst e => Efst <$> resolve_rhs_e ev e
+      | Esnd e => Esnd <$> resolve_rhs_e ev e
+      | Ecall f args => Ecall f <$> lift_list_option (map (resolve_rhs_e ev) args)
+      | _ => Some e
+    end.
+  
+  Fixpoint resolve_rhs {t: Type} (ev: @env t) (s: stmts) : option stmts :=
+    match s with
+      | Sskip => Some Sskip
+      | Sprim p => Some $ Sprim p
+      | Sassign e1 e2 => Sassign e1 <$> resolve_rhs_e ev e2
+      | Sif e s1 s2 =>
+        match resolve_rhs_e ev e, resolve_rhs ev s1, resolve_rhs ev s2 with
+          | Some e', Some s1', Some s2' => Some $ Sif e' s1' s2'
+          | _, _, _ => None
+        end
+      | Swhile c e s =>
+        match resolve_rhs_e ev c, resolve_rhs_e ev e, resolve_rhs ev s with
+          | Some c', Some e', Some s' => Some $ Swhile c' e' s'
+          | _, _, _ => None
+        end
+      | Srete e => Srete <$> resolve_rhs_e ev e
+      | Sret => Some Sret
+      | Sseq s1 s2 =>
+        match resolve_rhs ev s1, resolve_rhs ev s2 with
+          | Some s1', Some s2' => Some (Sseq s1' s2')
+          | _, _ => None
+        end
+    end.
+
+  Fixpoint resolve_lhs_e {t: Type} (ev: @env t) (e: expr) : option expr :=
+    match e with
+      | Evar x =>
+        (match sget x (lenv ev) with
+           | Some (_, l) => Some (Evalue (Vptr l))
+           | None => None
+         end)
+      | Ederef e' => resolve_rhs_e ev e'
+      | Efst e' => resolve_lhs_e ev e'
+      | Esnd e' =>
+        (e'' ← resolve_lhs_e ev e';
+         match type_infer ev e'' with
+           | Some (Tptr (Tprod t1 _)) =>
+             Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
+           | _ => None
+         end)
+      | Evalue (Vptr l) => Some e
+      | Ecall f es => Some $ Ecall f es
+      | _ => None
+    end.
+  
+  Fixpoint resolve_lhs {t: Type} (e: @env t) (s: stmts) : option stmts :=
+    match s with
+      | Sassign e1 e2 => e'' ← resolve_lhs_e e e1; Some (Sassign e'' e2)
+      | Sif ex s1 s2 =>
+        match resolve_lhs e s1, resolve_lhs e s2 with
+          | Some s1', Some s2' => Some (Sif ex s1' s2')
+          | _, _ => None
+        end
+      | Swhile c ex s => Swhile c ex <$> resolve_lhs e s
+      | Sseq s1 s2 =>
+        match resolve_lhs e s1, resolve_lhs e s2 with
+          | Some s1', Some s2' => Some (Sseq s1' s2')
+          | _, _ => None
+        end
+      | Sret => Some Sret
+      | Srete e => Some (Srete e)
+      | Sprim p => Some $ Sprim p
+      | Sskip => Some Sskip
+    end.
+
+  Fixpoint add_params_to_env {t: Type} (e: @env t) (params: list (ident * type)) ls : env :=
+    match params, ls with
+      | (x, t)::ps, l::ls' => add_params_to_env (Env _ (sset x (t, l) (lenv e)) (fenv e)) ps ls'
+      | _, _ => e
+    end.
+
+  Definition instantiate_f_body {t: Type} (ev: @env t) (s: stmts) : option stmts :=
+     (resolve_rhs ev s ≫= resolve_lhs ev).
+  
+  Lemma wp_call es vs params P Q f retty Φ Φret:
+    es = map Evalue vs →
+    params_match params vs →
+    fspec_prop f retty params P Q ∗
+    (∀ ls,
+       ⌜ length ls = length vs ⌝ -∗
+       alloc_params (zip (params.*2) ls) vs -∗ P ls) ∗
+    (∀ v, Q v -∗ Φ v)
+    ⊢ WP cure (Ecall f es) {{ Φ; Φret }}.
+  Admitted.
+    (* iIntros (???) "HΦ". *)
+    (* rewrite wp_unfold /wp_pre. *)
+    (* iRight. iRight. iSplit=>//. *)
+    (* iIntros (σ1 ks1) "Hσ1". iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver. *)
+    (* iModIntro. iSplit. *)
+    (* { iPureIntro. eexists _, _, _. apply CSestep. by apply alloc_fresh. } *)
+    (* iNext. iIntros (e2 σ2 ? ?). *)
+    (* iMod "Hclose". inversion H1. subst. inversion H3. subst. *)
+    (* iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//. *)
+    (* iFrame. iModIntro. iApply wp_value=>//. *)
+    (* iApply "HΦ". by iFrame. *)
 
 End rules.
