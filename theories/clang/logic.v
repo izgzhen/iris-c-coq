@@ -8,33 +8,23 @@ From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
-Definition fspec Σ : ofeT :=
-  prodC (list addr -c> iPreProp Σ) (val -c> iPreProp Σ).
-
-Instance equiv_type_decls: Equiv (type * decls) := (=).
+Instance equiv_type_decls: Equiv (function stmts) := (=).
 
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
   clangG_heapG :> gen_heapG addr byteval Σ;
-  clangG_textG :> inG Σ (gmapUR ident (agreeR (prodC (discreteC (type * decls)) (fspec Σ))));
+  clangG_textG :> inG Σ (gmapUR ident (agreeR (discreteC (function stmts))));
   clangG_textG_name : gname
 }.
-
-Definition map_funCF {Σ} (t: Type) (P: t → iProp Σ) : (t -c> iPreProp Σ) :=
-  cFunctor_map (ofe_funCF t idCF) (@iProp_fold Σ, iProp_unfold) P.
 
 Section wp.
   Context `{clangG Σ}.
 
-  Definition fspec_prop (f: ident) (t: type) (dls: decls) (P: list addr → iProp Σ) (Q: val → iProp Σ) :=
-    own clangG_textG_name {[ f := to_agree ((t, dls) : discreteC (type * decls),
-                                            (map_funCF (list addr) P, map_funCF val Q)) ]}.
-  
-  Definition fspec_interp (f: ident) (x: function stmts) :=
-    (∃ (P: list addr → iProp Σ) (Q: val → iProp Σ), fspec_prop f (f_retty _ x) (f_params _ x) P Q)%I.
+  Definition text_interp (f: ident) (x: function stmts) :=
+    own clangG_textG_name {[ f := to_agree (x : discreteC (function stmts)) ]}.
   
   Definition state_interp (s: state) : iProp Σ:=
-    (gen_heap_ctx (s_heap s) ∗ ([∗ map] k ↦ x ∈ (s_text s), fspec_interp k x))%I.
+    (gen_heap_ctx (s_heap s) ∗ ([∗ map] k ↦ x ∈ (s_text s), text_interp k x))%I.
   
   Definition wp_pre
            (wp: coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ) :
@@ -670,27 +660,17 @@ Section rules.
 
   Definition instantiate_f_body {t: Type} (ev: @env t) (s: stmts) : option stmts :=
      (resolve_rhs ev s ≫= resolve_lhs ev).
-  
-  Lemma wp_call es vs params P Q f retty Φ Φret:
+
+  Lemma wp_call (ev: @env stmts) es vs params f_body f retty Φ Φret:
     es = map Evalue vs →
     params_match params vs →
-    fspec_prop f retty params P Q ∗
-    (∀ ls,
-       ⌜ length ls = length vs ⌝ -∗
-       alloc_params (zip (params.*2) ls) vs -∗ P ls) ∗
-    (∀ v, Q v -∗ Φ v)
+    text_interp f (Function _ retty params f_body) ∗
+    (∀ ls f_body',
+       ⌜ length ls = length vs ∧
+         instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' ⌝ -∗
+       alloc_params (zip (params.*2) ls) vs -∗
+       WP curs f_body' {{ _, True; Φ }})
     ⊢ WP cure (Ecall f es) {{ Φ; Φret }}.
   Admitted.
-    (* iIntros (???) "HΦ". *)
-    (* rewrite wp_unfold /wp_pre. *)
-    (* iRight. iRight. iSplit=>//. *)
-    (* iIntros (σ1 ks1) "Hσ1". iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver. *)
-    (* iModIntro. iSplit. *)
-    (* { iPureIntro. eexists _, _, _. apply CSestep. by apply alloc_fresh. } *)
-    (* iNext. iIntros (e2 σ2 ? ?). *)
-    (* iMod "Hclose". inversion H1. subst. inversion H3. subst. *)
-    (* iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//. *)
-    (* iFrame. iModIntro. iApply wp_value=>//. *)
-    (* iApply "HΦ". by iFrame. *)
 
 End rules.

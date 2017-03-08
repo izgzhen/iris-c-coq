@@ -35,45 +35,44 @@ Section example.
 
   Definition int_ctx := @int_ctx _ _ invs i.
 
-  Definition ev := Env (fspec Σ) [(y, (Tint32, py))] [].
+  Definition ev := Env stmts [(y, (Tint32, py))] [].
   
-  (* Lemma f_spec γ γp f vx Φ Φret: *)
-  (*   p f = Some  → *)
-  (*   [(x, Tint32)]  ∗ *)
-  (*   int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ *)
-  (*   scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φ) *)
-  (*   ⊢ WP cure (Ecall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}. *)
-  (* Proof. *)
-  (*   iIntros (Hpf) "(#? & #? & Hp & Hsc & HΦ)". *)
-  (*   iApply (wp_call _ ev _ [Vint32 vx])=>//. *)
-  (*   { simpl. split=>//. constructor. } *)
-  (*   iIntros (ls) "% Hls". *)
-  (*   destruct ls as [|? [|? ls]]. *)
-  (*   - simpl. iDestruct "Hls" as "%"=>//. by iIntros "%". *)
-  (*   - unfold_f_inst. gmap_rewrite. *)
-  (*     iDestruct "Hls" as "[_ %]". *)
-  (*     inversion H1; subst. *)
-  (*     iIntros "[Hvx _]". *)
-  (*     wp_run. iApply cli_spec. *)
-  (*     iFrame "#". iFrame.  iIntros "HI Hp Hcl". *)
-  (*     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp. *)
-  (*     (* Open invariant *) *)
-  (*     iInv N as ">Hspec" "Hclose". *)
-  (*     iDestruct (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]} *)
-  (*                with "[Hspec HY Hsc]") *)
-  (*       as "(Hspec & Hss' & Hsc')". *)
-  (*     { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton. *)
-  (*       iFrame "Hsc".  *)
-  (*       iPureIntro. apply spec_step_rel. unfold f_rel. *)
-  (*       exists vy. gmap_simplify=>//. by gmap_rewrite. } *)
-  (*     (* close invariant *) *)
-  (*     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.       *)
-  (*     wp_run. iApply sti_spec. *)
-  (*     iFrame. iFrame "#".  iSplitL "Hss' Hy". *)
-  (*     { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. } *)
-  (*     iIntros "Hp". wp_run. iApply wp_ret. *)
-  (*     iApply ("HΦ" with "[-Hp]")=>//. *)
-  (*   - iDestruct "Hls" as "[% _]". inversion H1. *)
-  (* Qed. *)
+  Lemma f_spec γ γp f vx Φ Φret:
+    text_interp f (Function _ Tint32 [(x, Tint32)] f_body)  ∗
+    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
+    scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φ)
+    ⊢ WP cure (Ecall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}.
+  Proof.
+    iIntros "(? & #? & #? & Hp & Hsc & HΦ)".
+    iApply (wp_call ev _ [Vint32 vx] _)=>//; last iFrame.
+    { simpl. split=>//. constructor. }
+    iIntros (ls) "% Hls".
+    destruct ls as [|? [|? ls]].
+    - simpl. iDestruct "Hls" as "%"=>//. by iIntros "%".
+    - unfold_f_inst. gmap_rewrite.
+      iDestruct "Hls" as "[_ %]".
+      inversion H1; subst.
+      iIntros "[Hvx _]".
+      wp_run. iApply cli_spec.
+      iFrame "#". iFrame.  iIntros "HI Hp Hcl".
+      iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
+      (* Open invariant *)
+      iInv N as ">Hspec" "Hclose".
+      iDestruct (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
+                 with "[Hspec HY Hsc]")
+        as "(Hspec & Hss' & Hsc')".
+      { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
+        iFrame "Hsc".
+        iPureIntro. apply spec_step_rel. unfold f_rel.
+        exists vy. gmap_simplify=>//. by gmap_rewrite. }
+      (* close invariant *)
+      iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
+      wp_run. iApply sti_spec.
+      iFrame. iFrame "#".  iSplitL "Hss' Hy".
+      { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
+      iIntros "Hp". wp_run. iApply wp_ret.
+      iApply ("HΦ" with "[-Hp]")=>//.
+    - iDestruct "Hls" as "[% _]". inversion H1.
+  Qed.
 
 End example.

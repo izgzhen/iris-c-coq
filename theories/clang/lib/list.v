@@ -41,7 +41,7 @@ Section proof.
       x <- t
     }>.
 
-  Definition ev : @env (fspec Σ) :=
+  Definition ev : @env stmts :=
     Env _ [(x, (Tptr (tcell Tint32), px));
            (y, (Tptr Tvoid, py));
            (t, (Tptr (tcell Tint32), pt))]
