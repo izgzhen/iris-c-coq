@@ -13,7 +13,7 @@ Instance equiv_type_decls: Equiv (function stmts) := (=).
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
   clangG_heapG :> gen_heapG addr byteval Σ;
-  clangG_textG :> inG Σ (gmapUR ident (agreeR (discreteC (function stmts))));
+  clangG_textG :> inG Σ (authR (gmapUR ident (agreeR (discreteC (function stmts)))));
   clangG_textG_name : gname
 }.
 
@@ -21,10 +21,13 @@ Section wp.
   Context `{clangG Σ}.
 
   Definition text_interp (f: ident) (x: function stmts) :=
-    own clangG_textG_name {[ f := to_agree (x : discreteC (function stmts)) ]}.
+    own clangG_textG_name (◯ {[ f := to_agree (x : discreteC (function stmts)) ]}).
+
+  Definition gen_text (m: text) : iProp Σ :=
+    own clangG_textG_name (● (fmap (λ v, to_agree (v : leibnizC _)) m)).
   
   Definition state_interp (s: state) : iProp Σ:=
-    (gen_heap_ctx (s_heap s) ∗ ([∗ map] k ↦ x ∈ (s_text s), text_interp k x))%I.
+    (gen_heap_ctx (s_heap s) ∗ gen_text (s_text s))%I.
   
   Definition wp_pre
            (wp: coPset -c> cureval -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ) :
@@ -550,16 +553,50 @@ Section rules.
        | _, _ => False
      end)%I.
 
-  Lemma wp_call (ev: @env stmts) es vs params f_body f retty Φ Φret:
-    es = map Evalue vs →
-    params_match params vs →
+  Lemma text_singleton_included (σ: text) l v :
+    {[l := to_agree v]} ≼ (fmap (λ v, to_agree (v : leibnizC (function stmts))) σ) → σ !! l = Some v.
+  Proof.
+    rewrite singleton_included=> -[av []].
+    rewrite lookup_fmap fmap_Some_equiv. intros [v' [Hl ->]].
+    move=> /Some_included_total /to_agree_included /leibniz_equiv_iff -> //.
+  Qed.
+
+  Lemma lookup_text f x Γ:
+    text_interp f x ∗ gen_text Γ
+    ⊢ ⌜ Γ !! f = Some x⌝.
+  Proof.
+    iIntros "[Hf HΓ]".
+    rewrite /gen_text /text_interp. iDestruct (own_valid_2 with "HΓ Hf")
+      as %[Hl %text_singleton_included]%auth_valid_discrete_2.
+    done.
+  Qed.
+
+  Lemma wp_call es ls params f_body f_body' f retty Φ Φret:
+    es = map (fun l => Evalue (Vptr l)) ls →
+    instantiate_f_body (add_params_to_env (Env stmts [] []) params ls) f_body = Some f_body' →
     text_interp f (Function _ retty params f_body) ∗
-    (∀ ls f_body',
-       ⌜ length ls = length vs ∧
-         instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' ⌝ -∗
-       alloc_params (zip (params.*2) ls) vs -∗
-       WP curs f_body' {{ _, True; Φ }})
+    ▷ WP curs f_body' {{ _, False; Φ }}
     ⊢ WP cure (Ecall f es) {{ Φ; Φret }}.
+  Proof.
+    iIntros (??) "[Hf HΦ]".
+    rewrite !wp_unfold /wp_pre.
+    iRight. iRight. iSplit=>//.
+    iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]". iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame.
+    simpl in H2.
+    iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _. eapply CSecall=>//. }
+    iNext. iIntros (e2 σ2 ? ?).
+    iMod "Hclose". inversion H3; first inversion H5. simpl in H7.
+    rewrite H7 in H2. inversion H2; subst.
+    assert (ls = ls0).
+    { admit. } subst. rewrite H1 in H13. inversion H13. subst.
+    iFrame. iDestruct "HΦ" as "[? |[?|?]]".
+    - iDestruct "HΦ" as (?) "[% ?]". iMod "~" as "%". done.
+    - admit.
+    - iModIntro. rewrite !wp_unfold /wp_pre. iRight. iRight. admit.
+      (* iApply "HΦ". *)
+    (* iApply "HΦ". by iFrame. *)
   Admitted.
 
 End rules.

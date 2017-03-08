@@ -395,14 +395,13 @@ Inductive cstep: cureval → state → list context → cureval → state → li
 | CSestep: ∀ e e' σ σ' ks, estep e σ e' σ' → cstep (cure e) σ ks (cure e') σ' ks
 | CSsstep: ∀ s s' σ σ' ks, sstep s σ s' σ' → cstep (curs s) σ ks (curs s') σ' ks
 | CSecall:
-    ∀ (ev: @env stmts) es vs ls retty params f_body f_body' f ks σ σ',
-      es = map Evalue vs →
-      params_match params vs →
-      length ls = length vs →
+    ∀ es ls retty params f_body f_body' f ks σ,
+      es = map (fun l => Evalue (Vptr l)) ls →
       s_text σ !! f = Some (Function stmts retty params f_body) →
-      instantiate_f_body (add_params_to_env ev params ls) f_body = Some f_body' →
-      σ' = foldr (fun lv σ => alloc_heap (lv.1) (lv.2) σ) σ (zip ls vs) →
-      cstep (cure (Ecall f es)) σ ks (curs f_body') σ' ks.
+      instantiate_f_body (add_params_to_env (Env stmts [] []) params ls) f_body = Some f_body' →
+      cstep (cure (Ecall f es)) σ ks (curs f_body') σ ks.
+(* XXX: Essentially speaking, this prohibits free usage of global variables -- but this should be
+   easy to remedy *)
 
 Lemma fill_step_inv σ σ' ks ks' e c' Kes Ks:
   to_val (cure e) = None →
