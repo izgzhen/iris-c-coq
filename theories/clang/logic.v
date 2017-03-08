@@ -197,9 +197,9 @@ Section rules.
 
   Lemma wp_lift_pure_step E Φ Φret e1 :
     (∀ σ1 ks1, reducible (cure e1) σ1 ks1) →
-    (∀ σ1 σ2 e2, estep e1 σ1 e2 σ2 → σ1 = σ2) →
-    (▷ ∀ e2 σ1 σ2, ⌜ estep e1 σ1 e2 σ2 ⌝ →
-                WP (cure e2) @ E {{ Φ ; Φret }})
+    (∀ σ1 ks1 σ2 ks2 cur2, cstep (cure e1) σ1 ks1 cur2 σ2 ks2 → σ1 = σ2 ∧ ks1 = ks2) →
+    (▷ ∀ cur2 σ1 ks1 σ2 ks2, ⌜ cstep (cure e1) σ1 ks1 cur2 σ2 ks2 ⌝ →
+                WP cur2 @ E {{ Φ ; Φret }})
       ⊢ WP cure e1 @ E {{ Φ ; Φret }}.
   Proof.
     iIntros (Hsafe ?) "H".
@@ -208,8 +208,8 @@ Section rules.
        by eapply reducible_not_ret_val, (Hsafe inhabitant[])|].
     iIntros (σ1 ks1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ? ?).
-    iMod "Hclose"; iModIntro. 
-    inversion H1. subst. specialize (H0 _ _ _ H3). subst. iFrame. by iApply "H".
+    iMod "Hclose"; iModIntro.
+    destruct (H0 _ _ _ _ _ H1) as [? ?]. subst. iFrame. by iApply "H".
   Qed.
 
   Lemma wp_lift_atomic_step {E Φ Φret} s1 :
@@ -418,9 +418,10 @@ Section rules.
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP cure (Ebinop op (Evalue v1) (Evalue v2)) @ E {{ Φ ; Φret }}.
   Proof.
-    iIntros (?) "HΦ". iApply wp_lift_pure_step=>//; first eauto; first by inversion 1.
-    iNext. iIntros (e2 σ1 σ2 Estep).
-    inversion Estep; subst.
+    iIntros (?) "HΦ". iApply wp_lift_pure_step=>//; first eauto.
+    { inversion 1. inversion H3. by subst. }
+    iNext. iIntros (?????) "%".
+    inversion H1. inversion H3.
     simplify_eq. iApply wp_value=>//.
   Qed.
 
@@ -453,20 +454,20 @@ Section rules.
     ▷ WP cure (Evalue v1) {{ Φ; Φret }}
     ⊢ WP cure (Efst (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
   Proof.
-    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto; first by inversion 1.
-    iNext. iIntros (e2 σ1 σ2 Estep).
-    inversion Estep; subst.
-    by simplify_eq.
+    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto.
+    { inversion 1. inversion H2. by simplify_eq. }
+    iNext. iIntros (?????) "%".
+    inversion H0. inversion H2. by simplify_eq.
   Qed.
 
   Lemma wp_snd v1 v2 Φ Φret:
     ▷ WP cure (Evalue v2) {{ Φ; Φret }}
     ⊢ WP cure (Esnd (Evalue (Vpair v1 v2))) {{ Φ; Φret }}.
   Proof.
-    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto; first by inversion 1.
-    iNext. iIntros (e2 σ1 σ2 Estep).
-    inversion Estep; subst.
-    by simplify_eq.
+    iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto.
+    { inversion 1. inversion H2. by simplify_eq. }
+    iNext. iIntros (?????) "%".
+    inversion H0. inversion H2. by simplify_eq.
   Qed.
 
   (* Freshness and memory allocation *)
@@ -542,124 +543,12 @@ Section rules.
 
   (* Call *)
   
-  Fixpoint params_match (params: decls) (vs: list val) :=
-    match params, vs with
-      | (_, t)::params, v::vs => typeof v t ∧ params_match params vs
-      | [], [] => True
-      | _, _ => False
-    end.
-
   Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=
     (match addrs, vs with
        | (t, l)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
        | [], [] => True
        | _, _ => False
      end)%I.
-
-  Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
-    match l with
-      | Some x :: l' => (x ::) <$> lift_list_option l'
-      | None :: _ => None
-      | _ => Some []
-    end.
-  
-  Fixpoint resolve_rhs_e {t: Type} (ev: @env t) (e: expr) : option expr :=
-    match e with
-      | Evar x => (* closed-ness? *)
-        (match sget x (lenv ev) with
-          | Some (t, l) => Some $ Ederef_typed t (Evalue (Vptr l))
-          | None => None
-         end)
-      | Ebinop op e1 e2 =>
-        match resolve_rhs_e ev e1, resolve_rhs_e ev e2 with
-          | Some e1', Some e2' => Some (Ebinop op e1' e2')
-          | _, _ => None
-        end
-      | Ederef e =>
-        match type_infer ev e, resolve_rhs_e ev e with
-          | Some (Tptr t), Some e' => Some (Ederef_typed t e') 
-          | _, _ => None
-        end
-      | Eaddrof e => Eaddrof <$> resolve_rhs_e ev e
-      | Efst e => Efst <$> resolve_rhs_e ev e
-      | Esnd e => Esnd <$> resolve_rhs_e ev e
-      | Ecall f args => Ecall f <$> lift_list_option (map (resolve_rhs_e ev) args)
-      | _ => Some e
-    end.
-  
-  Fixpoint resolve_rhs {t: Type} (ev: @env t) (s: stmts) : option stmts :=
-    match s with
-      | Sskip => Some Sskip
-      | Sprim p => Some $ Sprim p
-      | Sassign e1 e2 => Sassign e1 <$> resolve_rhs_e ev e2
-      | Sif e s1 s2 =>
-        match resolve_rhs_e ev e, resolve_rhs ev s1, resolve_rhs ev s2 with
-          | Some e', Some s1', Some s2' => Some $ Sif e' s1' s2'
-          | _, _, _ => None
-        end
-      | Swhile c e s =>
-        match resolve_rhs_e ev c, resolve_rhs_e ev e, resolve_rhs ev s with
-          | Some c', Some e', Some s' => Some $ Swhile c' e' s'
-          | _, _, _ => None
-        end
-      | Srete e => Srete <$> resolve_rhs_e ev e
-      | Sret => Some Sret
-      | Sseq s1 s2 =>
-        match resolve_rhs ev s1, resolve_rhs ev s2 with
-          | Some s1', Some s2' => Some (Sseq s1' s2')
-          | _, _ => None
-        end
-    end.
-
-  Fixpoint resolve_lhs_e {t: Type} (ev: @env t) (e: expr) : option expr :=
-    match e with
-      | Evar x =>
-        (match sget x (lenv ev) with
-           | Some (_, l) => Some (Evalue (Vptr l))
-           | None => None
-         end)
-      | Ederef e' => resolve_rhs_e ev e'
-      | Efst e' => resolve_lhs_e ev e'
-      | Esnd e' =>
-        (e'' ← resolve_lhs_e ev e';
-         match type_infer ev e'' with
-           | Some (Tptr (Tprod t1 _)) =>
-             Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
-           | _ => None
-         end)
-      | Evalue (Vptr l) => Some e
-      | Ecall f es => Some $ Ecall f es
-      | _ => None
-    end.
-  
-  Fixpoint resolve_lhs {t: Type} (e: @env t) (s: stmts) : option stmts :=
-    match s with
-      | Sassign e1 e2 => e'' ← resolve_lhs_e e e1; Some (Sassign e'' e2)
-      | Sif ex s1 s2 =>
-        match resolve_lhs e s1, resolve_lhs e s2 with
-          | Some s1', Some s2' => Some (Sif ex s1' s2')
-          | _, _ => None
-        end
-      | Swhile c ex s => Swhile c ex <$> resolve_lhs e s
-      | Sseq s1 s2 =>
-        match resolve_lhs e s1, resolve_lhs e s2 with
-          | Some s1', Some s2' => Some (Sseq s1' s2')
-          | _, _ => None
-        end
-      | Sret => Some Sret
-      | Srete e => Some (Srete e)
-      | Sprim p => Some $ Sprim p
-      | Sskip => Some Sskip
-    end.
-
-  Fixpoint add_params_to_env {t: Type} (e: @env t) (params: list (ident * type)) ls : env :=
-    match params, ls with
-      | (x, t)::ps, l::ls' => add_params_to_env (Env _ (sset x (t, l) (lenv e)) (fenv e)) ps ls'
-      | _, _ => e
-    end.
-
-  Definition instantiate_f_body {t: Type} (ev: @env t) (s: stmts) : option stmts :=
-     (resolve_rhs ev s ≫= resolve_lhs ev).
 
   Lemma wp_call (ev: @env stmts) es vs params f_body f retty Φ Φret:
     es = map Evalue vs →
