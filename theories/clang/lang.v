@@ -59,7 +59,8 @@ Inductive exprctx :=
 | EKassignl (lhs: addr)
 | EKif (s1 s2: expr)
 | EKwhile (cond: expr) (s: expr)
-| EKrete.
+| EKrete
+| EKseq (s: expr).
 
 Record env :=
   Env {
@@ -109,6 +110,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKif s1 s2 => Eif e s1 s2
     | EKwhile c s => Ewhile c e s
     | EKrete => Erete e
+    | EKseq s => s
   end.
 
 Definition fill_ectxs := foldl fill_expr.
@@ -172,25 +174,8 @@ Definition to_val (c: expr) :=
 Lemma of_to_val e v : to_val e = Some v → e = Evalue v.
 Admitted.
 
-Fixpoint to_ret_val (e: expr) :=
-  match e with
-    | Erete (Evalue v) => Some v
-    | _ => None
-  end.
-
 Lemma fill_not_val Kes e: to_val (fill_ectxs e Kes) = None.
 Admitted.
-
-Lemma fill_not_ret_val Kes e: to_ret_val (fill_ectxs e Kes) = None.
-Admitted.
-
-Lemma val_implies_not_ret_val c v:
-  to_val c = Some v → to_ret_val c = None.
-Proof. intros ?. destruct c =>//. Qed.
-
-Lemma ret_val_implies_not_val c v:
-  to_ret_val c = Some v → to_val c = None.
-Proof. intros ?. destruct c=>//. Qed.
 
 Fixpoint params_match (params: decls) (vs: list val) :=
   match params, vs with
@@ -331,11 +316,6 @@ Inductive estep : expr → state → expr → state → Prop :=
       estep (Eassign (Evalue (Vptr l)) (Evalue v))
             σ (Evalue Vvoid)
             (State (storebytes l (encode_val v) (s_heap σ)) (s_text σ))
-| ESbind:
-    ∀ e e' σ σ' k,
-      is_jump e = false →
-      estep e σ e' σ' →
-      estep (fill_expr e k) σ (fill_expr e' k) σ'
 .
 
 Inductive jstep: state → expr → list exprctx → expr → list exprctx → Prop :=
@@ -358,24 +338,38 @@ Delimit Scope prim_scope with prim.
 
 Inductive cstep: expr → state → list exprctx → expr → state → list exprctx → Prop :=
 | HSestep: ∀ e e' σ σ' ks, estep e σ e' σ' → cstep e σ ks e' σ' ks
-| HSjstep: ∀ e e' σ ks ks', jstep σ e ks e' ks' → cstep e σ ks e' σ ks'.
+| HSjstep: ∀ e e' σ ks ks', jstep σ e ks e' ks' → cstep e σ ks e' σ ks'
+| HSbind:
+    ∀ e e' σ σ' kes ks,
+      is_jump e = false →
+      cstep e σ ks e' σ' ks →
+      cstep (fill_ectxs e kes) σ ks (fill_ectxs e' kes) σ' ks.
 
-Lemma fill_estep_inv σ σ' ks ks' e c' Kes:
+(* Proven from operational semantics *)
+Lemma fill_step_inv σ σ' ks ks' e c' Kes:
+  is_jump e = false →
   to_val e = None →
-  to_ret_val e = None →
   cstep (fill_ectxs e Kes) σ ks c' σ' ks' →
   (∃ e', c' =  (fill_ectxs e' Kes) ∧ estep e σ e' σ' ∧ ks = ks').
+Admitted.
+
+Lemma cstep_not_jump e e' σ σ' ks ks':
+  is_jump e = false → cstep e σ ks e' σ' ks' → ks = ks'.
+Admitted.      
 
 Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
 
+(* Proven from operational semantics *)
 Lemma lift_reducible e Kes σ ks:
   reducible e σ ks → reducible (fill_ectxs e Kes) σ ks.
 Admitted.
 
-Lemma reducible_not_val c σ ks: reducible c σ ks → to_val c = None.
+Lemma estep_not_jump e σ e' σ':
+  estep e σ e' σ' → is_jump e = false ∧ is_jump e' = false.
 Admitted.
 
-Lemma reducible_not_ret_val c σ ks: reducible c σ ks → to_ret_val c = None.
+(* Proven from operational semantics *)
+Lemma reducible_not_val c σ ks: reducible c σ ks → to_val c = None.
 Admitted.
 
 Instance state_inhabited: Inhabited state := populate (State ∅ ∅).
