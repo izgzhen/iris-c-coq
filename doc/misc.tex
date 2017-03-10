@@ -1,0 +1,65 @@
+\section{Misc}
+\label{sec:misc}
+
+This section contained some key formal developments claimed but not yet mechanized in Coq for reference.
+
+\subsection{Properties of Evaluation Context}
+
+Our expression $\Expr$ is a recursively defined algebraic data type, which can be generalized into the following form:
+
+\[
+e : \Expr \bnfdef{} \Expr_1(A_1, e^{r_1}) \mid ... \mid \Expr_n(A_n, e^{r_n}) \mid v
+\]
+
+Here, $\Expr_i$ is tag for $i$-th class of expression, $A_i$ is its arbitrary non-recursive payload, and $e^{r_i}$ means
+it has $r_i \in \nat$ recursive occurences.
+
+It is apparent that $\ectx$ is a direct translation of $\Expr$ plus some ordering considerations, though in actual Coq development we don't mechanize this fact.
+But we will make it explicit here to support some stronger claims than what we can do in Coq.
+
+For some abstract $\Expr$ like above, its $\ectx$ should be a sum of sub-$\ectx_i$ for each $\Expr_i$. When $r_i = 0$, $\ectx_i$ doesn't exist, now we consider
+$r_i > 0$, define
+
+\[
+k_i: \ectx_i \bnfdef{} \ectx_{i1}(A_i, e^{r_i - 1}) \mid \ectx_{i2}(A_i, v^1, e^{r_i - 2}) \mid ... \mid \ectx_{ir_i}(A_i, v^{r_i - 1})
+\]
+
+\begin{theorem}
+For any $e, e': \Expr$ and $k_{im}, k_{jn}: \ectx$,
+\[k_{im}(e) = k_{jn}(e') \proves i = j \]
+\end{theorem}
+\begin{proof} Trivial. \end{proof}
+
+\begin{theorem}
+For any $e, e': \Expr$ and $k_{im}, k_{in}: \ectx_i$,
+\[k_{im}(e) = k_{in}(e') \proves
+ (m = n \land e = e') \lor
+ (m \neq n \land (\Exists v. \toval(e) = v \lor \Exists v. \toval(e) = v))\]
+\end{theorem}
+\begin{proof} 
+
+When $m = n$, by injectivity;
+When $m \neq n$, we can expand the equation like below without loss of generality:
+\begin{align*}
+\Expr_i(A_i, v_1, ..., v_{m - 1}, &e, e_{m + 1}, ..., e_{r_i - 1}) = \\
+\Expr_i(A_i', v_1', ..., v_{m - 1}', &v_m', ..., e', ...)
+\end{align*}
+So $e = v_m'$ by injectivity.
+\end{proof}
+
+Now, if we partition $\Expr$ into complete groups of disjoint classes, like $E_v, E_{red}, E_{jmp}$,
+then we can trivially derive following lemma:
+
+\begin{lemma}
+For any $e, e': \Expr$ and $k, k': \ectx$,
+\[
+k(e) = k'(e') \proves (k = k' \land e = e') \lor (k \neq k' \land (e \in E_v \lor e' \in E_v))
+\]
+\end{lemma}
+
+\begin{lemma}
+For any $e \in E_{red}, e' \in E_{jmp}$ and $k, k': \ectx$,
+\[
+k(e) = k'(e') \proves \FALSE
+\]
+\end{lemma}
