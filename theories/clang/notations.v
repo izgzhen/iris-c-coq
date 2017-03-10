@@ -29,16 +29,16 @@ Notation "e1 != e2" := (Ebinop oneq e1%E e2%E)
 Notation "f < e1 , e2 , .. , en >" := (Ecall f (cons e1%E (cons e2%E .. (cons en%E nil) .. )))
   (at level 50) : expr_scope.
 
-Notation "e1 <- e2" := (Sassign e1%E e2%E) (at level 80) : stmts_scope.
-Notation "'if' ( e ) { s1 } 'else' { s2 }" := (Sif e%E s1%S s2%S)
-  (at level 200, e, s1, s2 at level 200) : stmts_scope.
-Notation "'while' [ c ] ( e ) <{ s }>" := (Swhile c%E e%E s%S)
-  (at level 200, c, e, s at level 200) : stmts_scope.
-Notation "s1 ;; s2" := (Sseq s1%S s2%S)
-  (at level 100, s2 at level 200, format "s1  ;;  s2") : stmts_scope.
-Notation "'ret'" := Sret (at level 80): stmts_scope.
-Notation "'rete' e" := (Srete e%E) (at level 80): stmts_scope.
-Notation "'skip'" := (Sskip) (at level 200) : stmts_scope.
+Notation "e1 <- e2" := (Eassign e1%E e2%E) (at level 80) : expr_scope.
+Notation "'if' ( e ) { s1 } 'else' { s2 }" := (Eif e%E s1%E s2%E)
+  (at level 200, e, s1, s2 at level 200) : expr_scope.
+Notation "'while' [ c ] ( e ) <{ s }>" := (Ewhile c%E e%E s%E)
+  (at level 200, c, e, s at level 200) : expr_scope.
+Notation "s1 ;; s2" := (Eseq s1%E s2%E)
+  (at level 100, s2 at level 200, format "s1  ;;  s2") : expr_scope.
+(* Notation "'ret'" := Eret (at level 80): expr_scope. *)
+Notation "'rete' e" := (Erete e%E) (at level 80): expr_scope.
+(* Notation "'skip'" := (Eskip) (at level 200) : expr_scope. *)
 
-Notation "'cli'" := (Sprim Pcli) (at level 80) : stmts_scope.
-Notation "'sti'" := (Sprim Psti) (at level 80) : stmts_scope.
+(* Notation "'cli'" := (Sprim Pcli) (at level 80) : expr_scope. *)
+(* Notation "'sti'" := (Sprim Psti) (at level 80) : expr_scope. *)

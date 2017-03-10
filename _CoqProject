@@ -9,11 +9,9 @@ theories/clang/memory.v
 theories/clang/lang.v
 theories/clang/types.v
 theories/clang/logic.v
-theories/clang/opsem.v
 theories/clang/tactics.v
 theories/clang/notations.v
 theories/clang/lib/list.v
-theories/os/spec.v
-theories/os/interrupt.v
-theories/os/reentrant.v
-theories/tests/add.v
+
+
+

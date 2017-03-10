@@ -33,7 +33,7 @@ Section proof.
   Definition y: ident := 2.
   Definition t: ident := 3.
 
-  Definition rev_list (telem: type) : stmts :=
+  Definition rev_list (telem: type) : expr :=
     while [ x != null ] ( x != null ) <{
       t <- snd (!?x) ;;
       snd (!?x) <- y ;;
@@ -41,19 +41,19 @@ Section proof.
       x <- t
     }>.
 
-  Definition ev : @env stmts :=
-    Env _ [(x, (Tptr (tcell Tint32), px));
-           (y, (Tptr Tvoid, py));
-           (t, (Tptr (tcell Tint32), pt))]
-          [].
+  Definition ev : env :=
+    Env [(x, (Tptr (tcell Tint32), px));
+         (y, (Tptr Tvoid, py));
+         (t, (Tptr (tcell Tint32), pt))]
+        [].
   
-  Lemma rev_spec Φ Φret body xs:
+  Lemma rev_spec Φ body xs:
     ∀ lx ly ys,
       instantiate_f_body ev (rev_list Tint32) = Some body →
       isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - @ Tptr (tcell Tint32) ∗
       px ↦ lx @ Tptr (tcell Tint32) ∗ py ↦ ly @ Tptr Tvoid ∗
       (∀ ly', py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
-      ⊢ WP curs body {{ Φ; Φret }}.
+      ⊢ WP body {{ Φ }}.
   Proof.
     unfold_f_inst; destruct px; subst;
     induction xs as [|x xs' IHxs']; intros ??? [=]; subst.
@@ -68,9 +68,8 @@ Section proof.
       iNext. wp_load. wp_load. wp_bind (Esnd _). iApply wp_snd. iNext.
       iApply wp_value=>//.
       iDestruct "Ht" as (?) "Ht".
-      wp_assign. wp_load.  
-      destruct p as [pb po].
-      wp_op.
+      wp_assign. wp_load.
+      destruct p as [pb po]. wp_op.
       rewrite /offset_by_byte.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
       wp_load. iDestruct (isList_ptr with "Hlr") as "%".

@@ -169,7 +169,7 @@ Section rules.
   Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}.
   Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed.
 
-  Lemma wp_bind kes E e Φ :
+  Lemma wp_bind' kes E e Φ :
     ⌜ is_jump e = false ⌝ ∗
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof.
@@ -191,6 +191,16 @@ Section rules.
     iApply "IH". destruct (estep_not_jump _ _ _ _ H3) as (?&?).
     iSplit=>//.
   Qed.
+
+  Lemma wp_bind kes E e Φ :
+    is_jump e = false →
+    WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
+  Proof. iIntros (?) "?". iApply wp_bind'. iSplit; done. Qed.
+
+  Lemma wp_seq E e1 e2 Φ:
+    is_jump e1 = false →
+    WP e1 @ E {{ _, WP e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
+  Admitted. 
   
   Lemma wp_lift_step E Φ e1 :
     to_val e1 = None →
@@ -333,11 +343,11 @@ Section rules.
     Φ v ⊢ WP fill_ectxs (Erete (Evalue v)) k @ E {{ Φ }}.
   Admitted.
 
-  Lemma wp_seq E v s2 Φ:
-    ▷ WP s2 @ E {{ Φ }}
-    ⊢ WP Eseq (Evalue v) s2 @ E {{ Φ }}.
-  Proof.
-  Admitted.
+  (* Lemma wp_seq E v s2 Φ: *)
+  (*   ▷ WP s2 @ E {{ Φ }} *)
+  (*   ⊢ WP Eseq (Evalue v) s2 @ E {{ Φ }}. *)
+  (* Proof. *)
+  (* Admitted. *)
 
   Lemma mapsto_readbytes q σ:
     ∀ bs l, mapstobytes l q bs ∗ gen_heap_ctx σ ⊢ ⌜ readbytes l bs σ ⌝.

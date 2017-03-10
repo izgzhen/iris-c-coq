@@ -40,12 +40,12 @@ Section definitions.
     closed_timeless γ : TimelessP (closed γ);
     closed_exclusive γ : closed γ -∗ closed γ -∗ False;
     (* -- operation specs -- *)
-    sti_spec N prio γ γp Φ Φret :
+    sti_spec N prio γ γp Φ :
       int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ)
-      ⊢ WP curs (Sprim Psti) {{ _, Φ; Φret }};
-    cli_spec N prio γ γp Φ Φret :
+      ⊢ WP curs (Sprim Psti) {{ _, Φ }};
+    cli_spec N prio γ γp Φ :
       int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ)
-      ⊢ WP curs (Sprim Pcli) {{ _, Φ; Φret }}
+      ⊢ WP curs (Sprim Pcli) {{ _, Φ }}
   }.
 End definitions.
 
