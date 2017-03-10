@@ -12,6 +12,3 @@ theories/clang/logic.v
 theories/clang/tactics.v
 theories/clang/notations.v
 theories/clang/lib/list.v
-
-
-

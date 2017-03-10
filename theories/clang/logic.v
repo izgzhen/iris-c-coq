@@ -177,7 +177,7 @@ Section rules.
     iDestruct "H" as "[% [Hv|[% H]]]".
     { iDestruct "Hv" as (v) "[Hev Hv]"; iDestruct "Hev" as % <-%of_to_val.
         by iApply fupd_wp. }
-    rewrite wp_unfold /wp_pre. iRight; iSplit; eauto using fill_not_val.
+    rewrite wp_unfold /wp_pre. iRight; iSplit; eauto using fill_ectxs_not_val.
     iIntros (σ1 ks1) "Hσ". iMod ("H" $! _ ks1 with "Hσ") as "[% H]".
     iModIntro; iSplit.
     { iPureIntro. unfold reducible in *.
@@ -197,11 +197,7 @@ Section rules.
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof. iIntros (?) "?". iApply wp_bind'. iSplit; done. Qed.
 
-  Lemma wp_seq E e1 e2 Φ:
-    is_jump e1 = false →
-    WP e1 @ E {{ _, WP e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
-  Admitted. 
-  
+
   Lemma wp_lift_step E Φ e1 :
     to_val e1 = None →
     (∀ σ1 ks1, state_interp σ1 ={E,∅}=∗
@@ -210,7 +206,7 @@ Section rules.
         state_interp σ2 ∗ WP e2 @ E {{ Φ }})
     ⊢ WP e1 @ E {{ Φ }}.
   Proof. iIntros (?) "H". rewrite wp_unfold /wp_pre; auto. Qed.
-
+  
   Lemma wp_lift_pure_step E Φ e1 :
     (∀ σ1 ks1, reducible e1 σ1 ks1) →
     (∀ σ1 ks1 σ2 ks2 cur2, cstep e1 σ1 ks1 cur2 σ2 ks2 → σ1 = σ2 ∧ ks1 = ks2) →
@@ -227,6 +223,18 @@ Section rules.
     destruct (H0 _ _ _ _ _ H1) as [? ?]. subst. iFrame. by iApply "H".
   Qed.
 
+  Lemma wp_skip E Φ v s:
+    ▷ WP s @ E {{ Φ }} ⊢ WP Eseq (Evalue v) s @ E {{ Φ }}.
+  Proof. Admitted.
+    (* iIntros "Φ". iApply wp_lift_pure_step; eauto. *)
+    (* - inversion 1. inversion H1. simplify_eq; done *)
+    
+  Lemma wp_seq E e1 e2 Φ:
+    is_jump e1 = false →
+    WP e1 @ E {{ _, WP e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
+  Admitted. 
+
+  
   Lemma wp_lift_atomic_step {E Φ} s1 :
     to_val s1 = None →
     (∀ σ1 ks1, state_interp σ1 ={E}=∗
@@ -325,29 +333,9 @@ Section rules.
     iFrame. iPureIntro. by constructor.
   Qed.
 
-  (* Lemma wp_seq_skip E s2 Φ: *)
-  (*   (|={E}=> WP curs s2 @ E {{ v, Φ v }})%I *)
-  (*   ⊢ WP curs (Sseq Sskip s2) @ E {{ v, Φ v;Φret }}. *)
-  (* Proof. *)
-  (*   iIntros "H". *)
-  (*   rewrite !wp_unfold /wp_pre. iRight; iRight; iSplit=>//. *)
-  (*   iIntros (σ1 ks1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver. *)
-  (*   iModIntro. iSplit; first eauto. *)
-  (*   iNext; iIntros (e2 σ2 ? ?). *)
-  (*   iMod "Hclose". inversion H0. subst. inversion H2. subst. iFrame. *)
-  (*   - rewrite !wp_unfold /wp_pre. done. *)
-  (*   - subst. inversion H7. *)
-  (* Qed. *)
-
   Lemma wp_ret E k v Φ:
     Φ v ⊢ WP fill_ectxs (Erete (Evalue v)) k @ E {{ Φ }}.
   Admitted.
-
-  (* Lemma wp_seq E v s2 Φ: *)
-  (*   ▷ WP s2 @ E {{ Φ }} *)
-  (*   ⊢ WP Eseq (Evalue v) s2 @ E {{ Φ }}. *)
-  (* Proof. *)
-  (* Admitted. *)
 
   Lemma mapsto_readbytes q σ:
     ∀ bs l, mapstobytes l q bs ∗ gen_heap_ctx σ ⊢ ⌜ readbytes l bs σ ⌝.

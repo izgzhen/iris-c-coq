@@ -110,8 +110,9 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKif s1 s2 => Eif e s1 s2
     | EKwhile c s => Ewhile c e s
     | EKrete => Erete e
-    | EKseq s => s
+    | EKseq s => Eseq (Evalue Vvoid) s
   end.
+
 
 Definition fill_ectxs := foldl fill_expr.
 
@@ -172,10 +173,14 @@ Definition to_val (c: expr) :=
   end.
 
 Lemma of_to_val e v : to_val e = Some v → e = Evalue v.
-Admitted.
+Proof. induction e; crush. Qed.
 
-Lemma fill_not_val Kes e: to_val (fill_ectxs e Kes) = None.
-Admitted.
+Lemma fill_ectx_not_val e K: to_val (fill_expr e K) = None.
+Proof. induction K; crush. Qed.
+
+Lemma fill_ectxs_not_val Kes: ∀ e, to_val e = None → to_val (fill_ectxs e Kes) = None.
+Proof. induction Kes; first by inversion 1.
+       intros. simpl. apply IHKes. apply fill_ectx_not_val. Qed.
 
 Fixpoint params_match (params: decls) (vs: list val) :=
   match params, vs with
@@ -316,6 +321,7 @@ Inductive estep : expr → state → expr → state → Prop :=
       estep (Eassign (Evalue (Vptr l)) (Evalue v))
             σ (Evalue Vvoid)
             (State (storebytes l (encode_val v) (s_heap σ)) (s_text σ))
+| ESseq: ∀ s v σ, estep (Eseq (Evalue v) s) σ s σ
 .
 
 Inductive jstep: state → expr → list exprctx → expr → list exprctx → Prop :=
