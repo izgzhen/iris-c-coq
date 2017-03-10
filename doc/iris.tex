@@ -32,8 +32,7 @@ The latest versions of Iris document and the Iris Coq formalization can be found
 
 \clearpage
 \tableofcontents
-
-\clearpage\begingroup
+\clearpage
 % \input{algebra}
 % \endgroup\clearpage\begingroup
 % \input{constructions}
@@ -44,14 +43,20 @@ The latest versions of Iris document and the Iris Coq formalization can be found
 % \endgroup\clearpage\begingroup
 % \input{ghost-state}
 % \endgroup\clearpage\begingroup
+\begingroup
 \input{language}
-\endgroup\clearpage\begingroup
+\endgroup
+\clearpage
+\begingroup
 \input{program-logic}
-\endgroup\clearpage
+\endgroup
+\clearpage
 % \input{derived}
-% \endgroup\clearpage\begingroup
-% \input{paradoxes}
-% \endgroup\clearpage\begingroup
+% \endgroup\clearpage
+\begingroup
+\input{misc}
+\endgroup
+\clearpage
 % \printbibliography
 
 \end{document}

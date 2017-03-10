@@ -50,7 +50,7 @@ So $e = v_m'$ by injectivity.
 Now, if we partition $\Expr$ into complete groups of disjoint classes, like $E_v, E_{red}, E_{jmp}$,
 then we can trivially derive following lemma:
 
-\begin{lemma}
+\begin{lemma}\label{lem:ectx-inj}
 For any $e, e': \Expr$ and $k, k': \ectx$,
 \[
 k(e) = k'(e') \proves (k = k' \land e = e') \lor (k \neq k' \land (e \in E_v \lor e' \in E_v))
@@ -60,6 +60,29 @@ k(e) = k'(e') \proves (k = k' \land e = e') \lor (k \neq k' \land (e \in E_v \lo
 \begin{lemma}
 For any $e \in E_{red}, e' \in E_{jmp}$ and $k, k': \ectx$,
 \[
-k(e) = k'(e') \proves \FALSE
+k(e) = k'(e') \proves k = k' \land e = e'
 \]
 \end{lemma}
+
+Now we define continuation $K : \cont \eqdef [\ectx]$, and corresponding fill operation as a trivial fold.
+You can imagine an arbitrary expression as a tree, in which the nodes might be either evaluated (the leaves),
+in some normal form ready to be evaluated (leaves' parent), or not in normal form at all.
+So for an expression $e$, the intuition might be there is only an \emph{unique} way of
+extracting it into a $K(e')$, in which $e'$ is either a value or in some normal form. This implies a very general
+injectivitity lemma for continuation:
+
+\begin{lemma}
+If $e, e'$ is in some normal form, and $K(e) = K'(e')$, then $K = K' \land e = e'$.
+\end{lemma}
+\begin{proof}
+We can prove it inductively with \ref{lem:ectx-inj}.
+
+\begin{itemize}
+\item If both $K, K'$ is empty, then it is trivially proven.
+\item If only one of $K, K'$, say $K$, is empty, then we have $e = K''(k'(e'))$ as assumption, which leads to
+contradiction.
+\item Now we can rewrite $K$ as $k::K_1$ for some $k$, and $K'$ as $k'::K_2$, it is apparent that either
+$K_1(e)$ or $K_2(e)$ can be in evaluated form, so by \ref{lem:ectx-inj}, we have $k = k'$ and $K_1(e) = K_2(e')$.
+The second equation can inductively lead to $K_1 = K_2 \land e = e'$, which proves the final conclusion.
+\end{itemize}
+\end{proof}
