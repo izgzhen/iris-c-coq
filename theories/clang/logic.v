@@ -260,10 +260,13 @@ Section rules.
     (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' {{ Φ }})
     ⊢ WP fill_ectxs (Erete (Evalue v)) k {{ Φ }}.
   Proof.
-    iIntros "[Hs HΦ]". iApply wp_lift_step; eauto; first admit.
+    iIntros "[Hs HΦ]". iApply wp_lift_step; eauto; first by apply fill_ectxs_not_val.
     iIntros (??) "[Hσ [HΓ Hstk]]".
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
-    iModIntro. iSplit; first admit.
+    iModIntro. iSplit.
+    { iDestruct (stack_agree with "[Hstk Hs]") as "%"; first iFrame.
+      subst. iPureIntro. eexists _, _, _. apply CSjstep. constructor.
+      apply cont_uninj. done. }
     iNext. iIntros (????). inversion H0.
     { simplify_eq.
       assert (enf (Erete (Evalue v)) = true) as ?; first done.
@@ -272,12 +275,13 @@ Section rules.
       exfalso. by eapply (escape_false H7 H5).
     }
     simplify_eq. inversion H1. simplify_eq.
-    assert (k'0 = k ∧ v0 = v) as (?&?); first admit. (* by cont_inj, which is not very convenient *)
-    simplify_eq. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
-    destruct H2; subst.
+    assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
+    { apply cont_inj=>//. }
+    inversion H3. subst. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
+    destruct H5; subst.
     iFrame. iMod "Hclose" as "_".
     iModIntro. by iApply "HΦ".
-  Admitted.
+  Qed.
 
   Lemma wp_skip E Φ v s:
     ▷ WP s @ E {{ Φ }} ⊢ WP Eseq (Evalue v) s @ E {{ Φ }}.
