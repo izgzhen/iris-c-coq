@@ -2,19 +2,22 @@
 
 From iris_os.clang Require Export lang.
 From iris.base_logic Require Import gen_heap big_op.
-From iris.algebra Require Export gmap agree auth.
+From iris.algebra Require Export gmap agree auth frac excl.
 From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
 From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
-Instance equiv_type_decls: Equiv function := (=).
+Instance equiv_type_function: Equiv function := (=).
+Instance equiv_type_stack: Equiv stack := (=).
 
 Class clangG Σ := ClangG {
   clangG_invG :> invG.invG Σ;
   clangG_heapG :> gen_heapG addr byteval Σ;
   clangG_textG :> inG Σ (authR (gmapUR ident (agreeR (discreteC function))));
-  clangG_textG_name : gname
+  clangG_textG_name : gname;
+  clangG_stackG :> inG Σ (authR (optionUR (agreeR (discreteC stack))));
+  clangG_stackG_name : gname
 }.
 
 Section wp.
@@ -23,11 +26,17 @@ Section wp.
   Definition text_interp (f: ident) (x: function) :=
     own clangG_textG_name (◯ {[ f := to_agree (x : discreteC function) ]}).
 
+  Definition stack_interp (s: stack) :=
+    own clangG_stackG_name (◯ Some (to_agree (s: discreteC stack))).
+
   Definition gen_text (m: text) : iProp Σ :=
     own clangG_textG_name (● (fmap (λ v, to_agree (v : leibnizC _)) m)).
+
+  Definition gen_stack (s: stack) : iProp Σ :=
+    own clangG_stackG_name (● Some (to_agree (s: discreteC stack))).
   
-  Definition state_interp (s: state) : iProp Σ:=
-    (gen_heap_ctx (s_heap s) ∗ gen_text (s_text s))%I.
+  Definition state_interp (s: state) (ks: stack) : iProp Σ:=
+    (gen_heap_ctx (s_heap s) ∗ gen_text (s_text s) ∗ gen_stack ks)%I.
   
   Definition wp_pre
            (wp: coPset -c> expr -c> (val -c> iProp Σ) -c> iProp Σ) :
@@ -36,9 +45,9 @@ Section wp.
      (∃ v, ⌜ to_val cur = Some v ⌝ ∧ |={E}=> Φ v) ∨
      (⌜ to_val cur = None ⌝ ∧
          (∀ (σ: state) ks,
-           state_interp σ ={E,∅}=∗ ⌜ reducible cur σ ks ⌝ ∗
+           state_interp σ ks ={E,∅}=∗ ⌜ reducible cur σ ks ⌝ ∗
             ▷ (∀ cur' σ' ks', ⌜cstep cur σ ks cur' σ' ks'⌝ ={∅,E}=∗
-                        state_interp σ' ∗ wp E cur' Φ))))%I.
+                        state_interp σ' ks' ∗ wp E cur' Φ))))%I.
 
   Local Instance wp_pre_contractive : Contractive wp_pre.
   Proof.
@@ -140,7 +149,7 @@ Section rules.
     to_val c = Some v →
     Φ v ⊢ WP c @ E {{ Φ }}.
   Proof. iIntros (?) "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
-
+  
   Lemma wp_strong_mono E1 E2 e Φ Ψ :
     E1 ⊆ E2 → (∀ v, Φ v ={E2}=∗ Ψ v) ∗ WP e @ E1 {{ Φ }} ⊢ WP e @ E2 {{ Ψ }}.
   Proof.
@@ -170,7 +179,7 @@ Section rules.
   Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed.
 
   Lemma wp_bind' kes E e Φ :
-    ⌜ is_jump e = false ⌝ ∗
+    ⌜ is_jmp e = false ⌝ ∗
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof.
     iIntros "H". iLöb as "IH" forall (E e Φ). rewrite wp_unfold /wp_pre.
@@ -181,29 +190,28 @@ Section rules.
     iIntros (σ1 ks1) "Hσ". iMod ("H" $! _ ks1 with "Hσ") as "[% H]".
     iModIntro; iSplit.
     { iPureIntro. unfold reducible in *.
-      destruct H2 as (cur'&σ'&ks'&?). eexists _, _, ks1. apply HSbind=>//.
-      assert (ks1 = ks') as ?; first eapply cstep_not_jump=>//.
+      destruct H2 as (cur'&σ'&ks'&?). eexists _, _, ks1. apply CSbind=>//.
+      assert (ks1 = ks') as ?; first eapply not_jmp_preserves_stack=>//.
       by subst.
     }
     iNext. iIntros (e2 σ2 ks2 Hstep).
-    destruct (fill_step_inv σ1 σ2 ks1 ks2 e e2 kes) as (e2'&->&?&?); auto; subst.
-    iMod ("H" $! e2' σ2 _ with "[%]") as "($ & H)"; auto.
-    iApply "IH". destruct (estep_not_jump _ _ _ _ H3) as (?&?).
-    iSplit=>//.
+    destruct (fill_step_inv e σ1 e2 σ2 kes ks1 ks2) as (e2'&->&?&?); auto; subst.
+    iMod ("H" $! e2' σ2 _ with "[%]") as "($ & H)"; eauto.
+    iApply "IH". iSplit=>//.
+    iPureIntro. eapply cstep_preserves_not_jmp=>//.
   Qed.
 
   Lemma wp_bind kes E e Φ :
-    is_jump e = false →
+    is_jmp e = false →
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof. iIntros (?) "?". iApply wp_bind'. iSplit; done. Qed.
 
-
   Lemma wp_lift_step E Φ e1 :
     to_val e1 = None →
-    (∀ σ1 ks1, state_interp σ1 ={E,∅}=∗
+    (∀ σ1 ks1, state_interp σ1 ks1 ={E,∅}=∗
       ⌜reducible e1 σ1 ks1⌝ ∗
       ▷ ∀ e2 σ2 ks2, ⌜cstep e1 σ1 ks1 e2 σ2 ks2⌝ ={∅,E}=∗
-        state_interp σ2 ∗ WP e2 @ E {{ Φ }})
+        state_interp σ2 ks2 ∗ WP e2 @ E {{ Φ }})
     ⊢ WP e1 @ E {{ Φ }}.
   Proof. iIntros (?) "H". rewrite wp_unfold /wp_pre; auto. Qed.
   
@@ -223,24 +231,82 @@ Section rules.
     destruct (H0 _ _ _ _ _ H1) as [? ?]. subst. iFrame. by iApply "H".
   Qed.
 
+  Lemma stack_agree ks ks':
+    stack_interp ks ∗ gen_stack ks' ⊢ ⌜ ks = ks' ⌝.
+  Proof.
+    iIntros "[Hs' Hs]".
+    rewrite /stack_interp /gen_stack.
+    iDestruct (own_valid_2 with "Hs Hs'") as "%".
+    iPureIntro. apply auth_valid_discrete_2 in H0.
+    destruct H0 as (H1 & H2).
+    generalize H1.
+    by rewrite Some_included_total to_agree_included leibniz_equiv_iff.
+  Qed.
+
+  Lemma stack_pop k k' ks ks':
+    stack_interp (k::ks) ∗ gen_stack (k'::ks') ==∗ stack_interp (ks) ∗ gen_stack (ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
+  Proof.
+    iIntros "[Hs Hs']".
+    iDestruct (stack_agree with "[-]") as "%"; first iFrame.
+    inversion H0. subst.
+    rewrite /stack_interp /gen_stack.
+    iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
+    apply (auth_update (Some (to_agree (k' :: ks' : discreteC stack)))).
+    apply option_local_update.
+  Admitted.
+  
+  Lemma wp_ret k k' ks v Φ:
+    stack_interp (k'::ks)  ∗
+    (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' {{ Φ }})
+    ⊢ WP fill_ectxs (Erete (Evalue v)) k {{ Φ }}.
+  Proof.
+    iIntros "[Hs HΦ]". iApply wp_lift_step; eauto; first admit.
+    iIntros (??) "[Hσ [HΓ Hstk]]".
+    iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    iModIntro. iSplit; first admit.
+    iNext. iIntros (????). inversion H0.
+    { simplify_eq. admit. }
+    simplify_eq. inversion H1. simplify_eq.
+    assert (k'0 = k ∧ v0 = v) as (?&?); first admit. (* by cont_inj, which is not very convenient *)
+    simplify_eq. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
+    destruct H2; subst.
+    iFrame. iMod "Hclose" as "_".
+    iModIntro. by iApply "HΦ".
+  Admitted.
+
   Lemma wp_skip E Φ v s:
     ▷ WP s @ E {{ Φ }} ⊢ WP Eseq (Evalue v) s @ E {{ Φ }}.
-  Proof. Admitted.
-    (* iIntros "Φ". iApply wp_lift_pure_step; eauto. *)
-    (* - inversion 1. inversion H1. simplify_eq; done *)
-    
-  Lemma wp_seq E e1 e2 Φ:
-    is_jump e1 = false →
-    WP e1 @ E {{ _, WP e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
-  Admitted. 
+  Proof.
+    iIntros "Φ". iApply wp_lift_pure_step; eauto.
+    - inversion 1.
+      + inversion H1=>//.
+        simplify_eq. inversion H1=>//. simplify_eq.
+        exfalso. replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H2; last done.
+        replace (fill_expr (fill_ectxs e kes0) k0)
+        with (fill_ectxs e (k0::kes0)) in H2; last done.
+        admit.
+      + simplify_eq. inversion H1.
+        simplify_eq. admit.
+    - iNext. iIntros (????? Hstep).
+      inversion Hstep.
+      + simplify_eq. inversion H0.
+        { simplify_eq. done. }
+        { simplify_eq. admit. }
+      + simplify_eq. inversion H0. simplify_eq. admit.
+        (* Though a lot of admits ... but some patterns pertain *)
+  Admitted.
 
+  Lemma wp_seq E e1 e2 Φ:
+    is_jmp e1 = false →
+    WP e1 @ E {{ v, WP Eseq (Evalue v) e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
+  Proof.  iIntros (?) "Hseq". iApply (wp_bind [EKseq e2])=>//. Qed.
   
   Lemma wp_lift_atomic_step {E Φ} s1 :
     to_val s1 = None →
-    (∀ σ1 ks1, state_interp σ1 ={E}=∗
+    (∀ σ1 ks1, state_interp σ1 ks1 ={E}=∗
       ⌜reducible s1 σ1 ks1⌝ ∗
       ▷ ∀ s2 σ2 ks2, ⌜cstep s1 σ1 ks1 s2 σ2 ks2⌝ ={E}=∗
-        state_interp σ2 ∗
+        state_interp σ2 ks2 ∗
         default False (to_val s2) Φ)
     ⊢ WP s1 @ E {{ Φ }}.
   Proof.
@@ -285,13 +351,13 @@ Section rules.
       rewrite -(typeof_preserves_size v' t')=>//.
       by apply assign_preserves_size. }
     inversion Hstep; subst.
-    - inversion H3. subst.
-      iMod "H" as "[Hσ' Hv']".
-      iModIntro. iFrame. iApply "HΦ".
-      iSplit=>//.
-      iPureIntro. by apply (assign_preserves_typeof t t').
-    - admit.
-    - admit.
+    - inversion H3; simplify_eq.
+      + iMod "H" as "[Hσ' Hv']".
+        iModIntro. iFrame. iApply "HΦ".
+        iSplit=>//.
+        iPureIntro. by apply (assign_preserves_typeof t t').
+      + admit.
+    - inversion H3. admit.
   Admitted.
 
   Lemma mapstobytes_prod b q:
@@ -332,10 +398,6 @@ Section rules.
     { iFrame "H1". by rewrite -(typeof_preserves_size v1 t1). }
     iFrame. iPureIntro. by constructor.
   Qed.
-
-  Lemma wp_ret E k v Φ:
-    Φ v ⊢ WP fill_ectxs (Erete (Evalue v)) k @ E {{ Φ }}.
-  Admitted.
 
   Lemma mapsto_readbytes q σ:
     ∀ bs l, mapstobytes l q bs ∗ gen_heap_ctx σ ⊢ ⌜ readbytes l bs σ ⌝.

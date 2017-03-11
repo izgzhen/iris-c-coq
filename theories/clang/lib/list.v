@@ -68,14 +68,14 @@ Section proof.
       iNext. wp_load. wp_load. wp_bind (Esnd _). iApply wp_snd. iNext.
       iApply wp_value=>//.
       iDestruct "Ht" as (?) "Ht".
-      wp_assign. wp_load.
+      wp_assign. wp_skip. wp_load.
       destruct p as [pb po]. wp_op.
       rewrite /offset_by_byte.
       replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
       wp_load. iDestruct (isList_ptr with "Hlr") as "%".
       unfold tcell.
       iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
-      wp_assign. wp_load. wp_assign. wp_load. wp_assign.
+      wp_assign. wp_skip. wp_load. wp_assign. wp_skip. wp_load. wp_assign. wp_skip.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)); first by unfold_f_inst.
       iFrame.
       iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".

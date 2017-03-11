@@ -25,7 +25,7 @@ for each possible decomposition until [tac] succeeds. *)
 Ltac reshape_expr e tac :=
   let rec go K e :=
   match e with
-  | _ => tac K e
+  | _ => tac (reverse K) e
   | Ebinop ?op (Evalue ?v1) ?e2 => go (EKbinopl op v1 :: K) e2
   | Ebinop ?op ?e1 ?e2 => go (EKbinopr op e2 :: K) e1
   | Efst ?e => go (EKfst :: K) e
@@ -150,3 +150,5 @@ end.
 
 Ltac unfold_f_inst :=
   rewrite /instantiate_f_body /resolve_rhs; repeat gmap_rewrite.
+
+Tactic Notation "wp_skip" := iApply wp_skip; iNext.
