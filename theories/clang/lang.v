@@ -113,7 +113,6 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKseq s => Eseq e s
   end.
 
-
 Definition fill_ectxs := foldr (λ x y, fill_expr y x).
 
 Definition heap := gmap addr byteval.
@@ -348,12 +347,132 @@ Lemma ESbind:
       estep (fill_ectxs e kes) σ (fill_ectxs e' kes) σ'.
 Proof. induction kes=>//. intros. apply ESbind'=>//. Qed.
 
+
 Definition cont := list exprctx.
 Definition stack := list cont.
+
+Definition mor {A} (ma: option A) (mb: option A) : option A :=
+  match ma with
+    | Some a => Some a
+    | None => mb
+  end.
+
+Notation "ma <|> mb" := (mor ma mb) (at level 50, left associativity).
+
+Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
+  match e with
+    | Evalue _ => None
+    | Evar _ => None
+    | Ebinop op e1 e2 =>
+      match e1, e2 with
+        | Evalue v1, Evalue v2 => Some (ks, e)
+        | Evalue v1, _ => unfill_expr e2 (EKbinopl op v1 :: ks)
+        | _, _ => unfill_expr e1 (EKbinopr op e2 :: ks)
+      end
+    | Ederef_typed t e =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKderef_typed t :: ks)
+      end
+    | Eaddrof e =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKaddrof :: ks)
+      end
+    | Efst e =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKfst :: ks)
+      end
+    | Esnd e =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKsnd :: ks)
+      end
+    (* | Ecall : ident → list expr → expr *) (* which is complex ... *)
+    | Ealloc t e =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKalloc t :: ks)
+      end
+    | Eassign e1 e2 =>
+      match e1, e2 with
+        | Evalue v1, Evalue v2 => Some (ks, e)
+        | Evalue (Vptr l), _ => unfill_expr e2 (EKassignl l :: ks)
+        | _, _ => unfill_expr e1 (EKassignr e2 :: ks)
+      end
+    | Eif e1 e2 e3 =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e1 (EKif e2 e3 :: ks)
+      end
+    | Ewhile c e s =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKwhile c s :: ks)
+      end
+    | Erete e =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e (EKrete :: ks)
+      end
+    | Eseq e1 e2 =>
+      match e with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e1 (EKseq e2 :: ks)
+      end
+    | _ => None
+  end.
+
+Definition is_some {A} (x: option A): bool := match x with Some _ => true | None => false end.
+
+Definition is_val e := is_some (to_val e).
+
+Definition is_loc e :=
+  match to_val e with
+    | Some (Vptr _) => true
+    | _ => false
+  end.
+
+
+Definition enf (e: expr) :=
+  match e with
+    | Ecall _ es => forallb is_val es
+    | Erete e => is_val e
+    | Ebinop _ e1 e2 => is_val e1 && is_val e2
+    | Ederef e => is_val e
+    | Ederef_typed _ e => is_val e
+    | Eaddrof e => is_val e
+    | Efst e => is_val e
+    | Esnd e => is_val e
+    | Ealloc _ e => is_val e
+    | Eassign e1 e2 => is_loc e1 && is_val e2
+    | Eif e1 e2 e3 => is_val e1
+    | Eseq e1 e2 => is_val e1
+    | _ => false
+  end.
+
+(* Proven on paper ... *)
+Lemma cont_inj {e e' kes kes'}:
+  enf e = true → enf e' = true →
+  fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
+Admitted.
+
+Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
+
+Lemma cont_uninj: ∀ kes e, enf e = true → unfill e kes.
+Admitted.
+(* This is an even stronger claim than above ... *)
+
+Lemma fill_estep_inv e ks a a1 a2:
+  enf e = true → estep (fill_ectxs e ks) a a1 a2 →
+  ∃ e', estep e a e' a2 ∧ a1 = fill_ectxs e' ks.
+Admitted.
 
 Inductive jstep: state → expr → stack → expr → stack → Prop :=
 | JSrete:
     ∀ σ v k k' ks,
+      unfill (Erete (Evalue v)) k' →
       jstep σ (fill_ectxs (Erete (Evalue v)) k') (k::ks) (fill_ectxs (Evalue v) k) ks.
 (* | JScall: *)
 (*     ∀ σ es ls retty params f_body f_body' f k ks, *)
@@ -399,31 +518,7 @@ Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
 Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
  
-Definition is_some {A} (x: option A): bool := match x with Some _ => true | None => false end.
 
-Definition is_val e := is_some (to_val e).
-
-Definition enf (e: expr) :=
-  match e with
-    | Ecall _ es => forallb is_val es
-    | Erete e => is_val e
-    | Ebinop _ e1 e2 => is_val e1 && is_val e2
-    | Ederef e => is_val e
-    | Ederef_typed _ e => is_val e
-    | Eaddrof e => is_val e
-    | Efst e => is_val e
-    | Esnd e => is_val e
-    | Ealloc _ e => is_val e
-    | Eassign e1 e2 => is_val e1 && is_val e2
-    | Eif e1 e2 e3 => is_val e1
-    | Eseq e1 e2 => is_val e1
-    | _ => false
-  end.
-(* Proven on paper ... *)
-Lemma cont_inj {e e' kes kes'}:
-  enf e = true → enf e' = true →
-  fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
-Admitted.
 
 (* Proven from operational semantics *)
 Lemma lift_reducible e Kes σ ks:
@@ -464,4 +559,9 @@ Admitted.
 
 Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
+Admitted.
+
+Lemma escape_false {e a e' a2 kes k0 e''}:
+  estep e a e' a2 →
+  fill_expr (fill_ectxs e kes) k0 = e'' → enf e'' = true → False.
 Admitted.

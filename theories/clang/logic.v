@@ -265,7 +265,12 @@ Section rules.
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit; first admit.
     iNext. iIntros (????). inversion H0.
-    { simplify_eq. admit. }
+    { simplify_eq.
+      assert (enf (Erete (Evalue v)) = true) as ?; first done.
+      destruct (fill_estep_inv _ _ _ _ _ H2 H1) as [? [? ?]].
+      inversion H3. simplify_eq.
+      exfalso. by eapply (escape_false H7 H5).
+    }
     simplify_eq. inversion H1. simplify_eq.
     assert (k'0 = k ∧ v0 = v) as (?&?); first admit. (* by cont_inj, which is not very convenient *)
     simplify_eq. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
@@ -284,22 +289,22 @@ Section rules.
         exfalso. replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H2; last done.
         replace (fill_expr (fill_ectxs e kes0) k0)
         with (fill_ectxs e (k0::kes0)) in H2; last done.
-        admit.
+        by eapply (escape_false H10 H8).
       + simplify_eq. inversion H1.
-        simplify_eq. admit.
+        simplify_eq. unfold unfill in H4. rewrite H2 in H4.
+        simpl in H4. done.
     - iNext. iIntros (????? Hstep).
       inversion Hstep.
       + simplify_eq. inversion H0.
         { simplify_eq. done. }
-        { simplify_eq. admit. }
-      + simplify_eq. inversion H0. simplify_eq. admit.
-        (* Though a lot of admits ... but some patterns pertain *)
-  Admitted.
+        { simplify_eq. exfalso. by eapply (escape_false H3 H1). }
+      + simplify_eq. inversion H0. simplify_eq. by rewrite /unfill H1 /= in H3.        
+  Qed.
 
   Lemma wp_seq E e1 e2 Φ:
     is_jmp e1 = false →
     WP e1 @ E {{ v, WP Eseq (Evalue v) e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
-  Proof.  iIntros (?) "Hseq". iApply (wp_bind [EKseq e2])=>//. Qed.
+  Proof. iIntros (?) "Hseq". iApply (wp_bind [EKseq e2])=>//. Qed.
   
   Lemma wp_lift_atomic_step {E Φ} s1 :
     to_val s1 = None →
@@ -356,9 +361,9 @@ Section rules.
         iModIntro. iFrame. iApply "HΦ".
         iSplit=>//.
         iPureIntro. by apply (assign_preserves_typeof t t').
-      + admit.
-    - inversion H3. admit.
-  Admitted.
+      + exfalso. by eapply (escape_false H6 H4).
+    - inversion H3. simplify_eq. by rewrite /unfill H4 /= in H6.
+  Qed.
 
   Lemma mapstobytes_prod b q:
     ∀ v1 o v2,
