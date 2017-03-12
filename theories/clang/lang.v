@@ -561,7 +561,32 @@ Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
 Admitted.
 
+Lemma estep_not_val e σ e' σ':
+  estep e σ e' σ' → to_val e = None.
+Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
+
+Lemma fill_not_enf e k:
+  is_val e = false → enf (fill_expr e k) = false.
+Proof. induction k=>//.
+       - intros H. simpl. rewrite H. done.
+       - intros H. simpl. rewrite forallb_app.
+         replace (e::args) with ([e] ++ args); last done.
+         rewrite forallb_app. simpl. rewrite H.
+         by rewrite andb_false_r.
+       - intros H. simpl. induction e; crush.
+Qed.
+
+Lemma to_val_is_val e:
+  to_val e = None ↔ is_val e = false.
+Proof. induction e; crush. Qed.
+
 Lemma escape_false {e a e' a2 kes k0 e''}:
   estep e a e' a2 →
   fill_expr (fill_ectxs e kes) k0 = e'' → enf e'' = true → False.
-Admitted.
+Proof.
+  intros. assert (enf e'' = false) as Hfalse; last by rewrite Hfalse in H1.
+  rewrite -H0. apply fill_not_enf.
+  apply to_val_is_val.
+  apply fill_ectxs_not_val. eapply estep_not_val. done.
+Qed.
+  
