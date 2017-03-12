@@ -443,33 +443,29 @@ Section rules.
   Lemma wp_load {E} Φ p v t q:
     ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP Ederef_typed t (Evalue (Vptr p)) @ E {{ Φ }}.
-  Proof. Admitted.
-  (*   iIntros "[Hl HΦ]". *)
-  (*   iApply wp_lift_atomic_step=>//. *)
-  (*   iIntros (σ1 ks1) "[Hσ HΓ]". *)
-  (*   unfold mapstoval. *)
-  (*   iDestruct "Hl" as "[>% >Hl]". *)
-  (*   iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame. *)
-  (*   iModIntro. iSplit; first eauto. *)
-  (*   iNext; iIntros (s2 σ2 ks2 Hstep). iModIntro. *)
-  (*   inversion Hstep. subst *)
-  (*   inversion H3. subst. simpl. iFrame. *)
-  (*   rewrite (same_type_encode_inj (s_heap σ2) t v v0 p)=>//.  *)
-  (*   iApply "HΦ". *)
-  (*   iSplit=>//. *)
-  (* Qed. *)
+  Proof.
+    iIntros "[Hl HΦ]".
+    iApply wp_lift_atomic_step=>//.
+    iIntros (σ1 ks1) "[Hσ [HΓ Hs]]".
+    unfold mapstoval.
+    iDestruct "Hl" as "[>% >Hl]".
+    iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
+    iModIntro. iSplit; first eauto.
+    iNext; iIntros (s2 σ2 ks2 Hstep). iModIntro.
+    inversion Hstep; subst.
+    - inversion H2; subst.
+      + simpl. iFrame.
+        rewrite (same_type_encode_inj (s_heap σ2) t v v0 p)=>//.
+        iApply ("HΦ" with "[-]") ; first by iSplit=>//.
+      + exfalso. by eapply (escape_false H5 H3).
+    - iFrame. inversion H2. simplify_eq.
+        by rewrite /unfill H3 /= in H5.
+  Qed.
 
   Lemma wp_op E op v1 v2 v' Φ:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP Ebinop op (Evalue v1) (Evalue v2) @ E {{ Φ }}.
-  Proof.
-  (*   iIntros (?) "HΦ". iApply wp_lift_pure_step=>//; first eauto. *)
-  (*   { inversion 1. inversion H3. by subst. } *)
-  (*   iNext. iIntros (?????) "%". *)
-  (*   inversion H1. inversion H3. *)
-  (*   simplify_eq. iApply wp_value=>//. *)
-    (* Qed. *)
-    Admitted.
+  Admitted.
 
   Lemma wp_while_true cond s Φ:
     ▷ WP Eseq s (Ewhile cond cond s) {{ Φ }}
