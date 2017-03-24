@@ -1,5 +1,6 @@
 (* Program Logic *)
 
+From iris.proofmode Require Export tactics.
 From iris_os.clang Require Export lang.
 Set Default Proof Using "Type".
 Import uPred.
@@ -12,7 +13,7 @@ Class clangG Σ := ClangG {
   clangG_heapG :> gen_heapG addr byteval Σ;
   clangG_textG :> inG Σ (authR (gmapUR ident (agreeR (discreteC function))));
   clangG_textG_name : gname;
-  clangG_stackG :> inG Σ (authR (optionUR (agreeR (discreteC stack))));
+  clangG_stackG :> inG Σ (prodR fracR (agreeR (discreteC stack)));
   clangG_stackG_name : gname
 }.
 
@@ -23,17 +24,17 @@ Section wp.
     own clangG_textG_name (◯ {[ f := to_agree (x : discreteC function) ]}).
 
   Definition stack_interp (s: stack) :=
-    own clangG_stackG_name (◯ Some (to_agree (s: discreteC stack))).
+    own clangG_stackG_name ((1/2)%Qp, (to_agree (s: discreteC stack))).
 
   Definition gen_text (m: text) : iProp Σ :=
     own clangG_textG_name (● (fmap (λ v, to_agree (v : leibnizC _)) m)).
 
   Definition gen_stack (s: stack) : iProp Σ :=
-    own clangG_stackG_name (● Some (to_agree (s: discreteC stack))).
-  
+    own clangG_stackG_name ((1/2)%Qp, (to_agree (s: discreteC stack))).
+
   Definition state_interp (s: state) (ks: stack) : iProp Σ:=
     (gen_heap_ctx (s_heap s) ∗ gen_text (s_text s) ∗ gen_stack ks)%I.
-  
+
   Definition wp_pre
            (wp: coPset -c> expr -c> (val -c> iProp Σ) -c> iProp Σ) :
     coPset -c> expr -c> (val -c> iProp Σ) -c> iProp Σ :=
@@ -145,7 +146,7 @@ Section rules.
     to_val c = Some v →
     Φ v ⊢ WP c @ E {{ Φ }}.
   Proof. iIntros (?) "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
-  
+
   Lemma wp_strong_mono E1 E2 e Φ Ψ :
     E1 ⊆ E2 → (∀ v, Φ v ={E2}=∗ Ψ v) ∗ WP e @ E1 {{ Φ }} ⊢ WP e @ E2 {{ Ψ }}.
   Proof.
@@ -210,7 +211,7 @@ Section rules.
         state_interp σ2 ks2 ∗ WP e2 @ E {{ Φ }})
     ⊢ WP e1 @ E {{ Φ }}.
   Proof. iIntros (?) "H". rewrite wp_unfold /wp_pre; auto. Qed.
-  
+
   Lemma wp_lift_pure_step E Φ e1 :
     (∀ σ1 ks1, reducible e1 σ1 ks1) →
     (∀ σ1 ks1 σ2 ks2 cur2, cstep e1 σ1 ks1 cur2 σ2 ks2 → σ1 = σ2 ∧ ks1 = ks2) →
@@ -233,10 +234,10 @@ Section rules.
     iIntros "[Hs' Hs]".
     rewrite /stack_interp /gen_stack.
     iDestruct (own_valid_2 with "Hs Hs'") as "%".
-    iPureIntro. apply auth_valid_discrete_2 in H0.
-    destruct H0 as (H1 & H2).
-    generalize H1.
-    by rewrite Some_included_total to_agree_included leibniz_equiv_iff.
+    iPureIntro.
+    destruct H0 as [? ?].
+    simpl in H1.
+    by apply to_agree_comp_valid in H1.
   Qed.
 
   Lemma stack_pop k k' ks ks':
@@ -247,10 +248,13 @@ Section rules.
     inversion H0. subst.
     rewrite /stack_interp /gen_stack.
     iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
-    apply (auth_update (Some (to_agree (k' :: ks' : discreteC stack)))).
-    apply option_local_update.
-  Admitted.
-  
+    rewrite pair_op frac_op' Qp_div_2.
+    apply cmra_update_exclusive.
+    split; simpl.
+    - by rewrite frac_op'.
+    - by apply to_agree_comp_valid.
+  Qed.
+
   Lemma wp_ret k k' ks v Φ:
     stack_interp (k'::ks)  ∗
     (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' {{ Φ }})
@@ -298,14 +302,14 @@ Section rules.
       + simplify_eq. inversion H0.
         { simplify_eq. done. }
         { simplify_eq. exfalso. by eapply (escape_false H3 H1). }
-      + simplify_eq. inversion H0. simplify_eq. by rewrite /unfill H1 /= in H3.        
+      + simplify_eq. inversion H0. simplify_eq. by rewrite /unfill H1 /= in H3.
   Qed.
 
   Lemma wp_seq E e1 e2 Φ:
     is_jmp e1 = false →
     WP e1 @ E {{ v, WP Eseq (Evalue v) e2 @ E {{ Φ }} }} ⊢ WP Eseq e1 e2 @ E {{ Φ }}.
   Proof. iIntros (?) "Hseq". iApply (wp_bind [EKseq e2])=>//. Qed.
-  
+
   Lemma wp_lift_atomic_step {E Φ} s1 :
     to_val s1 = None →
     (∀ σ1 ks1, state_interp σ1 ks1 ={E}=∗
@@ -349,7 +353,7 @@ Section rules.
     iIntros (σ1 ks1) "[Hσ HΓ] !>".
     rewrite /mapstoval. iSplit; first eauto.
     iNext; iIntros (v2 σ2 ks2 Hstep).
-    iDestruct "Hl" as "[% Hl]". 
+    iDestruct "Hl" as "[% Hl]".
     iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
     {
       rewrite -(typeof_preserves_size v t)=>//.
@@ -504,7 +508,7 @@ Section rules.
   (* Proof. *) Admitted.
 
   (* Freshness and memory allocation *)
-  
+
   Definition fresh_block (σ: heap) : block :=
     let addrst : list addr := elements (dom _ σ : gset addr) in
     let blockset : gset block := foldr (λ l, ({[ l.1 ]} ∪)) ∅ addrst in
@@ -518,7 +522,7 @@ Section rules.
     rewrite /fresh_block /= -not_elem_of_dom -elem_of_elements.
     move=> /(help _ _ ∅) /=. apply is_fresh.
   Qed.
-  
+
   Lemma alloc_fresh σ Γ v t:
     let l := (fresh_block σ, 0)%nat in
     typeof v t →
@@ -527,7 +531,7 @@ Section rules.
     intros l ?. apply ESalloc. auto.
     intros o'. apply (is_fresh_block _ o').
   Qed.
-  
+
   Lemma fresh_store σ1 b o bs:
     ∀ a : nat,
       a > 0 →
@@ -541,7 +545,7 @@ Section rules.
     apply IHbs=>//. induction a0; crush.
     intros [=]. omega.
   Qed.
-  
+
   Lemma gen_heap_update_block bs:
     ∀ σ1 b o,
       (∀ o' : offset, σ1 !! (b, o') = None) →
@@ -555,7 +559,7 @@ Section rules.
       apply fresh_store=>//.
       by iFrame.
   Qed.
-  
+
   Lemma wp_alloc E v t Φ:
     typeof v t →
     (∀ l, l ↦ v @ t -∗ Φ (Vptr l))
@@ -576,7 +580,7 @@ Section rules.
   Admitted.
 
   (* Call *)
-  
+
   Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=
     (match addrs, vs with
        | (t, l)::params, v::vs => l ↦ v @ t ∗ alloc_params params vs
@@ -629,5 +633,5 @@ Section rules.
   (*     (* iApply "HΦ". *) *)
   (*   (* iApply "HΦ". by iFrame. *) *)
   Admitted.
-    
+
 End rules.
