@@ -1,10 +1,6 @@
 (* Program Logic *)
 
 From iris_os.clang Require Export lang.
-From iris.base_logic Require Import gen_heap big_op.
-From iris.algebra Require Export gmap agree auth frac excl.
-From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
-From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 

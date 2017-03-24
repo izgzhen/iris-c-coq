@@ -1,7 +1,11 @@
 (** Language definition **)
 
+From iris.algebra Require Import gmap.
+From iris.base_logic Require Export gen_heap big_op.
+From iris.algebra Require Export gmap agree auth frac excl.
+From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
+From iris.proofmode Require Export tactics.
 From iris_os.lib Require Export smap prelude.
-From iris.algebra Require Export gmap.
 From iris_os.clang Require Export memory types.
 
 Open Scope Z_scope.
