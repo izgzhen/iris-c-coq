@@ -419,16 +419,6 @@ Section rules.
       iPureIntro. auto.
   Qed.
 
-  Lemma  same_type_encode_inj σ:
-    ∀ t v v' p,
-      typeof v t → typeof v' t →
-      readbytes p (encode_val v) σ →
-      readbytes p (encode_val v') σ →
-      v = v'.
-  Proof.
-    (* This holds for me .. *)
-  Admitted.
-
   Instance timeless_mapstobytes q bs p: TimelessP (mapstobytes p q bs)%I.
   Proof.
     generalize bs p.

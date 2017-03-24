@@ -158,6 +158,33 @@ Fixpoint readbytes l bs (σ: heap) :=
     | _ => True
   end.
 
+Lemma readbytes_segment σ bs': ∀ bs l,
+  readbytes l (bs ++ bs') σ → readbytes l bs σ.
+Proof.
+  induction bs=>//.
+  intros. destruct l. simpl. simpl in H.
+  destruct H. split=>//.
+  by apply IHbs.
+Qed.
+
+Definition shift_loc l (o: nat) : addr :=
+  let '(b, o') := l in (b, o' + o)%nat.
+
+Lemma readbytes_segment_2 σ bs': ∀ bs l,
+  readbytes l (bs ++ bs') σ → readbytes (shift_loc l (length bs)) bs' σ.
+Proof.
+  induction bs.
+  - intros. destruct l. unfold shift_loc. simpl.
+    replace ([] ++ bs') with bs' in H=>//.
+    replace (n + 0)%nat with n=>//.
+  - intros. destruct l. simpl. simpl in H.
+    destruct H.
+    specialize (IHbs _ H0).
+    simpl in IHbs.
+    replace (n + S (length bs))%nat with (n + 1 + length bs)%nat=>//.
+    omega.
+Qed.
+
 Fixpoint storebytes l bs (σ: heap) :=
   match bs with
     | byte::bs' => let '(b, o) := l in <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
@@ -593,4 +620,45 @@ Proof.
   apply to_val_is_val.
   apply fill_ectxs_not_val. eapply estep_not_val. done.
 Qed.
-  
+
+Lemma  same_type_encode_inj σ:
+  ∀ t v v' p,
+    typeof v t → typeof v' t →
+    readbytes p (encode_val v) σ →
+    readbytes p (encode_val v') σ →
+    v = v'.
+Proof.
+  induction t.
+  - intros. inversion H. inversion H0. done.
+  - admit.
+  - intros. inversion H. inversion H0.
+    subst. destruct p. simpl in H1, H2.
+    rewrite Byte.repr_unsigned in H2.
+    rewrite Byte.repr_unsigned in H1.
+    destruct H2. destruct H1. rewrite H2 in H1.
+    by inversion H1.
+  - intros.
+    inversion H. inversion H0.
+    subst. destruct p. simpl in H1, H2. admit.
+  - intros. inversion H; inversion H0; subst; destruct p; simpl in H1, H2=>//.
+    + destruct H1. destruct H2.
+      by rewrite H2 in H1.
+    + destruct H1. destruct H2.
+      by rewrite H2 in H1.
+    + destruct H1. destruct H2.
+      rewrite H2 in H1. by inversion H1.
+  - intros.
+    inversion H. inversion H0. subst.
+    f_equal.
+    + eapply IHt1=>//.
+      simpl in H1. by eapply readbytes_segment.
+      simpl in H2. by eapply readbytes_segment.
+    + eapply IHt2=>//.
+      * simpl in H1. by eapply readbytes_segment_2.
+      * simpl in H2.
+        replace (length (encode_val v1)) with
+        (length (encode_val v0)).
+        by eapply readbytes_segment_2.
+        { rewrite -(typeof_preserves_size v0 t1)=>//.
+          rewrite -(typeof_preserves_size v1 t1)=>//. }
+Admitted.
