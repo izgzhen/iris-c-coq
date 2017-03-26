@@ -452,10 +452,38 @@ Section rules.
         by rewrite /unfill H3 /= in H5.
   Qed.
 
+  Ltac pure_estep H :=
+    inversion H; subst;
+    [ match goal with
+        | [ HE: estep _ _ _ _ |- _ ] =>
+          inversion H2; subst;
+            [ idtac | exfalso;
+                match goal with
+                  | [ HF: fill_expr (fill_ectxs ?E _) _ = _, HE2: estep ?E _ _ _ |- _ ] =>
+                      by eapply (escape_false HE2 HF)
+                end ]
+      end
+    | match goal with
+        | [ HJ : jstep _ _ _ _ _ |- _ ] =>
+          inversion HJ; simplify_eq;
+          match goal with
+            | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
+                by rewrite /unfill HF /= in HU
+          end
+      end].
+
   Lemma wp_op E op v1 v2 v' Φ:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP Ebinop op (Evalue v1) (Evalue v2) @ E {{ Φ }}.
-  Admitted.
+  Proof.
+    iIntros (?) "HΦ".
+    iApply wp_lift_pure_step; first eauto.
+    { intros. pure_estep H1=>//. }
+    iNext. iIntros (??????).
+    pure_estep H1.
+    rewrite H0 in H9. inversion H9. subst.
+    iApply wp_value=>//.
+  Qed.
 
   Lemma wp_while_true cond s Φ:
     ▷ WP Eseq s (Ewhile cond cond s) {{ Φ }}
