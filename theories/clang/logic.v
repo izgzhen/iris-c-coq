@@ -255,6 +255,9 @@ Section rules.
     - by apply to_agree_comp_valid.
   Qed.
 
+  Lemma stack_push k k' ks ks':
+    stack_interp (ks) ∗ gen_stack (ks') ==∗ stack_interp (k::ks) ∗ gen_stack (k'::ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
+  Admitted.
 
   Lemma wp_ret k k' ks v Φ:
     stack_interp (k'::ks)  ∗
@@ -276,13 +279,18 @@ Section rules.
       inversion H3. simplify_eq.
       exfalso. by eapply (escape_false H7 H5).
     }
-    simplify_eq. inversion H1. simplify_eq.
-    assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
-    { apply cont_inj=>//. }
-    inversion H3. subst. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
-    destruct H5; subst.
-    iFrame. iMod "Hclose" as "_".
-    iModIntro. by iApply "HΦ".
+    simplify_eq. inversion H1.
+    - simplify_eq.
+      assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
+      { apply cont_inj=>//. }
+      inversion H3. subst. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
+      destruct H5; subst.
+      iFrame. iMod "Hclose" as "_".
+      iModIntro. by iApply "HΦ".
+    - simplify_eq.
+      apply cont_inj in H2=>//.
+      destruct H2 as [? ?]; done.
+      simpl. apply forall_is_val.
   Qed.
 
   Lemma wp_skip E Φ v s:
@@ -296,15 +304,24 @@ Section rules.
         replace (fill_expr (fill_ectxs e kes0) k0)
         with (fill_ectxs e (k0::kes0)) in H2; last done.
         by eapply (escape_false H10 H8).
-      + simplify_eq. inversion H1.
-        simplify_eq. unfold unfill in H4. rewrite H2 in H4.
-        simpl in H4. done.
+      + simplify_eq. inversion H1; subst.
+        * unfold unfill in H4. rewrite H2 in H4.
+          simpl in H4. done.
+        * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H2 =>//.
+          apply cont_inj in H2=>//.
+          by destruct H2.
+          by apply forall_is_val.
     - iNext. iIntros (????? Hstep).
       inversion Hstep.
       + simplify_eq. inversion H0.
         { simplify_eq. done. }
         { simplify_eq. exfalso. by eapply (escape_false H3 H1). }
-      + simplify_eq. inversion H0. simplify_eq. by rewrite /unfill H1 /= in H3.
+      + simplify_eq. inversion H0; subst.
+        * simplify_eq. by rewrite /unfill H1 /= in H3.
+        * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
+          apply cont_inj in H1=>//.
+          by destruct H1.
+          by apply forall_is_val.
   Qed.
 
   Lemma wp_seq E e1 e2 Φ:
@@ -345,6 +362,13 @@ Section rules.
       by iFrame.
   Qed.
 
+  Ltac absurd_jstep :=
+    match goal with
+      | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
+        replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
+              [ by destruct HF | by apply forall_is_val ]
+    end.
+
   Ltac atomic_step H :=
     inversion H; subst;
     [ match goal with
@@ -359,11 +383,13 @@ Section rules.
     | match goal with
         | [ HJ : jstep _ _ _ _ _ |- _ ] =>
           inversion HJ; subst;
-          match goal with
-            | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-                by rewrite /unfill HF /= in HU
-          end
-      end ].
+          [ match goal with
+              | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
+                  by rewrite /unfill HF /= in HU
+            end
+          | absurd_jstep ]
+      end
+    ].
 
   Lemma wp_assign {E l v v'} t t' Φ:
     typeof v' t' → assign_type_compatible t t' →
@@ -380,7 +406,7 @@ Section rules.
     {
       rewrite -(typeof_preserves_size v t)=>//.
       rewrite -(typeof_preserves_size v' t')=>//.
-      by apply assign_preserves_size. }
+        by apply assign_preserves_size. }
     atomic_step Hstep.
     iMod "H" as "[Hσ' Hv']".
     iModIntro. iFrame. iApply "HΦ".
@@ -531,7 +557,7 @@ Section rules.
     iNext. iIntros (??????).
     by atomic_step H0.
   Qed.
-    
+
   Lemma wp_snd v1 v2 Φ:
     ▷ WP Evalue v2 {{ Φ }}
     ⊢ WP Esnd (Evalue (Vpair v1 v2)) {{ Φ }}.
@@ -601,19 +627,17 @@ Section rules.
     (∀ l, l ↦ v @ t -∗ Φ (Vptr l))
     ⊢ WP Ealloc t (Evalue v) @ E {{ Φ }}.
   Proof.
-    (* iIntros (?) "HΦ". *)
-  (*   rewrite wp_unfold /wp_pre. *)
-  (*   iRight. iRight. iSplit=>//. *)
-  (*   iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver. *)
-  (*   iModIntro. iSplit. *)
-  (*   { iPureIntro. eexists _, _, _. apply CSestep. by apply alloc_fresh. } *)
-  (*   iNext. iIntros (e2 σ2 ? ?). *)
-  (*   iMod "Hclose". inversion H1. subst. inversion H3. subst. *)
-  (*   iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//. *)
-  (*   iFrame. iModIntro. iApply wp_value=>//. *)
-  (*   iApply "HΦ". by iFrame. *)
-  (* Qed. *)
-  Admitted.
+    iIntros (?) "HΦ".
+    iApply wp_lift_atomic_step=>//.
+    iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]".
+    iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _. apply CSestep. by apply alloc_fresh. }
+    iNext. iIntros (e2 σ2 ? ?).
+    atomic_step H1.
+    iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//.
+    iFrame. iModIntro.
+    iApply "HΦ". by iFrame.
+  Qed.
 
   (* Call *)
 
@@ -642,32 +666,39 @@ Section rules.
     done.
   Qed.
 
-  Lemma wp_call es ls params f_body f_body' f retty Φ:
+  Lemma wp_call k ks es ls params f_body f_body' f retty Φ:
     es = map (fun l => Evalue (Vptr l)) ls →
     instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
     text_interp f (Function retty params f_body) ∗
-    ▷ WP f_body' {{ Φ }}
-    ⊢ WP Ecall f es {{ Φ }}.
+    stack_interp ks ∗
+    ▷ (stack_interp (k::ks) -∗ WP f_body' {{ Φ }})
+    ⊢ WP fill_ectxs (Ecall f es) k {{ Φ }}.
   Proof.
-  (*   iIntros (??) "[Hf HΦ]". *)
-  (*   rewrite !wp_unfold /wp_pre. *)
-  (*   iRight. iRight. iSplit=>//. *)
-  (*   iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]". iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver. *)
-  (*   iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame. *)
-  (*   simpl in H2. *)
-  (*   iModIntro. iSplit. *)
-  (*   { iPureIntro. eexists _, _, _. eapply CSecall=>//. } *)
-  (*   iNext. iIntros (e2 σ2 ? ?). *)
-  (*   iMod "Hclose". inversion H3; first inversion H5. simpl in H7. *)
-  (*   rewrite H7 in H2. inversion H2; subst. *)
-  (*   assert (ls = ls0). *)
-  (*   { admit. } subst. rewrite H1 in H13. inversion H13. subst. *)
-  (*   iFrame. iDestruct "HΦ" as "[? |[?|?]]". *)
-  (*   - iDestruct "HΦ" as (?) "[% ?]". iMod "~" as "%". done. *)
-  (*   - admit. *)
-  (*   - iModIntro. rewrite !wp_unfold /wp_pre. iRight. iRight. admit. *)
-  (*     (* iApply "HΦ". *) *)
-  (*   (* iApply "HΦ". by iFrame. *) *)
+    iIntros (??) "[Hf [Hstk HΦ]]".
+    iApply wp_lift_step=>//.
+    { apply fill_ectxs_not_val. done. }
+    iIntros ((σ1&Γ) ks1) "[Hσ1 [HΓ Hs]]". iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
+    simpl in H2.
+    iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _. apply CSjstep. eapply JScall=>//. }
+    iNext. iIntros (e2 σ2 ? ?).
+    iMod "Hclose". inversion H3; subst.
+    - apply fill_estep_inv in H4; last by apply forall_is_val.
+      destruct H4 as [? [? ?]]. admit.
+    - inversion H4; subst.
+      + apply cont_inj in H0=>//; last by apply forall_is_val.
+        by destruct H0.
+      + apply cont_inj in H0=>//; try apply forall_is_val.
+        destruct H0. inversion H0. subst.
+        iFrame. iDestruct (stack_agree with "[Hs Hstk]") as "%"; first iFrame.
+        subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
+        iFrame. simpl in H6.
+        rewrite H6 in H2. inversion H2. subst.
+        assert (ls0 = ls) as ?; first admit.
+        subst. clear H2 H0.
+        rewrite H8 in H1. inversion H1. subst.
+        by iApply "HΦ".
   Admitted.
 
 End rules.

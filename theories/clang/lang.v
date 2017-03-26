@@ -512,13 +512,13 @@ Inductive jstep: state → expr → stack → expr → stack → Prop :=
 | JSrete:
     ∀ σ v k k' ks,
       unfill (Erete (Evalue v)) k' →
-      jstep σ (fill_ectxs (Erete (Evalue v)) k') (k::ks) (fill_ectxs (Evalue v) k) ks.
-(* | JScall: *)
-(*     ∀ σ es ls retty params f_body f_body' f k ks, *)
-(*       es = map (fun l => Evalue (Vptr l)) ls → *)
-(*       s_text σ !! f = Some (Function retty params f_body) → *)
-(*       instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' → *)
-(*       jstep σ (fill_ectxs (Ecall f es) k) ks f_body' (k::ks). *)
+      jstep σ (fill_ectxs (Erete (Evalue v)) k') (k::ks) (fill_ectxs (Evalue v) k) ks
+| JScall:
+    ∀ σ es ls retty params f_body f_body' f k ks,
+      es = map (fun l => Evalue (Vptr l)) ls →
+      s_text σ !! f = Some (Function retty params f_body) →
+      instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
+      jstep σ (fill_ectxs (Ecall f es) k) ks f_body' (k::ks).
 
 Bind Scope val_scope with val.
 Delimit Scope val_scope with V.
@@ -536,6 +536,9 @@ Inductive cstep: expr → state → stack → expr → state → stack → Prop 
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
 Admitted.
 
+Lemma is_jmp_call k' f es: is_jmp (fill_ectxs (Ecall f es) k') = true.
+Admitted.
+
 Lemma CSbind':
     ∀ e e' σ σ' k kes ks,
       is_jmp e = false →
@@ -546,6 +549,7 @@ Proof.
   - apply CSestep. apply ESbind=>//.
   - simplify_eq. inversion H1.
     + simplify_eq. by rewrite is_jmp_ret in H.
+    + simplify_eq. by rewrite is_jmp_call in H.
 Qed.
 
 Lemma CSbind:
@@ -556,7 +560,6 @@ Lemma CSbind:
 Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
 Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
- 
 
 
 (* Proven from operational semantics *)
@@ -670,3 +673,8 @@ Proof.
         { rewrite -(typeof_preserves_size v0 t1)=>//.
           rewrite -(typeof_preserves_size v1 t1)=>//. }
 Admitted.
+
+Lemma forall_is_val ls:
+  forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
+Proof. by induction ls=>//. Qed.
+  
