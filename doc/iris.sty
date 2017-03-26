@@ -135,6 +135,7 @@
 \newcommand{\byteval}{\textdom{Val}_\text{ byte}}
 \newcommand{\Addr}{\textdom{Addr}}
 \newcommand{\Expr}{\textdom{Expr}}
+\newcommand{\Funct}{\textdom{Function}}
 \newcommand{\Env}{\textdom{Env}}
 \newcommand{\Code}{\textdom{Code}}
 \newcommand{\Prim}{\textdom{Prim}}
@@ -244,8 +245,8 @@
 \newcommand{\gmapsto}{\hookrightarrow}%
 \newcommand{\fgmapsto}[1][\mathrm{-}]{\xhookrightarrow{#1}}%
 
-\NewDocumentCommand\wpre{m O{} m m}%
-  {\textlog{wp}_{#2}\spac#1\spac{\left\{{#3}; {#4}\right\}}}
+\NewDocumentCommand\wpre{m O{} m}%
+  {\textlog{wp}_{#2}\spac#1\spac{\left\{{#3}\right\}}}
 
 \newcommand{\later}{\mathop{{\triangleright}}}
 \newcommand*{\lateropt}[1]{\mathop{{\later}^{#1}}}
@@ -372,6 +373,8 @@
 \newcommand{\ofval}{\mathrm{val\any to\any expr}}
 \newcommand{\typeof}{\mathrm{typeof}}
 \newcommand{\encode}{\mathrm{encode}}
+\newcommand{\instantiate}{\mathrm{instantiate}}
+\newcommand{\stk}{\mathrm{stack}}
 \newcommand{\isjmp}{\mathrm{is \any jump}}
 \newcommand{\sizeof}{\mathrm{sizeof}}
 \newcommand{\fmap}{\mathrm{fmap}}

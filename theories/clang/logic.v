@@ -550,25 +550,25 @@ Section rules.
   Qed.
 
   Lemma wp_fst v1 v2 Φ:
-    ▷ WP Evalue v1 {{ Φ }}
+    ▷ Φ v1
     ⊢ WP Efst (Evalue (Vpair v1 v2)) {{ Φ }}.
   Proof.
     iIntros "HΦ".
     iApply wp_lift_pure_step; first eauto.
     { intros. atomic_step H0=>//. }
     iNext. iIntros (??????).
-    by atomic_step H0.
+    atomic_step H0. by iApply wp_value.
   Qed.
 
   Lemma wp_snd v1 v2 Φ:
-    ▷ WP Evalue v2 {{ Φ }}
+    ▷ Φ v2
     ⊢ WP Esnd (Evalue (Vpair v1 v2)) {{ Φ }}.
   Proof.
     iIntros "HΦ".
     iApply wp_lift_pure_step; first eauto.
     { intros. atomic_step H0=>//. }
     iNext. iIntros (??????).
-    by atomic_step H0.
+    atomic_step H0. by iApply wp_value.
   Qed.
 
   (* Freshness and memory allocation *)
@@ -587,10 +587,10 @@ Section rules.
     move=> /(help _ _ ∅) /=. apply is_fresh.
   Qed.
 
-  Lemma alloc_fresh σ Γ v t:
+  Lemma alloc_fresh σ Γ ks v t:
     let l := (fresh_block σ, 0)%nat in
     typeof v t →
-    estep (Ealloc t (Evalue v)) (State σ Γ) (Evalue (Vptr l)) (State (storebytes l (encode_val v) σ) Γ).
+    estep (Ealloc t (Evalue v)) (State σ Γ ks) (Evalue (Vptr l)) (State (storebytes l (encode_val v) σ) Γ ks).
   Proof.
     intros l ?. apply ESalloc. auto.
     intros o'. apply (is_fresh_block _ o').

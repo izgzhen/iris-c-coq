@@ -35,7 +35,7 @@ expressivity, we merged them together into a coherent expression $\Expr$ without
 
 \paragraph{Program.}
 
-A program is considered to be a set of functions, each identified by its name. Each
+A program is considered to be a set of functions $\Funct$, each identified by its name. Each
 function is a triple of return type $\tau_{ret}$, parameter declarations $(x_1 : \tau_1, ...)$,
 and function body $e$.
 
@@ -61,8 +61,7 @@ We define byte-size value and memory model:
 
 \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
 
-We define state $\sigma: \State \eqdef [ l \gmapsto \bval ]$,
-i.e. a heap in which every address maps to a byte-level value.
+We define state $\sigma: \State \eqdef (\text{heap}: [ l \gmapsto \bval ], \text{text}: [x \gmapsto \Funct], \text{stack}: \stack)$,
 
 You may notice the difference between $\Val$ and $\byteval$, it is intentional to create a layer of abstraction for
 easier manipulation of spatial assertions and also a clean, unified language syntax.

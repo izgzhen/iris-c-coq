@@ -15,13 +15,19 @@ l \mapsto_q - : t            \eqdef{}& \Exists v. l \mapsto_q v : t
 
 \subsection{Weakest Precondition}
 
-Finally, we can define the core piece of the program logic, the assertion that reasons about program behavior: Weakest precondition, from which Hoare triples will be derived.
+Finally, we can define the core piece of the program logic, the assertion that reasons about program behavior:
+Weakest precondition, from which Hoare triples will be derived.
 
 \paragraph{Defining weakest precondition.}
 
 While we have fixed the program state $\sigma$ in language definition, but it can be any state, as long as it has a predicate
 $S : \State \to \iProp$ that interprets the physical state as an Iris assertion.
-For our heap state, $S(\sigma) \eqdef \ownPhys{\authfull \fmap (\lambda v. (1, \aginj v), \sigma)}$.
+For our heap state, 
+\[S(\sigma) \eqdef 
+  \ownM{\authfull \fmap (\lambda v. (1, \aginj v), \sigma.\text{heap})} *
+  \ownM{\authfull \sigma.\text{text}} *
+  \ownM{(\frac12, \sigma.\text{stack})}
+\]
 
 \begin{align*}
   \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, \cureval, \pred, \predret. \\
@@ -45,25 +51,24 @@ Here are some conventions:
 The following rules can all be derived:
 \begin{mathpar}
 \infer[wp-value]
-{}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}{\predret}}
+{}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}}
 
 \infer[wp-skip]
-{}{\pred(\void) \proves \wpre{\val}[\mask]{\pred}{\predret}}
+{}{\later \wpre{e}[\mask]{\pred} \proves \wpre{\val; e}[\mask]{\pred}}
 
 \infer[wp-ret]
-{}{\predret(v) \proves \wpre{\srete{v}}[\mask]{\pred}{\predret}}
-
+{}{\stk(k'::ks) * (\stk(ks) \wand \wpre{k'(v)}[\mask]{\pred}) \proves \wpre{k(\srete{v})}[\mask]{\pred}}
 
 \infer[wp-strong-mono]
 {\mask_1 \subseteq \mask_2}
-{((\All v. \Phi(v) \pvs[\mask_2] \Psi(v)) \land (\All v. \predret(v) \pvs[\mask_2] \Psi_\text{ret}(v))) * \wpre\cureval[\mask_1]{\pred}{\predret}
+{((\All v. \Phi(v) \pvs[\mask_2] \Psi(v)) \land (\All v. \predret(v) \pvs[\mask_2] \Psi_\text{ret}(v))) * \wpre\cureval[\mask_1]{\pred}
  \proves \wpre\cureval[\mask_2]{\Psi}{\Psi_\text{ret}}}
 
 \infer[fup-wp]
-{}{\pvs[\mask] \wpre\cureval[\mask]{\pred}{\predret} \proves \wpre\cureval[\mask]{\pred}{\predret}}
+{}{\pvs[\mask] \wpre\cureval[\mask]{\pred} \proves \wpre\cureval[\mask]{\pred}}
 
 \infer[wp-fup]
-{}{\wpre\cureval[\mask]{\Ret\var.\pvs[\mask] \pred(\var)}{\Ret\var.\pvs[\mask] \predret(\var)} \proves \wpre\expr[\mask]{\pred}{\predret}}
+{}{\wpre\cureval[\mask]{\Ret\var.\pvs[\mask] \pred(\var)}{\Ret\var.\pvs[\mask] \predret(\var)} \proves \wpre\expr[\mask]{\pred}}
 
 % \infer[wp-atomic]
 % {\physatomic{\expr}}
@@ -78,57 +83,66 @@ The following rules can all be derived:
 % {\wpre\expr[\mask_2]{\Ret\var.\prop} * \pvs[\mask_1][\mask_2]\later\pvs[\mask_2][\mask_1]\propB \proves \wpre\expr[\mask_1]{\Ret\var.\propB*\prop}}
 
 \infer[wp-bind]
-{}
-{\wpre\expr[\mask]{\Ret\var. \wpre{\ctx(\var)}[\mask]{\pred}{\predret}}{\predret}
+{\isjmp(e) = \FALSE}
+{\wpre\expr[\mask]{\Ret\var. \wpre{k(\var)}[\mask]{\pred}}
  \proves 
- \wpre{\ctx(\expr)}[\mask]{\pred}{\predret}}
+ \wpre{k(\expr)}[\mask]{\pred}}
 
  \infer[wp-op]
 {\llbracket oplus \rrbracket (v_1, v_2) = v'}
 {\pred(v')
  \proves
- \wpre{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
+ \wpre{v_1 \oplus v_2}[\mask]{\pred}}
 
  \infer[wp-assign]
 {\tychk{v}{\tau'} \quad \assigncomp{\tau}{\tau'}}
 { l \mapsto - : \tau * (l \mapsto v : \tau \wand \pred)
  \proves
- \wpre{l \la v}[\mask]{\pred}{\predret}}
-
- \infer[wp-assign-offset]
-{\tychk{v_2}{\tau_2'} \quad \assigncomp{\tau_2}{\tau_2'}}
-{ \vaddr{b}{o} \mapsto (v_1, -) : \tau_1 \times \tau_2 *
-  (\vaddr{b}{o} \mapsto (v_1, v_2) : \tau_1 \times \tau_2 \wand \pred)
- \proves
- \wpre{\vaddr{b}{(o + \sizeof(\tau_1))} \la v_2}[\mask]{\pred}{\predret}}
-
+ \wpre{l \la v}[\mask]{\pred}}
 
  \infer[wp-load]
 {}
 { l \mapsto_q v : \tau  * (l \mapsto_q v : \tau \wand \pred (v))
  \proves
- \wpre{\dereft{\tau}{l}}[\mask]{\pred}{\predret}}
+ \wpre{\dereft{\tau}{l}}[\mask]{\pred}}
 
 \infer[wp-seq]
-{}
-{\wpre{s_1}[\mask]{\wpre{s_2}[\mask]{\pred}{\predret}}{\predret} 
+{\isjmp(e_1) = \FALSE}
+{\wpre{e_1}[\mask]{v,\,\wpre{v;e_2}[\mask]{\pred}}
  \proves
- \wpre{s_1 ; s_2}[\mask]{\pred}{\predret}}
+ \wpre{e_1 ; e_2}[\mask]{\pred}}
 
 \infer[wp-while-true]
-{\wpre{s; \swhile{e}{e}{s}}[\mask]{\pred}{\predret}}
-{\wpre{\swhile{e}{\vtrue}{s}}[\mask]{\pred}{\predret}}
+{\wpre{s; \swhile{e}{e}{s}}[\mask]{\pred}}
+{\wpre{\swhile{e}{\vtrue}{s}}[\mask]{\pred}}
 
 \infer[wp-while-false]
 {\pred(\void)}
-{\wpre{\swhile{e}{\vfalse}{s}}[\mask]{\pred}{\predret}}
+{\wpre{\swhile{e}{\vfalse}{s}}[\mask]{\pred}}
 
 \infer[wp-while-inv]
 {\begin{inbox}
- \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{e}{\pred}{\TRUE} \\
- \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}{\predret}
+ \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{e}{\pred} \\
+ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
  \end{inbox}}
-{I \proves \wpre{\swhile{e}{e}{s}}{Q}{\predret}}
+{I \proves \wpre{\swhile{e}{e}{s}}{Q}}
+
+\infer[wp-fst]
+{}
+{\later \pred(v_1) \proves \wpre{\efst{(v_1, v_2)}}[\mask]{\pred}}
+
+\infer[wp-snd]
+{}
+{\later \pred(v_2) \proves \wpre{\efst{(v_1, v_2)}}[\mask]{\pred}}
+
+\infer[wp-alloc]
+{\tychk{v}{\tau}}
+{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\alloc{\tau}{v}}[\mask]{\pred}}
+
+\infer[wp-call]
+{}
+{ f \mapsto_{\text{text}} (ps, e) * \stk(ks) * \later (\stk(k::ks) \wand \wpre{\instantiate(ps, ls, e)}[\mask]{\pred})
+  \proves \wpre{k(\scall{f}{vs})}[\mask]{\pred}}
 
 \end{mathpar}
 
