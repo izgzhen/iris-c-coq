@@ -587,10 +587,10 @@ Section rules.
     move=> /(help _ _ ∅) /=. apply is_fresh.
   Qed.
 
-  Lemma alloc_fresh σ Γ ks v t:
+  Lemma alloc_fresh σ Γ v t:
     let l := (fresh_block σ, 0)%nat in
     typeof v t →
-    estep (Ealloc t (Evalue v)) (State σ Γ ks) (Evalue (Vptr l)) (State (storebytes l (encode_val v) σ) Γ ks).
+    estep (Ealloc t (Evalue v)) (State σ Γ) (Evalue (Vptr l)) (State (storebytes l (encode_val v) σ) Γ).
   Proof.
     intros l ?. apply ESalloc. auto.
     intros o'. apply (is_fresh_block _ o').

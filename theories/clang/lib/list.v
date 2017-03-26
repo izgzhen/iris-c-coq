@@ -67,7 +67,6 @@ Section proof.
       destruct H0 as [? [? ?]]. subst.
       wp_op. iApply wp_while_true.
       iNext. wp_load. wp_load. wp_bind (Esnd _). iApply wp_snd. iNext.
-      iApply wp_value=>//.
       iDestruct "Ht" as (?) "Ht".
       wp_assign. wp_skip. wp_load.
       destruct p as [pb po]. wp_op.
