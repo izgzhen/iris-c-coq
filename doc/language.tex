@@ -5,8 +5,7 @@
 
 \paragraph{Syntax.}\label{p:type}
 
-The language is a simplified version of C. It consists of \Stmts{} (statements), \Prim{} (primitives),
-\Expr{} (expressions), \Type{} (types) and \Val{} (values).
+The language is a simplified version of C. It consists of \Prim{} (primitives), \Expr{} (expressions), \Type{} (types) and \Val{} (values).
 
 Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, offset $o \in \integer^{+}$.
 
@@ -17,57 +16,48 @@ Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, 
     v : \Val \bnfdef{}&
         \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l \mid (v, v)
 \\
-    e : \Expr \bnfdef{}&
-        v \mid x \mid e \oplus e \mid \deref{e} \mid \dereft{\tau}{e} \mid \& e \mid \ecast{e}{\tau} \mid \efst{e} \mid \esnd{e}
-\\
     p : \Prim \bnfdef{}&
         \pcli \mid \psti
 \\
-    s : \Stmts \bnfdef{}&
-        \sskip \mid p \mid e \la e \mid \sif{e}{s}{s} \mid \swhile{e}{e}{s} \mid \\&
-        \sret \mid \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid s ; s
+    e : \Expr \bnfdef{}&
+       v \mid x \mid e \oplus e \mid \deref{e} \mid \dereft{\tau}{e} \mid \& e \mid \efst{e} \mid \esnd{e} \\&
+       \sskip \mid p \mid e \la e \mid \sif{e}{e}{e} \mid \swhile{e}{e}{e} \mid \\&
+       \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid e ; e \mid \alloc{\tau}{e}
 \\
 \end{align*}
 
-XXX: Explain two type of dereference.
+The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is in source,
+and the later one is ``instantiated'' with type information and used in inference rules.
+It is part of the efforts of removing lexical analysis from core program logic.
+
+Note: the C program is usually more restrictive by differentiating statements and expressions. For simplicity and
+expressivity, we merged them together into a coherent expression $\Expr$ without loss of generality.
 
 \paragraph{Program.}
 
 A program is considered to be a set of functions, each identified by its name. Each
 function is a triple of return type $\tau_{ret}$, parameter declarations $(x_1 : \tau_1, ...)$,
-and function body $s$.
+and function body $e$.
 
 \paragraph{Evaluation Context.}
 
 To make the evaluation order explicit and reusable by the $\text{WP-BIND}$ rule, we define evaluation context.
-Compared to a simple expression-based language which has only one kind of context $\ctx$, we define two contexts
-$\ctx_e, \ctx_s$ for both $\Expr$ and $\Stmts$:
 
 \begin{align*}
-    \ctx_e : \ectx \eqdef{}&
+    \ctx : \ectx \eqdef{}&
         \emptyctx \mid \emptyctx \oplus e \mid v \oplus \emptyctx \mid
-        \deref{\emptyctx} \mid \& \emptyctx \mid \ecast{\emptyctx}{\tau} \mid
-        \efst{\emptyctx} \mid \esnd{\emptyctx}
-\\
-    \ctx_s : \sctx \eqdef{}&
-        \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{s}{s} \mid \swhile{e}{\emptyctx}{s} \mid \\&
-         \srete{\emptyctx} \mid \scall{f}{v_1, ..., \emptyctx, e_1, ...}
+        \deref{\emptyctx} \mid \& \emptyctx \mid
+        \efst{\emptyctx} \mid \esnd{\emptyctx} \mid \\&
+        \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{e}{e} \mid \swhile{e}{\emptyctx}{e} \mid \\&
+        \srete{\emptyctx} \mid \scall{f}{v_1, ..., \emptyctx, e_1, ...} \mid \alloc{\tau}{\emptyctx} \mid \emptyctx ; e
 \end{align*}
-
-Now we can define \emph{context}: $\ctx : \allctx \eqdef (\ctx_e, \ctx_s)$.
 
 \subsection{Semantics}
 \paragraph{Model.}
 
-Define $c: \Code \eqdef (\cureval: \{ \Expr + \Stmts\}, \curctx: \allctx, \ctx^{*}: [\allctx])$, in which
+Define continuation $\cont \eqdef [\ctx]$, and stack $\stack \eqdef [\cont]$.
 
-\begin{itemize}
-\item $\cureval$ is the ``current evaluation'', which could be either an expression $e^\dag$ or a statement $s^\dag$.
-\item $\curctx$ is the ``current context'', which semantically means rest code to execute in current frame.
-\item $\ctx^{*}$ is the ``previous contexts'', which semantically means previous frames on call stack
-\end{itemize}
-
-Next, we define byte-size value and memory model:
+We define byte-size value and memory model:
 
 \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
 
@@ -79,38 +69,36 @@ easier manipulation of spatial assertions and also a clean, unified language syn
 
 \paragraph{Small-Step Operational Semantics.}
 
-We define the HNF small step semantics for both expression ($\estep{e}{e'}{\sigma}$) and statements ($\sstep{s}{\sigma}{s'}{\sigma'}$),
-and then combine them together ($\cstep{e^\dag}{\sigma}{e'^\dag}{\sigma}$, $\cstep{s^\dag}{\sigma}{s'^\dag}{\sigma'}$).
+We define the HNF small step semantics for both non-jumping expression ($\estep{e}{\sigma}{e'}{\sigma'}$) and
+jumping expressions ($\jstep{\sigma}{e}{s: \stack}{e'}{s': \stack}$),
+and then combine them together ($\cstep{e}{\sigma}{s}{e'}{\sigma'}{s'}$).
 
 \begin{figure}
 \begin{mathpar}
 
-\infer[ES-BINOP]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{v'}{\sigma}}
+\infer[ES-BINOP]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{\sigma}{v'}{\sigma}}
 
-\infer[ES-DEREF]{\tychk{v}{t} \quad \sigma \vdash l \mapsto \encode(v)}{\estep{\dereft{\tau}{l}}{v}{\sigma}}
+\infer[ES-DEREF-TYPED]{\tychk{v}{\tau} \quad \sigma \vdash l \mapsto \encode(v)}{\estep{\dereft{\tau}{l}}{\sigma}{v}{\sigma}}
 
-\infer[ES-FST]{}{\estep{\efst{(v_1, v_2)}}{v_1}{\sigma}}
+\infer[ES-FST]{}{\estep{\efst{(v_1, v_2)}}{\sigma}{v_1}{\sigma}}
 
-\infer[ES-SND]{}{\estep{\esnd{(v_1, v_2)}}{v_2}{\sigma}}
+\infer[ES-SND]{}{\estep{\esnd{(v_1, v_2)}}{\sigma}{v_2}{\sigma}}
+
+\infer[ES-ASSIGN]{}{\estep{l \la v}{\sigma}{\sskip}{\sigma[ l \mapsto \encode(v) ]}}
+
+\infer[ES-SEQ]{}{\estep{v ; e}{\sigma}{e}{\sigma}}
+
+\infer[ES-ALLOC]{\tychk{v}{\tau} \quad \All o'. \sigma(b, o') = \bot}{\estep{\alloc{\tau}{v}}{\sigma}{\vaddr{b}{o}}{\sigma[\vaddr{b}{o} \mapsto v]}}
+
+\infer[ES-WHILE-TRUE]{}{\estep{\swhile{e}{\vtrue}{s}}{\sigma}{s; \swhile{e}{e}{s}}{\sigma}}
+
+\infer[ES-WHILE-FALSE]{}{\estep{\swhile{e}{\vfalse}{s}}{\sigma}{\sskip}{\sigma}}
+
+\infer[ES-BIND']{\isjmp(e) = \FALSE \quad \estep{e}{\sigma}{e'}{\sigma'}}{\estep{(k::ks)e}{\sigma}{(k::ks)e'}{\sigma'}}
 
 \end{mathpar}
-\caption{Semantics of expression evaluation}
+\caption{Semantics rules}
 \end{figure}
-
-\begin{figure}
-\begin{mathpar}
-
-\infer[SS-ASSIGN]{}{\sstep{l \la v}{\sigma}{\sskip}{\sigma[ l \mapsto \encode(v) ]}}
-
-\infer[SS-SEQ]{}{\sstep{\sskip ; s}{\sigma}{s}{\sigma}}
-
-\infer[SS-SEQ-HEAD]{\sstep{s_1}{\sigma}{s_1'}{\sigma'}}{\sstep{s_1; s_2}{\sigma}{s_1'; s_2}{\sigma'}}
-
-\end{mathpar}
-\caption{Semantics of statements execution}
-\end{figure}
-
-
 
 XXX: Define $\sigma \vdash l \mapsto \vec \bval$
 
@@ -151,8 +139,8 @@ or the dereference of their location (right-hand side). And we will also produce
 expression when processing the left-hand side expression, which requires type inference $\tyinf{e}{\tau}$
 (since it is standard and trivial, we will leave out the details here).
 
-Then we define the rules for ``interpreting'' left-hand side expression ($\reslhs{e}$ or $\reslhs{s}$)
-and right-hand side expression ($\resrhs{e}$ or $\resrhs{s}$). In all rules below, a $\Gamma$ is implicitly
+Then we define the rules for ``interpreting'' left-hand side expression ($\reslhs{e}$)
+and right-hand side expression ($\resrhs{e}$). In all rules below, a $\Gamma$ is implicitly
 captured, and if any operation on $\Gamma$ failed, then the rule will be returning ``invalid'' in implementation.
 
 \begin{align*}

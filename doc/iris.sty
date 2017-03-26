@@ -372,6 +372,7 @@
 \newcommand{\ofval}{\mathrm{val\any to\any expr}}
 \newcommand{\typeof}{\mathrm{typeof}}
 \newcommand{\encode}{\mathrm{encode}}
+\newcommand{\isjmp}{\mathrm{is \any jump}}
 \newcommand{\sizeof}{\mathrm{sizeof}}
 \newcommand{\fmap}{\mathrm{fmap}}
 \newcommand{\atomic}{\mathrm{atomic}}
@@ -413,6 +414,7 @@
 \newcommand{\swhile}[3]{\texttt{while}_{#1}({#2})\,\{{#3}\}}
 \newcommand{\sret}{\texttt{return}}
 \newcommand{\srete}[1]{\texttt{return}\,{#1}}
+\newcommand{\alloc}[2]{\texttt{alloc}_{#1}(#2)}
 \newcommand{\scall}[2]{{#1}({#2})}
 
 % primitives
@@ -426,6 +428,7 @@
 \newcommand{\sctx}{\ensuremath{\textmon{Sctx}}}
 \newcommand{\allctx}{\ensuremath{\textmon{Ctx}}}
 \newcommand{\cont}{\ensuremath{\textmon{Cont}}}
+\newcommand{\stack}{\ensuremath{\textmon{Stack}}}
 \newcommand{\cureval}{E_{\text{cur}}}
 \newcommand{\curctx}{K_{\text{cur}}}
 \newcommand{\emptyctx}{\bullet}
@@ -434,9 +437,9 @@
 \newcommand{\tychk}[2]{\vdash_{\text{tychk}} {#1} : {#2}}
 \newcommand{\tyinf}[2]{\vdash_{\text{tyinf}} {#1} : {#2}}
 
-\newcommand{\estep}[3]{{#3} \vdash {#1} \ra_{\Expr} {#2}}
-\newcommand{\sstep}[4]{({#1}, {#2}) \ra_{\Stmts} ({#3}, {#4})}
-\newcommand{\cstep}[4]{({#1}, {#2}) \ra_{\text{cur}} ({#3}, {#4})}
+\newcommand{\estep}[4]{({#1}, {#2}) \ra_{\Expr} ({#3}, {#4})}
+\newcommand{\jstep}[5]{({#2}, {#3}) \ra_{jump}^{#1} ({#4}, {#5})}
+\newcommand{\cstep}[6]{({#1}, {#2}, {#3}) \ra_{\text{cur}} ({#4}, {#5}, {#6})}
 
 \newcommand{\reslhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{LHS}}}
 \newcommand{\resrhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{RHS}}}
