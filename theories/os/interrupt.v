@@ -41,11 +41,11 @@ Section definitions.
     closed_exclusive γ : closed γ -∗ closed γ -∗ False;
     (* -- operation specs -- *)
     sti_spec N prio γ γp Φ :
-      int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ)
-      ⊢ WP (Eprim Psti) {{ _, Φ }};
+      int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ Vvoid)
+      ⊢ WP (Eprim Psti) {{ Φ }};
     cli_spec N prio γ γp Φ :
-      int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ)
-      ⊢ WP (Eprim Pcli) {{ _, Φ }}
+      int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ Vvoid)
+      ⊢ WP (Eprim Pcli) {{ Φ }}
   }.
 End definitions.
 

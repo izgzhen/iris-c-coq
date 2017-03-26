@@ -1,7 +1,9 @@
 (* Program Logic *)
 
-From iris.proofmode Require Export tactics.
+From iris.algebra Require Export gmap agree auth frac excl.
+From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
 From iris_os.clang Require Export lang.
+From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 

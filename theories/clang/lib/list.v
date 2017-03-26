@@ -1,5 +1,6 @@
 (* Singly linked list *)
 
+From iris.base_logic.lib Require Export wsat.
 From iris_os.clang Require Import logic tactics notations.
 Require Import lib.gmap_solve.
 

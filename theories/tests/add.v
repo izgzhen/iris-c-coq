@@ -1,13 +1,15 @@
+From iris.base_logic.lib Require Export wsat.
 From iris_os.clang Require Import logic tactics notations.
 From iris.base_logic Require Import big_op.
 From iris_os.os Require Import spec interrupt.
 Require Import lib.gmap_solve.
+From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 
 Section example.
   Context `{clangG Σ, specG Σ} {N: namespace}.
 
-  Parameter py: addr.
+  Parameter px py: addr.
   Definition x: ident := 1.
   Definition y: ident := 3.
   Definition Y: ident := 2.
@@ -15,13 +17,13 @@ Section example.
 
   Definition invs (prio: nat) : iProp Σ :=
     match prio with
-      | 0 => I
+      | O => I
       | _ => True%I
     end.
 
   Context `{i: interrupt invs}.
 
-  Definition f_body : stmts :=
+  Definition f_body : expr :=
     cli ;;
     y <- y + x ;;
     x <- y ;;
@@ -33,46 +35,38 @@ Section example.
               r = Some (Vint32 (Int.add vx vy)) ∧
               s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
 
-  Definition int_ctx := @int_ctx _ _ invs i.
+  Definition int_ctx := @interrupt.int_ctx _ _ invs i.
 
-  Definition ev := Env stmts [(y, (Tint32, py))] [].
-  
-  Lemma f_spec γ γp f vx Φ Φret:
-    text_interp f (Function _ Tint32 [(x, Tint32)] f_body)  ∗
-    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
-    scode (SCrel (f_rel vx)) ∗ (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ Φ)
-    ⊢ WP cure (Ecall f [Evalue (Vint32 vx)]) {{ _, Φ ; Φret }}.
+  Lemma f_spec γ γp f vx Φ k ks:
+    text_interp f (Function Tint32 [(x, Tint32); (y, Tint32)] f_body)  ∗
+    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ stack_interp ks ∗
+    scode (SCrel (f_rel vx)) ∗ px ↦ vx @ Tint32 ∗
+    (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ stack_interp ks -∗ WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
+    ⊢ WP fill_ectxs (Ecall f [Evalue (Vptr px); Evalue (Vptr py)]) k {{ _, Φ }}.
   Proof.
-    iIntros "(? & #? & #? & Hp & Hsc & HΦ)".
-    iApply (wp_call ev _ [Vint32 vx] _)=>//; last iFrame.
-    { simpl. split=>//. constructor. }
-    iIntros (ls) "% Hls".
-    destruct ls as [|? [|? ls]].
-    - simpl. iDestruct "Hls" as "%"=>//. by iIntros "%".
-    - unfold_f_inst. gmap_rewrite.
-      iDestruct "Hls" as "[_ %]".
-      inversion H1; subst.
-      iIntros "[Hvx _]".
-      wp_run. iApply cli_spec.
-      iFrame "#". iFrame.  iIntros "HI Hp Hcl".
-      iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
-      (* Open invariant *)
-      iInv N as ">Hspec" "Hclose".
-      iDestruct (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
-                 with "[Hspec HY Hsc]")
-        as "(Hspec & Hss' & Hsc')".
-      { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
-        iFrame "Hsc".
-        iPureIntro. apply spec_step_rel. unfold f_rel.
-        exists vy. gmap_simplify=>//. by gmap_rewrite. }
-      (* close invariant *)
-      iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-      wp_run. iApply sti_spec.
-      iFrame. iFrame "#".  iSplitL "Hss' Hy".
-      { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
-      iIntros "Hp". wp_run. iApply wp_ret.
-      iApply ("HΦ" with "[-Hp]")=>//.
-    - iDestruct "Hls" as "[% _]". inversion H1.
+    iIntros "(? & #? & #? & Hp & Hs & Hsc & Hx & HΦ)".
+    iApply (wp_call _ _ _ [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
+    iFrame. iNext. iIntros "Hstk". iApply wp_seq=>//.
+    iApply cli_spec. iFrame "#". iFrame.
+    iIntros "HI Hp Hcl".
+    iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
+    (* Open invariant *)
+    iInv N as ">Hspec" "Hclose".
+    iDestruct (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
+               with "[Hspec HY Hsc]")
+      as "(Hspec & Hss' & Hsc')".
+    { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
+      iFrame "Hsc". iPureIntro. apply spec_step_rel. unfold f_rel.
+      exists vy. gmap_simplify=>//. by gmap_rewrite. }
+    (* close invariant *)
+    iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
+    wp_skip. wp_load. wp_load. wp_op. wp_assign. wp_skip.
+    wp_load. wp_assign. wp_skip. iApply wp_seq=>//.
+    iApply sti_spec.
+    iFrame. iFrame "#".  iSplitL "Hss' Hy".
+    { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
+    iIntros "Hp". wp_skip. wp_load. iApply (wp_ret []). iFrame.
+    iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
   Qed.
 
 End example.
