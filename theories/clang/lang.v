@@ -39,7 +39,8 @@ Inductive expr :=
 | Eif (cond: expr) (s1 s2: expr)
 | Ewhile (cond: expr) (curcond: expr) (s: expr)
 | Erete (e: expr)
-| Eseq (s1 s2: expr).
+| Eseq (s1 s2: expr)
+| Eprim (p: prim).
 
 Record function :=
   Function {
@@ -268,6 +269,7 @@ Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
         | Some s1', Some s2' => Some (Eseq s1' s2')
         | _, _ => None
       end
+    | Eprim p => Some e
   end.
 
 Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
@@ -306,6 +308,7 @@ Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
         | _, _ => None
       end
     | Erete e => Some (Erete e)
+    | Eprim _ => Some e
   end.
 
 Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
@@ -677,4 +680,3 @@ Admitted.
 Lemma forall_is_val ls:
   forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
 Proof. by induction ls=>//. Qed.
-  

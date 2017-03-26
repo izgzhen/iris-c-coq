@@ -25,21 +25,21 @@ Structure reent_lock Σ `{!clangG Σ} := ReentLock {
   locked_timeless γ d: TimelessP (locked γ d);
   locked_exclusive γ d1 d2: locked γ d1 -∗ locked γ d2 -∗ False;
   (* -- operation specs -- *)
-  newlock_spec N (R : iProp Σ) Φ Φret:
+  newlock_spec N (R : iProp Σ) Φ:
     R ∗ (∀ lk γ, is_lock N γ lk R -∗ Φ lk)
-    ⊢ WP cure (Ecall newlock []) {{ Φ; Φret }};
-  acquire0_spec N γ lk R Φ Φret:
+    ⊢ WP (Ecall newlock []) {{ Φ }};
+  acquire0_spec N γ lk R Φ:
     is_lock N γ lk R ∗ (locked γ 0 -∗ R -∗ Φ)
-    ⊢ WP cure (Ecall acquire [Evalue lk]) {{ _, Φ; Φret }};
-  acquiren_spec γ N R n lk Φ Φret:
+    ⊢ WP (Ecall acquire [Evalue lk]) {{ _, Φ }};
+  acquiren_spec γ N R n lk Φ:
     is_lock N γ lk R ∗ locked γ n ∗ (locked γ (n + 1) -∗ Φ)
-    ⊢ WP cure (Ecall acquire [Evalue lk]) {{ _, Φ; Φret }};
-  release0_spec N γ lk R Φ Φret:
+    ⊢ WP (Ecall acquire [Evalue lk]) {{ _, Φ }};
+  release0_spec N γ lk R Φ:
     is_lock N γ lk R ∗ locked γ 0 ∗ R ∗ (True -∗ Φ)
-    ⊢ WP cure (Ecall release [Evalue lk]) {{ _, Φ; Φret }};
-  releasen_spec N γ n lk R Φ Φret:
+    ⊢ WP (Ecall release [Evalue lk]) {{ _, Φ }};
+  releasen_spec N γ n lk R Φ:
     is_lock N γ lk R ∗ locked γ (S n) ∗ (locked γ n -∗ Φ)
-    ⊢ WP cure (Ecall release [Evalue lk]) {{ _, Φ; Φret }}
+    ⊢ WP (Ecall release [Evalue lk]) {{ _, Φ }}
 }.
 
 Arguments newlock {_ _} _.

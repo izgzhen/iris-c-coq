@@ -14,7 +14,7 @@ Section definitions.
   Fixpoint INVS (p: nat) :=
     match p with
       | S p' => (invs p ∗ INVS p')%I
-      | 0 => invs 0
+      | O => invs O
     end.
 
 (* Definition interrupt_handler_pre (γie γpri: gname) (prio: nat) := *)
@@ -22,7 +22,7 @@ Section definitions.
 
   Definition INVS_up (p: nat) :=
     match p with
-      | 0 => True%I
+      | O => True%I
       | S p' => INVS p'
     end.
 
@@ -42,10 +42,10 @@ Section definitions.
     (* -- operation specs -- *)
     sti_spec N prio γ γp Φ :
       int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ)
-      ⊢ WP curs (Sprim Psti) {{ _, Φ }};
+      ⊢ WP (Eprim Psti) {{ _, Φ }};
     cli_spec N prio γ γp Φ :
       int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ)
-      ⊢ WP curs (Sprim Pcli) {{ _, Φ }}
+      ⊢ WP (Eprim Pcli) {{ _, Φ }}
   }.
 End definitions.
 
