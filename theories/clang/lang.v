@@ -365,11 +365,18 @@ Inductive estep : expr → state → expr → state → Prop :=
             σ (Evalue Vvoid)
             (State (storebytes l (encode_val v) (s_heap σ)) (s_text σ))
 | ESseq: ∀ s v σ, estep (Eseq (Evalue v) s) σ s σ
+| ESwhile_true:
+    ∀ s cond σ,
+      estep (Ewhile cond (Evalue vtrue) s) σ (Eseq s (Ewhile cond cond s)) σ
+| ESwhile_false:
+    ∀ s cond σ,
+      estep (Ewhile cond (Evalue vfalse) s) σ (Evalue Vvoid) σ
 | ESbind':
     ∀ e e' σ σ' k kes,
       is_jmp e = false →
       estep e σ e' σ' →
-      estep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'.
+      estep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'
+.
 
 Lemma ESbind:
     ∀ kes e e' σ σ',
@@ -480,6 +487,7 @@ Definition enf (e: expr) :=
     | Eassign e1 e2 => is_loc e1 && is_val e2
     | Eif e1 e2 e3 => is_val e1
     | Eseq e1 e2 => is_val e1
+    | Ewhile _ e _ => is_val e
     | _ => false
   end.
 

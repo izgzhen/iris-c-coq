@@ -255,6 +255,7 @@ Section rules.
     - by apply to_agree_comp_valid.
   Qed.
 
+
   Lemma wp_ret k k' ks v Φ:
     stack_interp (k'::ks)  ∗
     (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' {{ Φ }})
@@ -267,7 +268,8 @@ Section rules.
     { iDestruct (stack_agree with "[Hstk Hs]") as "%"; first iFrame.
       subst. iPureIntro. eexists _, _, _. apply CSjstep. constructor.
       apply cont_uninj. done. }
-    iNext. iIntros (????). inversion H0.
+    iNext. iIntros (????).
+    inversion H0.
     { simplify_eq.
       assert (enf (Erete (Evalue v)) = true) as ?; first done.
       destruct (fill_estep_inv _ _ _ _ _ H2 H1) as [? [? ?]].
@@ -343,6 +345,26 @@ Section rules.
       by iFrame.
   Qed.
 
+  Ltac atomic_step H :=
+    inversion H; subst;
+    [ match goal with
+        | [ HE: estep _ _ _ _ |- _ ] =>
+          inversion HE; subst;
+            [ idtac | exfalso;
+                match goal with
+                  | [ HF: fill_expr (fill_ectxs ?E _) _ = _, HE2: estep ?E _ _ _ |- _ ] =>
+                      by eapply (escape_false HE2 HF)
+                end ]
+      end
+    | match goal with
+        | [ HJ : jstep _ _ _ _ _ |- _ ] =>
+          inversion HJ; subst;
+          match goal with
+            | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
+                by rewrite /unfill HF /= in HU
+          end
+      end ].
+
   Lemma wp_assign {E l v v'} t t' Φ:
     typeof v' t' → assign_type_compatible t t' →
     ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t -∗ Φ Vvoid)
@@ -359,14 +381,11 @@ Section rules.
       rewrite -(typeof_preserves_size v t)=>//.
       rewrite -(typeof_preserves_size v' t')=>//.
       by apply assign_preserves_size. }
-    inversion Hstep; subst.
-    - inversion H3; simplify_eq.
-      + iMod "H" as "[Hσ' Hv']".
-        iModIntro. iFrame. iApply "HΦ".
-        iSplit=>//.
-        iPureIntro. by apply (assign_preserves_typeof t t').
-      + exfalso. by eapply (escape_false H6 H4).
-    - inversion H3. simplify_eq. by rewrite /unfill H4 /= in H6.
+    atomic_step Hstep.
+    iMod "H" as "[Hσ' Hv']".
+    iModIntro. iFrame. iApply "HΦ".
+    iSplit=>//. iPureIntro.
+    by apply (assign_preserves_typeof t t').
   Qed.
 
   Lemma mapstobytes_prod b q:
@@ -442,35 +461,11 @@ Section rules.
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
     iModIntro. iSplit; first eauto.
     iNext; iIntros (s2 σ2 ks2 Hstep). iModIntro.
-    inversion Hstep; subst.
-    - inversion H2; subst.
-      + simpl. iFrame.
-        rewrite (same_type_encode_inj (s_heap σ2) t v v0 p)=>//.
-        iApply ("HΦ" with "[-]") ; first by iSplit=>//.
-      + exfalso. by eapply (escape_false H5 H3).
-    - iFrame. inversion H2. simplify_eq.
-        by rewrite /unfill H3 /= in H5.
+    atomic_step Hstep.
+    simpl. iFrame.
+    rewrite (same_type_encode_inj (s_heap σ2) t v v0 p)=>//.
+    iApply ("HΦ" with "[-]") ; first by iSplit=>//.
   Qed.
-
-  Ltac pure_estep H :=
-    inversion H; subst;
-    [ match goal with
-        | [ HE: estep _ _ _ _ |- _ ] =>
-          inversion H2; subst;
-            [ idtac | exfalso;
-                match goal with
-                  | [ HF: fill_expr (fill_ectxs ?E _) _ = _, HE2: estep ?E _ _ _ |- _ ] =>
-                      by eapply (escape_false HE2 HF)
-                end ]
-      end
-    | match goal with
-        | [ HJ : jstep _ _ _ _ _ |- _ ] =>
-          inversion HJ; simplify_eq;
-          match goal with
-            | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-                by rewrite /unfill HF /= in HU
-          end
-      end].
 
   Lemma wp_op E op v1 v2 v' Φ:
     evalbop op v1 v2 = Some v' →
@@ -478,9 +473,9 @@ Section rules.
   Proof.
     iIntros (?) "HΦ".
     iApply wp_lift_pure_step; first eauto.
-    { intros. pure_estep H1=>//. }
+    { intros. atomic_step H1=>//. }
     iNext. iIntros (??????).
-    pure_estep H1.
+    atomic_step H1.
     rewrite H0 in H9. inversion H9. subst.
     iApply wp_value=>//.
   Qed.
@@ -488,42 +483,65 @@ Section rules.
   Lemma wp_while_true cond s Φ:
     ▷ WP Eseq s (Ewhile cond cond s) {{ Φ }}
     ⊢ WP Ewhile cond (Evalue vtrue) s {{ Φ }}.
-  Admitted.
+  Proof.
+    iIntros "Hnext".
+    iApply wp_lift_pure_step; first eauto.
+    { intros. atomic_step H0=>//. }
+    iNext. iIntros (??????).
+    by atomic_step H0.
+  Qed.
 
   Lemma wp_while_false cond s Φ:
     ▷ Φ Vvoid
     ⊢ WP Ewhile cond (Evalue vfalse) s {{ Φ }}.
-  Admitted.
+  Proof.
+    iIntros "HΦ".
+    iApply wp_lift_pure_step; first eauto.
+    { intros. atomic_step H0=>//. }
+    iNext. iIntros (??????).
+    atomic_step H0.
+    by iApply wp_value.
+  Qed.
 
   Lemma wp_while_inv I Q cond s:
+    is_jmp s = false → is_jmp cond = false →
     □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP cond {{ Φ }})) ∗
     □ (∀ Φ, (I ∗ (I -∗ Φ Vvoid)) -∗ WP s {{ Φ }}) ∗ I
     ⊢ WP Ewhile cond cond s {{ Q }}.
   Proof.
-  (*   iIntros "(#Hcond & #Hs & HI)". *)
-  (*   iLöb as "IH". *)
-  (*   iApply (wp_bind [] (SKwhile _ _)). simpl. *)
-  (*   iApply "Hcond". iFrame. *)
-  (*   iIntros (v) "[[% HQ]|[% HI]]"; subst. *)
-  (*   - iApply wp_while_false. by iNext. *)
-  (*   - iApply wp_while_true. iNext. *)
-  (*     iApply wp_seq. iApply "Hs". by iFrame. *)
-  (* Qed. *) Admitted.
+    iIntros (??) "(#Hcond & #Hs & HI)".
+    iLöb as "IH".
+    iApply (wp_bind [EKwhile cond s])=>//.
+    iApply "Hcond". iFrame.
+    iIntros (v) "[[% HQ]|[% HI]]"; subst.
+    - iApply wp_while_false. by iNext.
+    - iApply wp_while_true. iNext.
+      iApply wp_seq=>//. iApply "Hs". iFrame.
+      iIntros "HI". iApply wp_skip.
+      iApply "IH". by iNext.
+  Qed.
 
   Lemma wp_fst v1 v2 Φ:
     ▷ WP Evalue v1 {{ Φ }}
     ⊢ WP Efst (Evalue (Vpair v1 v2)) {{ Φ }}.
-  (* Proof. *) Admitted.
-  (*   iIntros "HΦ". iApply wp_lift_pure_step=>//; first eauto. *)
-  (*   { inversion 1. inversion H2. by simplify_eq. } *)
-  (*   iNext. iIntros (?????) "%". *)
-  (*   inversion H0. inversion H2. by simplify_eq. *)
-  (* Qed. *)
-
+  Proof.
+    iIntros "HΦ".
+    iApply wp_lift_pure_step; first eauto.
+    { intros. atomic_step H0=>//. }
+    iNext. iIntros (??????).
+    by atomic_step H0.
+  Qed.
+    
   Lemma wp_snd v1 v2 Φ:
     ▷ WP Evalue v2 {{ Φ }}
     ⊢ WP Esnd (Evalue (Vpair v1 v2)) {{ Φ }}.
-  (* Proof. *) Admitted.
+  Proof.
+    iIntros "HΦ".
+    iApply wp_lift_pure_step; first eauto.
+    { intros. atomic_step H0=>//. }
+    iNext. iIntros (??????).
+    by atomic_step H0.
+  Qed.
 
   (* Freshness and memory allocation *)
 
@@ -583,7 +601,7 @@ Section rules.
     (∀ l, l ↦ v @ t -∗ Φ (Vptr l))
     ⊢ WP Ealloc t (Evalue v) @ E {{ Φ }}.
   Proof.
-  (*   iIntros (?) "HΦ". *)
+    (* iIntros (?) "HΦ". *)
   (*   rewrite wp_unfold /wp_pre. *)
   (*   iRight. iRight. iSplit=>//. *)
   (*   iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver. *)
