@@ -11,7 +11,8 @@ Inductive bop :=
 | oplus
 | ominus
 | oequals
-| oneq.
+| oneq
+| oless.
 
 Definition decls := list (ident * type).
 
@@ -129,6 +130,8 @@ Record state :=
 Definition offset_by_int32 (o: nat) (i: int32) : nat := o + Z.to_nat (Int.intval i).
 Definition offset_by_byte (o: nat) (i: byte) : nat := o + Z.to_nat (Byte.intval i).
 
+Definition b_to_v (b: bool) := if b then vtrue else vfalse.
+
 (* XXX: not precise *)
 Definition evalbop (op: bop) v1 v2 : option val :=
   match op with
@@ -148,6 +151,11 @@ Definition evalbop (op: bop) v1 v2 : option val :=
                  end)
     | oequals => if decide (v1 = v2) then Some vtrue else Some vfalse
     | oneq => if decide (v1 = v2) then Some vfalse else Some vtrue
+    | oless => (match v1, v2 with
+                  | Vint8 i1, Vint8 i2 => Some (b_to_v (Byte.lt i1 i2))
+                  | Vint32 i1, Vint32 i2 => Some (b_to_v (Int.lt i1 i2))
+                  | _, _ => None
+                end)
   end.
 
 Fixpoint readbytes l bs (σ: heap) :=

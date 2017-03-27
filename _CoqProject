@@ -15,5 +15,6 @@ theories/clang/lib/list.v
 theories/os/spec.v
 theories/os/reentrant.v
 theories/os/interrupt.v
+theories/os/page_table.v
+theories/os/vmm.v
 theories/tests/add.v
-

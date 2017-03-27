@@ -26,7 +26,9 @@ Notation "e1 == e2" := (Ebinop oequals e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
 Notation "e1 != e2" := (Ebinop oneq e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
-Notation "f < e1 , e2 , .. , en >" := (Ecall f (cons e1%E (cons e2%E .. (cons en%E nil) .. )))
+Notation "e1 :<: e2" := (Ebinop oless e1%E e2%E)
+  (at level 50, left associativity) : expr_scope.
+Notation "f <$ e1 , e2 , .. , en $>" := (Ecall f (cons e1%E (cons e2%E .. (cons en%E nil) .. )))
   (at level 50) : expr_scope.
 
 Notation "e1 <- e2" := (Eassign e1%E e2%E) (at level 80) : expr_scope.
