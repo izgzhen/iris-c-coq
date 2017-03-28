@@ -1,0 +1,36 @@
+\section{OS and Virtualization}
+\label{sec:osvirt}
+
+This section discusses the system features as part of the formalization.
+The first part, OS, mainly include interrupt and simulation.
+The second part, virtualization, mainly include virtual memory model and
+the memory allocator on top of that.
+
+\subsection{Interrupt}
+
+Interrupt is a hardware features, thus we will only write down its abstract specification
+without proving it. However, in the OS's perspective, multi-level interrupt will enable us to
+open/close OS-global invariants for different level of priorities.
+
+\subsection{Simulation}
+
+Simulation piggybacks on the WP-based program logic through two special kinds of assertions:
+spec state witnessing assertion and spec code assertion.
+
+With this, we can give refinment style proofs for certain kernel APIs.
+
+\subsection{VMM}
+
+We will first write down the abstract spec for page table primitives:
+\texttt{insert}, \texttt{lookup}, and \texttt{delete}. They will change the
+locally owned page table content, which is modelled by a \texttt{gmap}.
+
+On top of that, supposing that the physical heap memory is shared across the processes,
+and our language provides related operations. We can combine these operation with
+page table access to virtualize an exclusively owned, sequentially allocated memory space.
+The relevant operations will be \texttt{mem\_init}, \texttt{mem\_read} and \texttt{mem\_write}.
+
+Since our final client is a high-level language, we want to expose an object allocator interface
+built on top of the local virtual memory. The new operations for runtime to use will be
+\texttt{mem\_alloc}, \texttt{mem\_free}.
+\texttt{mem\_init} will be called at the initialization time of the system.
