@@ -658,3 +658,11 @@ Admitted.
 Lemma forall_is_val ls:
   forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
 Proof. by induction ls=>//. Qed.
+
+Lemma estep_call_false f ls σ1 e' σ2:
+  estep (Ecall f (map (λ l, Evalue (Vptr l)) ls)) σ1 e' σ2 → False.
+Proof.
+  intros. inversion H. subst. eapply (escape_false H2)=>//.
+  apply forall_is_val.
+Qed.
+

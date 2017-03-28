@@ -29,3 +29,17 @@ Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
     | None :: _ => None
     | _ => Some []
   end.
+
+Lemma map_inj {A B} (f: A → B):
+  (∀ a1 a2, f a1 = f a2 → a1 = a2) →
+  ∀ (l1: list A) l2,
+    map f l1 = map f l2 → l1 = l2.
+Proof.
+  intros Finj.
+  induction l1; induction l2.
+  - done.
+  - intros. simpl in H. inversion H.
+  - intros. simpl in H. inversion H.
+  - simpl. intros. inversion H.
+    apply Finj in H1. apply IHl1 in H2. by subst.
+Qed.

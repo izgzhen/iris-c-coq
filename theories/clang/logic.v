@@ -257,9 +257,21 @@ Section rules.
     - by apply to_agree_comp_valid.
   Qed.
 
-  Lemma stack_push k k' ks ks':
-    stack_interp (ks) ∗ gen_stack (ks') ==∗ stack_interp (k::ks) ∗ gen_stack (k'::ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
-  Admitted.
+  Lemma stack_push k ks ks':
+    stack_interp (ks) ∗ gen_stack (ks') ==∗ stack_interp (k::ks) ∗ gen_stack (k::ks') ∗ ⌜ ks = ks' ⌝.
+  Proof.
+    iIntros "[Hs Hs']".
+    iDestruct (stack_agree with "[-]") as "%"; first iFrame.
+    inversion H0. subst.
+    rewrite /stack_interp /gen_stack.
+    iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
+    - rewrite pair_op frac_op' Qp_div_2.
+      apply cmra_update_exclusive.
+      split; simpl
+      + by rewrite frac_op'.
+      + done.
+      + by apply to_agree_comp_valid.
+  Qed.
 
   Lemma wp_ret k k' ks v Φ:
     stack_interp (k'::ks)  ∗
@@ -687,7 +699,8 @@ Section rules.
     iNext. iIntros (e2 σ2 ? ?).
     iMod "Hclose". inversion H3; subst.
     - apply fill_estep_inv in H4; last by apply forall_is_val.
-      destruct H4 as [? [? ?]]. admit.
+      destruct H4 as [? [? ?]]. iFrame. simpl.
+      exfalso. by eapply estep_call_false.
     - inversion H4; subst.
       + apply cont_inj in H0=>//; last by apply forall_is_val.
         by destruct H0.
@@ -697,10 +710,11 @@ Section rules.
         subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
         iFrame. simpl in H6.
         rewrite H6 in H2. inversion H2. subst.
-        assert (ls0 = ls) as ?; first admit.
+        assert (ls0 = ls) as ?.
+        { eapply map_inj=>//. simpl. intros. by inversion H7. }
         subst. clear H2 H0.
         rewrite H8 in H1. inversion H1. subst.
         by iApply "HΦ".
-  Admitted.
+  Qed.
 
 End rules.
