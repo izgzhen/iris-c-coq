@@ -36,3 +36,4 @@ Arguments lookup_pt {_ _} _.
 Arguments insert_pt_spec {_ _} _ _ _ _ _.
 Arguments delete_pt_spec {_ _} _ _ _ _.
 Arguments lookup_pt_spec {_ _} _ _ _ _.
+Arguments is_page_table {_ _} _ _.
