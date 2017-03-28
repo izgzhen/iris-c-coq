@@ -17,3 +17,15 @@ Proof.
   - apply drop_app.
   - apply take_length_le. done.
 Qed.
+
+Definition is_some {A} (x: option A): bool := match x with Some _ => true | None => false end.
+
+Definition offset_by_int32 (o: nat) (i: int32) : nat := o + Z.to_nat (Int.intval i).
+Definition offset_by_byte (o: nat) (i: byte) : nat := o + Z.to_nat (Byte.intval i).
+
+Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
+  match l with
+    | Some x :: l' => (x ::) <$> lift_list_option l'
+    | None :: _ => None
+    | _ => Some []
+  end.

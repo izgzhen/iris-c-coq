@@ -14,6 +14,9 @@ Definition block : Set := positive.
 Definition offset := nat.
 Definition addr : Set := prod block offset.
 
+Definition shift_loc l (o: nat) : addr :=
+  let '(b, o') := l in (b, o' + o)%nat.
+
 Instance addr_eq_dec : EqDecision addr.
 Proof. solve_decision. Defined.
 Instance int_eq_dec : EqDecision int.
@@ -37,6 +40,7 @@ Inductive val : Set :=
 | Vptr (p: addr)
 | Vpair (v1 v2: val).
 
+
 Instance val_eq_dec : EqDecision val.
 Proof. solve_decision. Defined.
 
@@ -53,6 +57,8 @@ Instance sizeof_val: Sizeof val :=
 
 Definition vtrue := Vint8 (Byte.repr 1).
 Definition vfalse := Vint8 (Byte.repr 0).
+
+Definition b_to_v (b: bool) := if b then vtrue else vfalse.
 
 (** Encoding high-level value to byte-level values **)
 

@@ -127,11 +127,6 @@ Record state :=
       s_text : text
     }.
 
-Definition offset_by_int32 (o: nat) (i: int32) : nat := o + Z.to_nat (Int.intval i).
-Definition offset_by_byte (o: nat) (i: byte) : nat := o + Z.to_nat (Byte.intval i).
-
-Definition b_to_v (b: bool) := if b then vtrue else vfalse.
-
 (* XXX: not precise *)
 Definition evalbop (op: bop) v1 v2 : option val :=
   match op with
@@ -173,9 +168,6 @@ Proof.
   by apply IHbs.
 Qed.
 
-Definition shift_loc l (o: nat) : addr :=
-  let '(b, o') := l in (b, o' + o)%nat.
-
 Lemma readbytes_segment_2 σ bs': ∀ bs l,
   readbytes l (bs ++ bs') σ → readbytes (shift_loc l (length bs)) bs' σ.
 Proof.
@@ -200,8 +192,6 @@ Fixpoint storebytes l bs (σ: heap) :=
 Definition alloc_heap (l: addr) (v: val) (σ: state) : state :=
   State (storebytes l (encode_val v) (s_heap σ)) (s_text σ).
 
-(* expr *can* have side-effect *)
-
 Definition to_val (c: expr) :=
   match c with
     | Evalue v => Some v
@@ -224,13 +214,6 @@ Fixpoint params_match (params: decls) (vs: list val) :=
     | (_, t)::params, v::vs => typeof v t ∧ params_match params vs
     | [], [] => True
     | _, _ => False
-  end.
-
-Fixpoint lift_list_option {A} (l: list (option A)): option (list A) :=
-  match l with
-    | Some x :: l' => (x ::) <$> lift_list_option l'
-    | None :: _ => None
-    | _ => Some []
   end.
 
 Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
@@ -339,7 +322,7 @@ Fixpoint is_jmp (e: expr) :=
     | Eassign e1 e2 => is_jmp e1 || is_jmp e2
     | Eif e1 e2 e3 => is_jmp e1 || is_jmp e2 || is_jmp e3
     | Eseq e1 e2 => is_jmp e1 || is_jmp e2
-    | Ewhile c _ e2 => is_jmp c || is_jmp e2
+    | Ewhile _ c e2 => is_jmp c || is_jmp e2
     | _ => false
   end.
 
@@ -393,17 +376,12 @@ Lemma ESbind:
       estep (fill_ectxs e kes) σ (fill_ectxs e' kes) σ'.
 Proof. induction kes=>//. intros. apply ESbind'=>//. Qed.
 
+Lemma estep_not_val e σ e' σ':
+  estep e σ e' σ' → to_val e = None.
+Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
 
 Definition cont := list exprctx.
 Definition stack := list cont.
-
-Definition mor {A} (ma: option A) (mb: option A) : option A :=
-  match ma with
-    | Some a => Some a
-    | None => mb
-  end.
-
-Notation "ma <|> mb" := (mor ma mb) (at level 50, left associativity).
 
 Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
   match e with
@@ -470,16 +448,17 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
     | _ => None
   end.
 
-Definition is_some {A} (x: option A): bool := match x with Some _ => true | None => false end.
-
 Definition is_val e := is_some (to_val e).
+
+Lemma to_val_is_val e:
+  to_val e = None ↔ is_val e = false.
+Proof. induction e; crush. Qed.
 
 Definition is_loc e :=
   match to_val e with
     | Some (Vptr _) => true
     | _ => false
   end.
-
 
 Definition enf (e: expr) :=
   match e with
@@ -499,21 +478,57 @@ Definition enf (e: expr) :=
     | _ => false
   end.
 
-(* Proven on paper ... *)
+Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
+
+Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.
+
 Lemma cont_inj {e e' kes kes'}:
   enf e = true → enf e' = true →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
-Admitted.
+Proof.
+  intros. apply (cont_uninj kes) in H.
+  apply (cont_uninj kes') in H0.
+  unfold unfill in H0, H.
+  rewrite H1 in H. by simplify_eq.
+Qed.
 
-Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
+Lemma fill_not_enf e k:
+  is_val e = false → enf (fill_expr e k) = false.
+Proof. induction k=>//.
+       - intros H. simpl. rewrite H. done.
+       - intros H. simpl. rewrite forallb_app.
+         replace (e::args) with ([e] ++ args); last done.
+         rewrite forallb_app. simpl. rewrite H.
+         by rewrite andb_false_r.
+       - intros H. simpl. induction e; crush.
+Qed.
 
-Lemma cont_uninj: ∀ kes e, enf e = true → unfill e kes.
-Admitted.
-(* This is an even stronger claim than above ... *)
+Lemma escape_false {e a e' a2 kes k0 e''}:
+  estep e a e' a2 →
+  fill_expr (fill_ectxs e kes) k0 = e'' → enf e'' = true → False.
+Proof.
+  intros. assert (enf e'' = false) as Hfalse; last by rewrite Hfalse in H1.
+  rewrite -H0. apply fill_not_enf.
+  apply to_val_is_val.
+  apply fill_ectxs_not_val. eapply estep_not_val. done.
+Qed.
+
+Ltac gen_eq H E1 E2 KS :=
+  replace E1 with (fill_ectxs E1 []) in H; last done;
+  assert (E1 = E2 ∧ [] = KS) as [? ?];
+  [ apply cont_inj=>// | subst; clear H ].
 
 Lemma fill_estep_inv e ks a a1 a2:
   enf e = true → estep (fill_ectxs e ks) a a1 a2 →
   ∃ e', estep e a e' a2 ∧ a1 = fill_ectxs e' ks.
+Proof.
+  intros.
+  inversion H0; subst;
+  match goal with
+    | [ H: fill_expr _ _ = fill_ectxs ?E2 ?KS |- _] => idtac
+    | [ H: ?E = fill_ectxs ?E2 ?KS |- _] => gen_eq H E E2 KS
+  end; eauto.
+  admit. (* This can be proven inductively ... *)
 Admitted.
 
 Inductive jstep: state → expr → stack → expr → stack → Prop :=
@@ -542,10 +557,10 @@ Inductive cstep: expr → state → stack → expr → state → stack → Prop 
     ∀ e e' σ ks ks', jstep σ e ks e' ks' → cstep e σ ks e' σ ks'.
 
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
-Admitted.
+Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
 Lemma is_jmp_call k' f es: is_jmp (fill_ectxs (Ecall f es) k') = true.
-Admitted.
+Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
 Lemma CSbind':
     ∀ e e' σ σ' k kes ks,
@@ -568,7 +583,6 @@ Lemma CSbind:
 Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
 Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
-
 
 (* Proven from operational semantics *)
 Lemma lift_reducible e Kes σ ks:
@@ -610,35 +624,6 @@ Admitted.
 Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
 Admitted.
-
-Lemma estep_not_val e σ e' σ':
-  estep e σ e' σ' → to_val e = None.
-Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
-
-Lemma fill_not_enf e k:
-  is_val e = false → enf (fill_expr e k) = false.
-Proof. induction k=>//.
-       - intros H. simpl. rewrite H. done.
-       - intros H. simpl. rewrite forallb_app.
-         replace (e::args) with ([e] ++ args); last done.
-         rewrite forallb_app. simpl. rewrite H.
-         by rewrite andb_false_r.
-       - intros H. simpl. induction e; crush.
-Qed.
-
-Lemma to_val_is_val e:
-  to_val e = None ↔ is_val e = false.
-Proof. induction e; crush. Qed.
-
-Lemma escape_false {e a e' a2 kes k0 e''}:
-  estep e a e' a2 →
-  fill_expr (fill_ectxs e kes) k0 = e'' → enf e'' = true → False.
-Proof.
-  intros. assert (enf e'' = false) as Hfalse; last by rewrite Hfalse in H1.
-  rewrite -H0. apply fill_not_enf.
-  apply to_val_is_val.
-  apply fill_ectxs_not_val. eapply estep_not_val. done.
-Qed.
 
 Lemma  same_type_encode_inj σ:
   ∀ t v v' p,
