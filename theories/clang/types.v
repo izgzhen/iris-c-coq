@@ -91,3 +91,21 @@ Admitted.
 (*            end *)
 (*        end) *)
 (*   end. *)
+
+
+Inductive assign_type_compatible : type → type → Prop :=
+| assign_id: ∀ t, assign_type_compatible t t
+| assign_null_ptr: ∀ t, assign_type_compatible (Tptr t) Tnull
+| assign_ptr_ptr: ∀ t1 t2, assign_type_compatible (Tptr t1) (Tptr t2).
+
+Lemma assign_preserves_size t1 t2:
+  assign_type_compatible t1 t2 → sizeof t1 = sizeof t2.
+Proof. inversion 1; subst=>//. Qed.
+
+Lemma assign_preserves_typeof t1 t2 v:
+  assign_type_compatible t1 t2 → typeof v t2 → typeof v t1.
+Proof.
+  inversion 1=>//.
+  { subst. intros. inversion H0; subst. constructor. }
+  { intros. inversion H2; subst; constructor. }
+Qed.

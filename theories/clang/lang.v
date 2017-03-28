@@ -585,32 +585,16 @@ Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
 
 (* Proven from operational semantics *)
-Lemma lift_reducible e Kes σ ks:
-  reducible e σ ks → reducible (fill_ectxs e Kes) σ ks.
-Admitted.
-
-(* Proven from operational semantics *)
 Lemma reducible_not_val c σ ks: reducible c σ ks → to_val c = None.
-Admitted.
+Proof.
+  intros (?&?&?&?).
+  inversion H; subst.
+  - inversion H0; subst; eauto.
+    simpl. apply fill_ectx_not_val.
+  - inversion H0; subst; apply fill_ectxs_not_val; done.
+Qed.
 
 Instance state_inhabited: Inhabited state := populate (State ∅ ∅).
-
-Inductive assign_type_compatible : type → type → Prop :=
-| assign_id: ∀ t, assign_type_compatible t t
-| assign_null_ptr: ∀ t, assign_type_compatible (Tptr t) Tnull
-| assign_ptr_ptr: ∀ t1 t2, assign_type_compatible (Tptr t1) (Tptr t2).
-
-Lemma assign_preserves_size t1 t2:
-  assign_type_compatible t1 t2 → sizeof t1 = sizeof t2.
-Admitted.
-
-Lemma assign_preserves_typeof t1 t2 v:
-  assign_type_compatible t1 t2 → typeof v t2 → typeof v t1.
-Proof.
-  inversion 1=>//.
-  { subst. intros. inversion H0; subst. constructor. }
-  { intros. inversion H2; subst; constructor. }
-Qed.
 
 Lemma not_jmp_preserves_stack e e' σ σ' ks ks':
   is_jmp e = false → cstep e σ ks e' σ' ks' → ks = ks'.
