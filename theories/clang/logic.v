@@ -191,7 +191,7 @@ Section rules.
     { iPureIntro. unfold reducible in *.
       destruct H2 as (cur'&σ'&ks'&?). eexists _, _, ks1. apply CSbind=>//.
       assert (ks1 = ks') as ?; first eapply not_jmp_preserves_stack=>//.
-      by subst.
+        by subst.
     }
     iNext. iIntros (e2 σ2 ks2 Hstep).
     destruct (fill_step_inv e σ1 e2 σ2 kes ks1 ks2) as (e2'&->&?&?); auto; subst.

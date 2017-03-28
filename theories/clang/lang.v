@@ -326,7 +326,6 @@ Fixpoint is_jmp (e: expr) :=
     | _ => false
   end.
 
-
 Inductive estep : expr → state → expr → state → Prop :=
 | ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
@@ -598,18 +597,23 @@ Instance state_inhabited: Inhabited state := populate (State ∅ ∅).
 
 Lemma not_jmp_preserves_stack e e' σ σ' ks ks':
   is_jmp e = false → cstep e σ ks e' σ' ks' → ks = ks'.
-Admitted.
+Proof.
+  intros. inversion H0; subst=>//.
+  inversion H1; subst.
+  - by rewrite is_jmp_ret in H.
+  - by rewrite is_jmp_call in H.
+Qed.
 
 Lemma fill_step_inv e1' σ1 e2 σ2 K kes kes':
-    is_jmp e1' = false → to_val e1' = None → cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
+    is_jmp e1' = false → cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
     ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 kes e2' σ2 kes' ∧ kes = kes'.
-Admitted.
-
+Admitted. (* We need finer-grained lemmas about the inclusion relationship in the syntax tree *)
+  
 Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
-Admitted.
+Admitted. (* hard to prove ... intuitively right *)
 
-Lemma  same_type_encode_inj σ:
+Lemma same_type_encode_inj σ:
   ∀ t v v' p,
     typeof v t → typeof v' t →
     readbytes p (encode_val v) σ →
@@ -618,7 +622,7 @@ Lemma  same_type_encode_inj σ:
 Proof.
   induction t.
   - intros. inversion H. inversion H0. done.
-  - admit.
+  - intros. inversion H. inversion H0. done.
   - intros. inversion H. inversion H0.
     subst. destruct p. simpl in H1, H2.
     rewrite Byte.repr_unsigned in H2.
@@ -627,7 +631,7 @@ Proof.
     by inversion H1.
   - intros.
     inversion H. inversion H0.
-    subst. destruct p. simpl in H1, H2. admit.
+    subst. destruct p. simpl in H1, H2. admit. (* Hairy arithmetic -- should be right *)
   - intros. inversion H; inversion H0; subst; destruct p; simpl in H1, H2=>//.
     + destruct H1. destruct H2.
       by rewrite H2 in H1.
