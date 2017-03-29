@@ -501,6 +501,9 @@ Definition enf (e: expr) :=
     | _ => false
   end.
 
+Lemma enf_not_val e: enf e = true → to_val e = None.
+Proof. induction e; crush. Qed.
+
 Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
 Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.
@@ -515,11 +518,6 @@ Proof.
   rewrite H1 in H. by simplify_eq.
 Qed.
 
-Lemma cont_incl {e' kes kes' e}:
-  enf e = true →
-  fill_ectxs e kes = fill_ectxs e' kes' →
-  ∃ kes'', e' = fill_ectxs e kes''.
-Admitted.
 
 Lemma fill_not_enf e k:
   is_val e = false → enf (fill_expr e k) = false.
@@ -598,6 +596,33 @@ Lemma fill_estep_inv {e ks a a1 a2}:
   estep (fill_ectxs e ks) a a1 a2 →
   ∃ e', estep e a e' a2 ∧ a1 = fill_ectxs e' ks.
 Proof. move: fill_estep_inv' => /= H. intros. apply H=>//. Qed.
+
+Lemma cont_incl':
+  let P e' :=
+      (∀ e kes kes',
+        enf e = true →
+        fill_ectxs e kes = fill_ectxs e' kes' →
+        ∃ kes'', e' = fill_ectxs e kes'')
+  in ∀ e', to_val e' = None → P e'.
+Proof.
+  intros P. apply (not_val_ind P).
+  - unfold P. intros.
+    apply cont_inj in H1=>//.
+    destruct H1. subst.
+    by exists [].
+  - unfold P. intros.
+    rewrite fill_app in H2.
+    apply H0 in H2=>//.
+    destruct H2.
+    subst. rewrite fill_app. eauto.
+Qed.
+
+Lemma cont_incl {e' kes kes' e}:
+  enf e = true →
+  to_val e' = None →
+  fill_ectxs e kes = fill_ectxs e' kes' →
+  ∃ kes'', e' = fill_ectxs e kes''.
+Proof. move: cont_incl' => /= H. intros. by eapply H. Qed.
 
 Inductive jstep: state → expr → stack → expr → stack → Prop :=
 | JSrete:
