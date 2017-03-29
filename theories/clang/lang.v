@@ -453,6 +453,10 @@ Lemma to_val_is_val e:
   to_val e = None ↔ is_val e = false.
 Proof. induction e; crush. Qed.
 
+Lemma forall_is_val ls:
+  forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
+Proof. by induction ls=>//. Qed.
+
 Definition is_loc e :=
   match to_val e with
     | Some (Vptr _) => true
@@ -491,6 +495,12 @@ Proof.
   rewrite H1 in H. by simplify_eq.
 Qed.
 
+Lemma cont_incl {e' kes kes' e}:
+  enf e = true →
+  fill_ectxs e kes = fill_ectxs e' kes' →
+  ∃ kes'', e' = fill_ectxs e kes''.
+Admitted.
+
 Lemma fill_not_enf e k:
   is_val e = false → enf (fill_expr e k) = false.
 Proof. induction k=>//.
@@ -517,7 +527,7 @@ Ltac gen_eq H E1 E2 KS :=
   assert (E1 = E2 ∧ [] = KS) as [? ?];
   [ apply cont_inj=>// | subst; clear H ].
 
-Lemma fill_estep_inv e ks a a1 a2:
+Lemma fill_estep_inv {e ks a a1 a2}:
   enf e = true → estep (fill_ectxs e ks) a a1 a2 →
   ∃ e', estep e a e' a2 ∧ a1 = fill_ectxs e' ks.
 Proof.
@@ -604,10 +614,34 @@ Proof.
   - by rewrite is_jmp_call in H.
 Qed.
 
+Lemma peek_estep e:
+  is_jmp e = false →
+  ∃ e' K, enf e' = true ∧ is_jmp e' = false ∧ e = fill_ectxs e' K.
+Admitted.
+
+Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
+Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
+
 Lemma fill_step_inv e1' σ1 e2 σ2 K kes kes':
     is_jmp e1' = false → cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
     ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 kes e2' σ2 kes' ∧ kes = kes'.
-Admitted. (* We need finer-grained lemmas about the inclusion relationship in the syntax tree *)
+Proof.
+  intros. inversion H0; subst.
+  - destruct (peek_estep _ H) as (e''&K''&?&?&?). subst.
+    rewrite fill_app in H1, H0.
+    destruct (fill_estep_inv H2 H1) as (?&?&?).
+    exists (fill_ectxs x K'').
+    rewrite fill_app. split; first assumption.
+    split; last done.
+    constructor. apply ESbind=>//.
+  - inversion H1; subst.
+    + eapply cont_incl in H2=>//.
+      destruct H2 as (?&?); subst.
+      by rewrite is_jmp_ret in H.
+    + eapply cont_incl in H2=>//.
+      destruct H2 as (?&?); subst.
+      by rewrite is_jmp_call in H. apply forall_is_val.
+Qed.
   
 Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
@@ -654,10 +688,6 @@ Proof.
         { rewrite -(typeof_preserves_size v0 t1)=>//.
           rewrite -(typeof_preserves_size v1 t1)=>//. }
 Admitted.
-
-Lemma forall_is_val ls:
-  forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
-Proof. by induction ls=>//. Qed.
 
 Lemma estep_call_false f ls σ1 e' σ2:
   estep (Ecall f (map (λ l, Evalue (Vptr l)) ls)) σ1 e' σ2 → False.
