@@ -326,6 +326,10 @@ Fixpoint is_jmp (e: expr) :=
     | _ => false
   end.
 
+Lemma is_jmp_rec e K:
+  is_jmp (fill_ectxs e K) = false → is_jmp e = false.
+Admitted.
+
 Inductive estep : expr → state → expr → state → Prop :=
 | ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
@@ -501,6 +505,12 @@ Lemma cont_incl {e' kes kes' e}:
   ∃ kes'', e' = fill_ectxs e kes''.
 Admitted.
 
+Lemma cont_incl' {kes' e e'}:
+  enf e = true →
+  e = fill_ectxs e' kes' →
+  e' = e ∧ kes' = [].
+Admitted.
+
 Lemma fill_not_enf e k:
   is_val e = false → enf (fill_expr e k) = false.
 Proof. induction k=>//.
@@ -527,18 +537,55 @@ Ltac gen_eq H E1 E2 KS :=
   assert (E1 = E2 ∧ [] = KS) as [? ?];
   [ apply cont_inj=>// | subst; clear H ].
 
-Lemma fill_estep_inv {e ks a a1 a2}:
-  enf e = true → estep (fill_ectxs e ks) a a1 a2 →
-  ∃ e', estep e a e' a2 ∧ a1 = fill_ectxs e' ks.
-Proof.
-  intros.
-  inversion H0; subst;
-  match goal with
-    | [ H: fill_expr _ _ = fill_ectxs ?E2 ?KS |- _] => idtac
-    | [ H: ?E = fill_ectxs ?E2 ?KS |- _] => gen_eq H E E2 KS
-  end; eauto.
-  admit. (* This can be proven inductively ... *)
+Lemma focus_estep_inv {e1 σ1 e2 σ2}:
+  estep e1 σ1 e2 σ2 →
+  ∃ e1' e2' K, enf e1' = true ∧ e1 = fill_ectxs e1' K ∧ estep e1' σ1 e2' σ2 ∧ e2 = fill_ectxs e2' K.
 Admitted.
+
+Lemma fill_estep_false: ∀ e kes e' σ σ',
+  is_jmp e = true →
+  estep (fill_ectxs e kes) σ e' σ' → False.
+Admitted. (* Difficulty: super hard *) 
+
+Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
+Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
+
+Axiom not_val_ind:
+  ∀ P: expr → Prop,
+    (∀ e, enf e = true → P e) →
+    (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) →
+    (∀ e, to_val e = None → P e).
+
+Lemma fill_estep_inv':
+  let P e :=
+    (∀ e' σ σ' ks,
+       is_jmp e = false →
+       estep (fill_ectxs e ks) σ e' σ' →
+       ∃ e'', estep e σ e'' σ' ∧ e' = fill_ectxs e'' ks)
+  in ∀ e, to_val e = None → P e.
+Proof.
+  intros P. apply (not_val_ind P).
+  - unfold P. intros.
+    eapply focus_estep_inv in H1.
+    destruct H1 as (?&?&?&?&?&?&?).
+    eapply cont_inj in H2=>//.
+    destruct H2. subst. eauto.
+  - unfold P. intros.
+    rewrite fill_app in H2.
+    apply H0 in H2; last by eapply is_jmp_rec.
+    destruct H2 as (?&?&?).
+    exists (fill_ectxs x ks).
+    split. apply ESbind=>//.
+    by eapply is_jmp_rec.
+    by rewrite fill_app.
+Qed.
+
+Lemma fill_estep_inv {e ks a a1 a2}:
+  to_val e = None →
+  is_jmp e = false →
+  estep (fill_ectxs e ks) a a1 a2 →
+  ∃ e', estep e a e' a2 ∧ a1 = fill_ectxs e' ks.
+Proof. move: fill_estep_inv' => /= H. intros. apply H=>//. Qed.
 
 Inductive jstep: state → expr → stack → expr → stack → Prop :=
 | JSrete:
@@ -614,14 +661,25 @@ Proof.
   - by rewrite is_jmp_call in H.
 Qed.
 
-Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
-Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
-
 Lemma fill_step_inv e1' σ1 e2 σ2 K kes kes':
-    is_jmp e1' = false → cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
-    ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 kes e2' σ2 kes' ∧ kes = kes'.
-Admitted.
-  
+  to_val e1' = None →
+  is_jmp e1' = false →
+  cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
+  ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 kes e2' σ2 kes' ∧ kes = kes'.
+Proof.
+  intros. inversion H1; subst.
+  - eapply fill_estep_inv in H2=>//.
+    destruct H2 as (?&?&?).
+    exists x. split; [done | split; [ by constructor | done ] ].
+  - inversion H2; subst.
+    + eapply cont_incl in H3=>//.
+      destruct H3 as (?&?); subst.
+      by rewrite is_jmp_ret in H0.
+    + eapply cont_incl in H3=>//.
+      destruct H3 as (?&?); subst.
+      by rewrite is_jmp_call in H0. apply forall_is_val.
+Qed.
+
 Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
 Admitted.

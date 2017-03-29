@@ -286,23 +286,15 @@ Section rules.
       subst. iPureIntro. eexists _, _, _. apply CSjstep. constructor.
       apply cont_uninj. done. }
     iNext. iIntros (????).
-    inversion H0.
-    { simplify_eq.
-      assert (enf (Erete (Evalue v)) = true) as ?; first done.
-      destruct (fill_estep_inv _ _ _ _ _ H2 H1) as [? [? ?]].
-      inversion H3. simplify_eq.
-      exfalso. by eapply (escape_false H7 H5).
-    }
-    simplify_eq. inversion H1.
-    - simplify_eq.
-      assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
+    inversion H0; subst; first by apply fill_estep_false in H1.
+    inversion H1; subst.
+    - assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
       { apply cont_inj=>//. }
       inversion H3. subst. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
       destruct H5; subst.
       iFrame. iMod "Hclose" as "_".
       iModIntro. by iApply "HΦ".
-    - simplify_eq.
-      apply cont_inj in H2=>//.
+    - apply cont_inj in H2=>//.
       destruct H2 as [? ?]; done.
       simpl. apply forall_is_val.
   Qed.
@@ -697,23 +689,20 @@ Section rules.
     iModIntro. iSplit.
     { iPureIntro. eexists _, _, _. apply CSjstep. eapply JScall=>//. }
     iNext. iIntros (e2 σ2 ? ?).
-    iMod "Hclose". inversion H3; subst.
-    - apply fill_estep_inv in H4; last by apply forall_is_val.
-      destruct H4 as [? [? ?]]. iFrame. simpl.
-      exfalso. by eapply estep_call_false.
-    - inversion H4; subst.
-      + apply cont_inj in H0=>//; last by apply forall_is_val.
+    iMod "Hclose". inversion H3; subst; first by apply fill_estep_false in H4.
+    inversion H4; subst.
+    + apply cont_inj in H0=>//; last by apply forall_is_val.
         by destruct H0.
-      + apply cont_inj in H0=>//; try apply forall_is_val.
-        destruct H0. inversion H0. subst.
-        iFrame. iDestruct (stack_agree with "[Hs Hstk]") as "%"; first iFrame.
-        subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
-        iFrame. simpl in H6.
-        rewrite H6 in H2. inversion H2. subst.
-        assert (ls0 = ls) as ?.
-        { eapply map_inj=>//. simpl. intros. by inversion H7. }
+    + apply cont_inj in H0=>//; try apply forall_is_val.
+      destruct H0. inversion H0. subst.
+      iFrame. iDestruct (stack_agree with "[Hs Hstk]") as "%"; first iFrame.
+      subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
+      iFrame. simpl in H6.
+      rewrite H6 in H2. inversion H2. subst.
+      assert (ls0 = ls) as ?.
+      { eapply map_inj=>//. simpl. intros. by inversion H7. }
         subst. clear H2 H0.
-        rewrite H8 in H1. inversion H1. subst.
+      rewrite H8 in H1. inversion H1. subst.
         by iApply "HΦ".
   Qed.
 
