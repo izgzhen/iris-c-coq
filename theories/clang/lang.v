@@ -614,38 +614,17 @@ Proof.
   - by rewrite is_jmp_call in H.
 Qed.
 
-Lemma peek_estep e:
-  is_jmp e = false →
-  ∃ e' K, enf e' = true ∧ is_jmp e' = false ∧ e = fill_ectxs e' K.
-Admitted.
-
 Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
 Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 
 Lemma fill_step_inv e1' σ1 e2 σ2 K kes kes':
     is_jmp e1' = false → cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
     ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 kes e2' σ2 kes' ∧ kes = kes'.
-Proof.
-  intros. inversion H0; subst.
-  - destruct (peek_estep _ H) as (e''&K''&?&?&?). subst.
-    rewrite fill_app in H1, H0.
-    destruct (fill_estep_inv H2 H1) as (?&?&?).
-    exists (fill_ectxs x K'').
-    rewrite fill_app. split; first assumption.
-    split; last done.
-    constructor. apply ESbind=>//.
-  - inversion H1; subst.
-    + eapply cont_incl in H2=>//.
-      destruct H2 as (?&?); subst.
-      by rewrite is_jmp_ret in H.
-    + eapply cont_incl in H2=>//.
-      destruct H2 as (?&?); subst.
-      by rewrite is_jmp_call in H. apply forall_is_val.
-Qed.
+Admitted.
   
 Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
   is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
-Admitted. (* hard to prove ... intuitively right *)
+Admitted.
 
 Lemma same_type_encode_inj σ:
   ∀ t v v' p,
@@ -695,4 +674,3 @@ Proof.
   intros. inversion H. subst. eapply (escape_false H2)=>//.
   apply forall_is_val.
 Qed.
-
