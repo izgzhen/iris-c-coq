@@ -47,42 +47,39 @@ When $m \neq n$, we can expand the equation like below without loss of generalit
 So $e = v_m'$ by injectivity.
 \end{proof}
 
-Now, if we partition $\Expr$ into complete groups of disjoint classes, like $E_v, E_{red}, E_{jmp}$,
-then we can trivially derive following lemma:
+As you may observe, the expression space spanned by $k(e)$ for any $k, e$ is not the entire
+expression space as an ADT. Instead, it is a subset of $\Expr$ which represents well-formed ones
+that can appear as an immediate form according to some well-defined evaluation order. We call
+such $e$ is \emph{well-formed}.
 
-\begin{lemma}\label{lem:ectx-inj}
-For any $e, e': \Expr$ and $k, k': \ectx$,
-\[
-k(e) = k'(e') \proves (k = k' \land e = e') \lor (k \neq k' \land (e \in E_v \lor e' \in E_v))
-\]
-\end{lemma}
+Here we prove two lemmas about the syntactic structure on paper:
 
 \begin{lemma}
-For any $e \in E_{red}, e' \in E_{jmp}$ and $k, k': \ectx$,
-\[
-k(e) = k'(e') \proves k = k' \land e = e'
-\]
-\end{lemma}
-
-Now we define continuation $K : \cont \eqdef [\ectx]$, and corresponding fill operation as a trivial fold.
-You can imagine an arbitrary expression as a tree, in which the nodes might be either evaluated (the leaves),
-in some normal form ready to be evaluated (leaves' parent), or not in normal form at all.
-So for an expression $e$, the intuition might be there is only an \emph{unique} way of
-extracting it into a $K(e')$, in which $e'$ is either a value or in some normal form. This implies a very general
-injectivitity lemma for continuation:
-
-\begin{lemma}
-If $e, e'$ is in some normal form, and $K(e) = K'(e')$, then $K = K' \land e = e'$.
+$\All e: \Expr, k: \cont . \isenf(e) \ra \unfill(k(e)) = (k, e)$
 \end{lemma}
 \begin{proof}
-We can prove it inductively with \ref{lem:ectx-inj}.
 
-\begin{itemize}
-\item If both $K, K'$ is empty, then it is trivially proven.
-\item If only one of $K, K'$, say $K$, is empty, then we have $e = K''(k'(e'))$ as assumption, which leads to
-contradiction.
-\item Now we can rewrite $K$ as $k::K_1$ for some $k$, and $K'$ as $k'::K_2$, it is apparent that either
-$K_1(e)$ or $K_2(e)$ can be in evaluated form, so by \ref{lem:ectx-inj}, we have $k = k'$ and $K_1(e) = K_2(e')$.
-The second equation can inductively lead to $K_1 = K_2 \land e = e'$, which proves the final conclusion.
-\end{itemize}
+Let's prove inductively w.r.t $k$. When $k$ is empty,
+since $e$ is in normal form, so unfill it will only return the same thing.
+And inductively, since fill and unfill should cancel out, the final conclusion is proved trivially as well.
+
+\end{proof}
+
+\begin{lemma}
+Induction scheme for $\Expr$:
+\begin{align*}
+\All P: \Expr \ra \Prop.
+  &(\All e. \isenf(e) \ra P(e)) \ra \\
+  &(\All e, k: \cont . \toval(e) = \bot \ra \wellformed(e) \ra P(e) \ra P(k(e))) \ra\\
+  &(\All e. \toval(e) = \bot \ra \wellformed(e) \ra P(e))
+\end{align*}
+\end{lemma}
+\begin{proof}
+We want to \emph{inductively} prove that for any non-value, \emph{well-formed} $e$, $P(e)$ holds.
+Note that $P$ here can be any proposition.
+
+The base case is when $e$ is in normal form, which corresponds to the first condition;
+The inductive case is that for any well-formed $e'$ that is not in normal form,
+it must be of the form $k(e)$ for some $k, e$. With each proved given sufficient inductive
+assumption, we know that any well-formed $e$ must satisfy $P$.
 \end{proof}

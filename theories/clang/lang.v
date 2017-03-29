@@ -506,7 +506,7 @@ Proof. induction e; crush. Qed.
 
 Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
-Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.
+Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.  
 
 Lemma cont_inj {e e' kes kes'}:
   enf e = true → enf e' = true →
