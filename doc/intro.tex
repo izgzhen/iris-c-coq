@@ -8,32 +8,32 @@
 Our work explores two dimensions of mechanized OS verification:
 
 \begin{itemize}
-\item Language-level guarantee through trused virtualization i.e. a verified \emph{Unikernel}
+\item Language-level guarantee through trusted virtualization i.e. a verified \emph{Unikernel}
 \item C-like language verification framework in Coq based on Iris
 \end{itemize}
 
 \paragraph{1. Unikernel.} In this part, we will design a new unikernel architecture. The high-level
-languague will be F$\star$, compiled to C with Kremlin,
+language will be F$\star$, compiled to C with Kremlin,
 and linked with a minimal substrate providing booting etc.
 
 We don't currently have any real implementation of such system, but it should not be very difficult to build.
-What we care about it, instead, is the \textbf{linking} part.
+What we care about is, instead, the \textbf{linking} part.
 For example, to provide heap allocation, we will expose a malloc-like C interface to F$\star$. We can write
 some properties about these interfaces in F$\star$, which should be preserved in the lower level. Also, to show
-that each guest OS on the hypervisor won't interfere with each other, we want to do some meta-theoretic proofs
+that each guest OS on the hypervisor won't interfere with each other, we might want to do some meta-theoretic proofs
 of the whole system in Coq as well.
 
 In this work, we will focus on the memory management part,
 and prove related lemmas for such a perspective system.
 
-\paragraph{2. Iris for C} In this part, we will build a new Coq framework specific for languages similar to C,
-and designed for verifying OSes. While the part I is more about modelling, specifying and ``real'' proofs, this
+\paragraph{2. Iris for C} In this part, we will build a new Coq framework for languages similar to C on top of Iris,
+and designed for verifying OSes. While the part 1 is more about modeling, specifying and ``real'' proofs, this
 part is more about the tooling for this work and more future users.
 
-What are particularly interesting in this are:
+What are particularly interesting about it are:
 
 \begin{itemize}
-\item Compared functional languages, which Iris usually instantiates to, C-like lanugage is harder since
+\item Compared to functional languages, which Iris usually instantiates to, C-like language is harder since
       it can \texttt{return}, \texttt{break} and even \texttt{throw} (or \texttt{longjmp}, if you insist).
       How can we adapt the WP-based program logic to such exotic features? Can we make the adaption process
       itself easier?
@@ -44,6 +44,6 @@ What are particularly interesting in this are:
 \item For OS verification, contextual refinement is vital for specifying APIs. Can we do that too?
 \end{itemize}
 
-Though we can't promise to answer solve all questions, we should make sure that our program logic is sound.
+Though we can't promise to answer all questions, we should make sure that our program logic is sound.
 
 \subsection{Related Work}

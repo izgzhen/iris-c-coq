@@ -37,7 +37,7 @@ $\sstep{\scode}{\sstate}{\scode'}{\sstate'}$:
 We can also define the reflective transitive closure
 $\sstepstar{\scode}{\sstate}{\scode'}{\sstate'}$ trivially.
 
-With this, we can give refinment style proofs for certain kernel APIs.
+With this, we can give refinement style proofs for certain kernel APIs.
 The following proof rule is proved in Coq:
 
 \begin{mathpar}
@@ -51,7 +51,7 @@ The following proof rule is proved in Coq:
 
 We will first write down the abstract spec for page table primitives:
 \texttt{insert}, \texttt{lookup}, and \texttt{delete}. They will change the
-locally owned page table content, which is modelled by a \texttt{gmap}.
+locally owned page table content, which is modeled by a \texttt{gmap}.
 
 On top of that, supposing that the physical heap memory is shared across the processes,
 and our language provides related operations. We can combine these operation with
