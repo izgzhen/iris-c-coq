@@ -54,9 +54,8 @@ Section example.
     iInv N as ">Hspec" "Hclose".
     iMod (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
                with "[Hspec HY Hsc]")
-      as "(Hspec & Hss' & Hsc')".
-    { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
-      iFrame "Hsc". iPureIntro. apply spec_step_rel'. unfold f_rel.
+      as "(Hspec & Hss' & Hsc')"; [ | iFrame; by iApply mapsto_singleton | ].
+    { apply spec_step_rel'. unfold f_rel.
       exists vy. gmap_simplify=>//. by gmap_rewrite. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.

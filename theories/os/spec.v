@@ -129,11 +129,11 @@ Section rules.
   Qed.
     
   Lemma spec_update ss sc ss' sc':
-    spec_inv ∗ sstate ss ∗ scode sc ∗
-    ⌜ spec_step sc ss sc' ss' ⌝
+    spec_step sc ss sc' ss' →
+    spec_inv ∗ sstate ss ∗ scode sc
     ⊢ |==> spec_inv ∗ sstate ss' ∗ scode sc'.
   Proof.
-    iIntros "(Hinv & Hss & Hsc & %)".
+    iIntros (?) "(Hinv & Hss & Hsc)".
     iDestruct "Hinv" as (c0 s0 c s) "(HSC & HSS & %)".
     rewrite /sstate /scode.
     (* HSC Hsc and sc' are easy to prove *)
