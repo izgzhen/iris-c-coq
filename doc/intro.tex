@@ -9,11 +9,12 @@ Our work explores two dimensions of mechanized OS verification:
 
 \begin{itemize}
 \item Language-level guarantee through trusted virtualization i.e. a verified \emph{Unikernel}
-\item C-like language verification framework in Coq based on Iris
+\item C-like language verification framework in Coq based on Iris \cite{iris3}
 \end{itemize}
 
 \paragraph{1. Unikernel.} In this part, we will design a new unikernel architecture. The high-level
-language will be F$\star$, compiled to C with Kremlin,
+language will be \href{https://www.fstar-lang.org/}{F$\star$}, compiled to C with
+\href{https://github.com/FStarLang/kremlin}{Kremlin},
 and linked with a minimal substrate providing booting etc.
 
 We don't currently have any real implementation of such system, but it should not be very difficult to build.
