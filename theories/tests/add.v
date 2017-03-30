@@ -52,7 +52,7 @@ Section example.
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
     (* Open invariant *)
     iInv N as ">Hspec" "Hclose".
-    iDestruct (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
+    iMod (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
                with "[Hspec HY Hsc]")
       as "(Hspec & Hss' & Hsc')".
     { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.

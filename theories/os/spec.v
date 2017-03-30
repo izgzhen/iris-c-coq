@@ -3,7 +3,7 @@
 Require Import logic.
 From iris.base_logic Require Import gen_heap.
 From iris.base_logic Require Export big_op.
-From iris.algebra Require Import gmap agree auth.
+From iris.algebra Require Import gmap agree auth frac.
 From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
@@ -23,6 +23,12 @@ Inductive spec_step : spec_code → spec_state → spec_code → spec_state → 
     ∀ (r: spec_rel) s retv s' sf,
       gset_dom sf ⊥ gset_dom s → r s retv s' →
       spec_step (SCrel r) (sf ∪ s) (SCdone retv) (sf ∪ s').
+
+Inductive spec_step_star: spec_code → spec_state → spec_code → spec_state → Prop :=
+| SSid: ∀ c s, spec_step_star c s c s
+| SStrans:
+    ∀ c c' c'' s s' s'',
+      spec_step_star c s c' s' → spec_step c' s' c'' s'' → spec_step_star c s c'' s''.
 
 Lemma left_id_ss  (s' : spec_state):
   ∅ ∪ s' = s'.
@@ -63,7 +69,7 @@ Instance spec_code_equiv: Equiv spec_code := (=).
 
 Class specG Σ := SpecG {
   specG_spstG :> gen_heapG ident val Σ;
-  specG_specG :> inG Σ (authR (optionUR (agreeR (discreteC (spec_code)))));
+  specG_specG :> inG Σ (prodR fracR (agreeR (discreteC (spec_code))));
   spec_gname : gname
 }.
 
@@ -78,20 +84,15 @@ Section rules.
   Definition γ_sstate := @gen_heap_name _ _ _ _ _ specG_spstG.
 
   Definition sstate (s: spec_state) := ([⋅ map] l ↦ v ∈ s, l S↦ v)%I.
-  Definition scode (c: spec_code) := own spec_gname (◯ (Some (to_agree (c: leibnizC spec_code)))).
+  Definition scode (c: spec_code) := own spec_gname ((1/2)%Qp, (to_agree (c: leibnizC spec_code))).
 
   Lemma mapsto_singleton l v:
     l S↦ v ⊣⊢ sstate {[ l := v ]}.
   Proof. by rewrite /sstate big_sepM_singleton. Qed.
-  
+
   Definition spec_inv :=
     (∃ c0 s0 c s,
-     own spec_gname (● (Some (to_agree (c : leibnizC spec_code)))) ∗
-     own γ_sstate (● to_gen_heap s) ∗ ⌜ spec_step c0 s0 c s⌝)%I.
-    
-  Lemma spec_step_trans c c' c'' s s' s'':
-    spec_step c s c' s' → spec_step c' s' c'' s'' → spec_step c s c'' s''.
-  Admitted.
+     scode c ∗ own γ_sstate (● to_gen_heap s) ∗ ⌜ spec_step_star c0 s0 c s⌝)%I.
 
   Lemma sstate_update s ss ss':
     own γ_sstate (● to_gen_heap s) ∗
@@ -102,17 +103,35 @@ Section rules.
   Proof.
   Admitted.
 
+  Lemma scode_agree ks ks':
+   scode ks ∗ scode ks'  ⊢ ⌜ ks = ks' ⌝.
+  Proof.
+    iIntros "[Hs' Hs]".
+    rewrite /scode.
+    iDestruct (own_valid_2 with "Hs Hs'") as "%".
+    iPureIntro. destruct H0 as [? ?]. simpl in H1.
+    by apply to_agree_comp_valid in H1.
+  Qed.
+  
   Lemma scode_update c1 c2 c3:
-    own spec_gname (● Some (to_agree c1)) ∗
-    own spec_gname (◯ Some (to_agree c2))
-    ⊢ own spec_gname (● Some (to_agree c3)) ∗
-      own spec_gname (◯ Some (to_agree c3)) ∗ ⌜ c1 = c2 ⌝.
-  Admitted.
+    scode c1 ∗ scode c2 ⊢ |==> scode c3 ∗ scode c3 ∗ ⌜ c1 = c2 ⌝.
+  Proof.
+    iIntros "[Hs Hs']".
+    iDestruct (scode_agree with "[-]") as "%"; first iFrame.
+    inversion H0. subst.
+    rewrite /scode.
+    iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
+    rewrite pair_op frac_op' Qp_div_2.
+    apply cmra_update_exclusive.
+    split; simpl.
+    - by rewrite frac_op'.
+    - by apply to_agree_comp_valid.
+  Qed.
     
   Lemma spec_update ss sc ss' sc':
     spec_inv ∗ sstate ss ∗ scode sc ∗
     ⌜ spec_step sc ss sc' ss' ⌝
-    ⊢ spec_inv ∗ sstate ss' ∗ scode sc'.
+    ⊢ |==> spec_inv ∗ sstate ss' ∗ scode sc'.
   Proof.
     iIntros "(Hinv & Hss & Hsc & %)".
     iDestruct "Hinv" as (c0 s0 c s) "(HSC & HSS & %)".
@@ -120,14 +139,14 @@ Section rules.
     (* HSC Hsc and sc' are easy to prove *)
     (* ss, s => ss' are hard, might need some framing properties *)
     iDestruct (sstate_update s ss ss' with "[HSS Hss]") as (s') "(HSS' & Hss' & %)"; first iFrame.
-    iDestruct (scode_update _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame.
+    iMod (scode_update _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame.
     iSplitL "HSS' HSC'".
     { iExists c0, s0, sc', s'. iFrame.
       destruct H2 as (sf & ? & ? & ?).
       subst. iPureIntro.
-      assert (spec_step sc (sf ∪ ss) sc' (sf ∪ ss')) as ?; first by apply spec_step_framing.
-      eapply spec_step_trans=>//.
+      eapply SStrans=>//.
+      apply spec_step_framing=>//.
     }
-    iFrame.
+    by iFrame.
   Qed.
 End rules.
