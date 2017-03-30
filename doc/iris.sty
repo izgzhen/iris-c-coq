@@ -362,6 +362,8 @@
 \newcommand{\bval}{v_\text{ byte}}
 \newcommand{\valB}{w}
 \newcommand{\state}{\sigma}
+\newcommand{\sstate}{\tilde{\sigma}}
+\newcommand{\scode}{\tilde{c}}
 \newcommand{\step}{\ra}
 \newcommand{\hstep}{\ra_{\mathsf{h}}}
 \newcommand{\tpstep}{\ra_{\mathsf{tp}}}
@@ -374,6 +376,8 @@
 \newcommand{\ofval}{\mathrm{val\any to\any expr}}
 \newcommand{\typeof}{\mathrm{typeof}}
 \newcommand{\encode}{\mathrm{encode}}
+\newcommand{\Scode}{\mathrm{scode}}
+\newcommand{\Sstate}{\mathrm{sstate}}
 \newcommand{\instantiate}{\mathrm{instantiate}}
 \newcommand{\stk}{\mathrm{stack}}
 \newcommand{\isjmp}{\mathrm{is \any jump}}
@@ -434,6 +438,7 @@
 \newcommand{\sctx}{\ensuremath{\textmon{Sctx}}}
 \newcommand{\allctx}{\ensuremath{\textmon{Ctx}}}
 \newcommand{\cont}{\ensuremath{\textmon{Cont}}}
+\newcommand{\SpecCode}{\ensuremath{\textmon{SpecCode}}}
 \newcommand{\stack}{\ensuremath{\textmon{Stack}}}
 \newcommand{\cureval}{E_{\text{cur}}}
 \newcommand{\curctx}{K_{\text{cur}}}
@@ -446,6 +451,8 @@
 \newcommand{\estep}[4]{({#1}, {#2}) \ra_{\Expr} ({#3}, {#4})}
 \newcommand{\jstep}[5]{({#2}, {#3}) \ra_{jump}^{#1} ({#4}, {#5})}
 \newcommand{\cstep}[6]{({#1}, {#2}, {#3}) \ra_{\text{cur}} ({#4}, {#5}, {#6})}
+\newcommand{\sstep}[4]{({#1}, {#2}) \ra_{spec} ({#3}, {#4})}
+\newcommand{\sstepstar}[4]{({#1}, {#2}) \ra^{*}_{spec} ({#3}, {#4})}
 
 \newcommand{\reslhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{LHS}}}
 \newcommand{\resrhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{RHS}}}
