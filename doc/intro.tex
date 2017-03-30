@@ -40,9 +40,12 @@ What are particularly interesting about it are:
       itself easier?
 \item Can Iris make it easier to provide more advanced features such as
       concurrency, function pointer (higher-order) etc.?
-\item When we don't need that much fine-grained concurrency, can we improve the level of
+\item When we don't need that much fine-grained concurrency or higher-orderness, can we improve the level of
       proof automation?
 \item For OS verification, contextual refinement is vital for specifying APIs. Can we do that too?
+\item Iris's base logic is intuitionisic, but a lot of separation logics as in ??? are precise.
+      What does that imply? Can we still prove something like, memory-leak-free, in this intuitionistic
+      framework? Will proof-mode keep working if we make base logic precise?
 \end{itemize}
 
 Though we can't promise to answer all questions, we should make sure that our program logic is sound.
