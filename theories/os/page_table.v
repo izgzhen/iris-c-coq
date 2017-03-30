@@ -2,7 +2,7 @@
 
 Require Import iris_os.clang.logic.
 
-Instance int32_eq_dec: EqDecision int32. Admitted.
+Instance int32_eq_dec: EqDecision int32 := Int.eq_dec.
 Instance int32_countable: Countable int32. Admitted.
 
 Definition option_addr_to_val (opt_a: option addr) : val :=

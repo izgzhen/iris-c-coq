@@ -56,7 +56,7 @@ Section example.
                with "[Hspec HY Hsc]")
       as "(Hspec & Hss' & Hsc')".
     { iFrame "Hspec". iSplitL "HY"; first by iApply mapsto_singleton.
-      iFrame "Hsc". iPureIntro. apply spec_step_rel. unfold f_rel.
+      iFrame "Hsc". iPureIntro. apply spec_step_rel'. unfold f_rel.
       exists vy. gmap_simplify=>//. by gmap_rewrite. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.

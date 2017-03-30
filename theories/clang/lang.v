@@ -755,7 +755,12 @@ Proof.
     by inversion H1.
   - intros.
     inversion H. inversion H0.
-    subst. destruct p. simpl in H1, H2. admit. (* Hairy arithmetic -- should be right *)
+    subst. destruct p. simpl in H1, H2.
+    destruct H2 as (?&?&?&?&?).
+    destruct H1 as (?&?&?&?&?).
+    rewrite H2 in H1. rewrite H3 in H7.
+    rewrite H4 in H8. rewrite H5 in H9.
+    admit. (* Hairy arithmetic -- should be right *)
   - intros. inversion H; inversion H0; subst; destruct p; simpl in H1, H2=>//.
     + destruct H1. destruct H2.
       by rewrite H2 in H1.
