@@ -649,6 +649,14 @@ Inductive cstep: expr → state → stack → expr → state → stack → Prop 
 | CSjstep:
     ∀ e e' σ ks ks', jstep σ e ks e' ks' → cstep e σ ks e' σ ks'.
 
+Lemma cstep_not_val e σ ks e' σ' ks':
+  cstep e σ ks e' σ' ks' → to_val e = None.
+Proof.
+  inversion 1; subst.
+  - by eapply estep_not_val.
+  - inversion H0; by apply fill_ectxs_not_val.
+Qed.
+
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
