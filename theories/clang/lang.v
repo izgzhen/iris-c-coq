@@ -685,18 +685,6 @@ Lemma CSbind:
       cstep (fill_ectxs e kes) σ (fill_ectxs e' kes) σ'.
 Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
-Definition reducible cur σ := ∃ cur' σ', cstep cur σ cur' σ'.
-
-(* Proven from operational semantics *)
-Lemma reducible_not_val c σ: reducible c σ → to_val c = None.
-Proof.
-  intros (?&?&?).
-  inversion H; subst.
-  - inversion H0; subst; eauto.
-    simpl. apply fill_ectx_not_val.
-  - inversion H0; subst; apply fill_ectxs_not_val; done.
-Qed.
-
 Instance state_inhabited: Inhabited state := populate (State ∅ ∅ []).
 
 Lemma not_jmp_preserves_stack e e' σ σ':

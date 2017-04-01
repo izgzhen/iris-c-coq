@@ -2,6 +2,7 @@
 
 From iris.algebra Require Export gmap agree auth frac excl.
 From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
+From iris.program_logic Require Export weakestpre.
 From iris_os.clang Require Export lang.
 From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
@@ -40,23 +41,6 @@ Section wp.
   Definition state_interp (s: state) : iProp Σ:=
     (gen_heap_ctx (s_heap s) ∗ gen_text (s_text s) ∗ gen_stack (s_stack s))%I.
 
-  Definition wp_pre
-           (wp: coPset -c> expr -c> (val -c> iProp Σ) -c> iProp Σ) :
-    coPset -c> expr -c> (val -c> iProp Σ) -c> iProp Σ :=
-    (λ E cur Φ,
-     (∃ v, ⌜ to_val cur = Some v ⌝ ∧ |={E}=> Φ v) ∨
-     (⌜ to_val cur = None ⌝ ∧
-         (∀ (σ: state),
-           state_interp σ ={E,∅}=∗ ⌜ reducible cur σ ⌝ ∗
-            ▷ (∀ cur' σ', ⌜cstep cur σ cur' σ'⌝ ={∅,E}=∗
-                        state_interp σ' ∗ wp E cur' Φ))))%I.
-
-  Local Instance wp_pre_contractive : Contractive wp_pre.
-  Proof.
-    rewrite /wp_pre=> n wp wp' Hwp E e1 Φ.
-    repeat (f_contractive || f_equiv); apply Hwp.
-  Qed.
-
   Fixpoint mapstobytes l q bytes: iProp Σ :=
     let '(b, o) := l in
     (match bytes with
@@ -67,66 +51,14 @@ Section wp.
   Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
     (⌜ typeof v t ⌝ ∗ mapstobytes l q (encode_val v))%I.
 
-  Definition wp_def :
-    coPset → expr → (val → iProp Σ) → iProp Σ := fixpoint wp_pre.
-  Definition wp_aux : { x | x = @wp_def }. by eexists. Qed.
-  Definition wp := proj1_sig wp_aux.
-  Definition wp_eq : @wp = @wp_def := proj2_sig wp_aux.
-
 End wp.
 
-Notation "'WP' e @ E {{ Φ } }" := (wp E e%E Φ)
-  (at level 20, e, Φ at level 200,
-   format "'WP'  e  @  E  {{  Φ  } }") : uPred_scope.
-Notation "'WP' e {{ Φ } }" := (wp ⊤ e%E Φ)
-  (at level 20, e, Φ at level 200,
-   format "'WP'  e  {{  Φ  } }") : uPred_scope.
+Instance heapG_irisG `{clangG Σ}: irisG clang_lang Σ := {
+  iris_invG := clangG_invG;
+  state_interp := state_interp
+}.
 
-Notation "'WP' e @ E {{ v , Q } }" := (wp E e%E (λ v, Q))
-  (at level 20, e, Q at level 200,
-   format "'WP'  e  @  E  {{  v ,  Q  } }") : uPred_scope.
-Notation "'WP' e {{ v , Q } }" := (wp ⊤ e%E (λ v, Q))
-  (at level 20, e, Q at level 200,
-   format "'WP'  e  {{  v ,  Q  } }") : uPred_scope.
-
-(* Texan triples *)
-Notation "'{{{' P } } } e {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e {{ Φ }})%I
-    (at level 20, x closed binder, y closed binder,
-     format "{{{  P  } } }  e  {{{  x .. y ,   RET  pat ;  Q } } }") : uPred_scope.
-Notation "'{{{' P } } } e @ E {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ E {{ Φ }})%I
-    (at level 20, x closed binder, y closed binder,
-     format "{{{  P  } } }  e  @  E  {{{  x .. y ,  RET  pat ;  Q } } }") : uPred_scope.
-Notation "'{{{' P } } } e {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e {{ Φ }})%I
-    (at level 20,
-     format "{{{  P  } } }  e  {{{  RET  pat ;  Q } } }") : uPred_scope.
-Notation "'{{{' P } } } e @ E {{{ 'RET' pat ; Q } } }" :=
-  (□ ∀ Φ, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ E {{ Φ }})%I
-    (at level 20,
-     format "{{{  P  } } }  e  @  E  {{{  RET  pat ;  Q } } }") : uPred_scope.
-
-Notation "'{{{' P } } } e {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ : _ → uPred _,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e {{ Φ }})
-    (at level 20, x closed binder, y closed binder,
-     format "{{{  P  } } }  e  {{{  x .. y ,  RET  pat ;  Q } } }") : C_scope.
-Notation "'{{{' P } } } e @ E {{{ x .. y , 'RET' pat ; Q } } }" :=
-  (∀ Φ : _ → uPred _,
-      P -∗ ▷ (∀ x, .. (∀ y, Q -∗ Φ pat%V) .. ) -∗ WP e @ E {{ Φ }})
-    (at level 20, x closed binder, y closed binder,
-     format "{{{  P  } } }  e  @  E  {{{  x .. y ,  RET  pat ;  Q } } }") : C_scope.
-Notation "'{{{' P } } } e {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ : _ → uPred _, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e {{ Φ }})
-    (at level 20,
-     format "{{{  P  } } }  e  {{{  RET  pat ;  Q } } }") : C_scope.
-Notation "'{{{' P } } } e @ E {{{ 'RET' pat ; Q } } }" :=
-  (∀ Φ : _ → uPred _, P -∗ ▷ (Q -∗ Φ pat%V) -∗ WP e @ E {{ Φ }})
-    (at level 20,
-     format "{{{  P  } } }  e  @  E  {{{  RET  pat ;  Q } } }") : C_scope.
+Global Opaque iris_invG.
 
 Notation "l ↦{ q } v @ t" := (mapstoval l q v t)%I
   (at level 20, q at level 50, format "l  ↦{ q }  v  @  t") : uPred_scope.
@@ -138,47 +70,9 @@ Notation "l ↦ - @ t" := (l ↦{1} - @ t)%I (at level 20) : uPred_scope.
 
 Section rules.
   Context `{clangG Σ}.
-
-  Local Hint Extern 0 (reducible _ _ _) => eexists _, _, _; simpl.
-
-  Local Hint Constructors cstep estep.
-
-  Lemma wp_unfold E c Φ: WP c @ E {{ Φ }} ⊣⊢ wp_pre wp E c Φ.
-    (* Proof. rewrite wp_eq. apply (fixpoint_unfold wp_pre). Qed. *) (* XXX: too slow *)
-  Admitted.
-
-  Lemma wp_value Φ E c v:
-    to_val c = Some v →
-    Φ v ⊢ WP c @ E {{ Φ }}.
-  Proof. iIntros (?) "HΦ". rewrite wp_unfold /wp_pre. iLeft. eauto. Qed.
-
-  Lemma wp_strong_mono E1 E2 e Φ Ψ :
-    E1 ⊆ E2 → (∀ v, Φ v ={E2}=∗ Ψ v) ∗ WP e @ E1 {{ Φ }} ⊢ WP e @ E2 {{ Ψ }}.
-  Proof.
-    iIntros (?) "[HΦ H]". iLöb as "IH" forall (e). rewrite !wp_unfold /wp_pre.
-    iDestruct "H" as "[Hv|[% H]]"; [iLeft|iRight].
-    { iDestruct "Hv" as (v) "[% Hv]". iExists v; iSplit; first done.
-      iApply ("HΦ" with ">[-]"). by iApply (fupd_mask_mono E1 _). }
-    iSplit; [done|]; iIntros (σ1) "Hσ".
-    iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done.
-    iMod ("H" $! _ with "Hσ") as "[$ H]".
-    iModIntro. iNext. iIntros (e2 σ2 Hstep).
-    iMod ("H" $! _ _ with "[#]") as "($ & H)"; auto.
-    iMod "Hclose" as "_". by iApply ("IH" with "HΦ").
-  Qed.
-
-  Lemma fupd_wp E e Φ : (|={E}=> WP e @ E {{ Φ }}) ⊢ WP e @ E {{ Φ }}.
-  Proof.
-    rewrite wp_unfold /wp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?.
-    { iLeft. iExists v; iSplit; first done.
-        by iMod "H" as "[H|[% ?]]"; [iDestruct "H" as (v') "[% ?]"|]; simplify_eq. }
-      iRight; iSplit; [done|]; iIntros (σ1) "Hσ1".
-    iMod "H" as "[H|[% H]]"; last by iApply "H".
-    iDestruct "H" as (v') "[% ?]"; simplify_eq.
-  Qed.
-
-  Lemma wp_fupd E e Φ : WP e @ E {{ v, |={E}=> Φ v }} ⊢ WP e @ E {{ Φ }}.
-  Proof. iIntros "H". iApply (wp_strong_mono E); try iFrame; auto. Qed.
+  Implicit Types P Q : iProp Σ.
+  Implicit Types Φ : val → iProp Σ.
+  Implicit Types σ : state.
 
   Lemma wp_bind' kes E e Φ :
     ⌜ is_jmp e = false ⌝ ∗
@@ -192,10 +86,11 @@ Section rules.
     iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
     iModIntro; iSplit.
     { iPureIntro. unfold reducible in *.
-      destruct H2 as (cur'&σ'&?). eexists _, _. apply CSbind=>//. }
-    iNext. iIntros (e2 σ2 Hstep).
+      destruct H2 as (cur'&σ'&?&?). eexists _, _, []. apply CSbind=>//. apply H2. }
+    iNext. iIntros (e2 σ2 ? Hstep).
     destruct (fill_step_inv e σ1 e2 σ2 kes) as (e2'&->&?&?); auto; subst.
-    iMod ("H" $! _ _ with "[%]") as "($ & H)"; eauto.
+    iMod ("H" $! _ _ _ with "[%]") as "($ & H & ?)"; eauto; first apply H3.
+    iFrame "~".
     iApply "IH". iSplit=>//.
     iPureIntro. eapply cstep_preserves_not_jmp=>//.
   Qed.
@@ -205,29 +100,31 @@ Section rules.
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof. iIntros (?) "?". iApply wp_bind'. iSplit; done. Qed.
 
+  Definition reducible := @reducible clang_lang.
+  
   Lemma wp_lift_step E Φ e1 :
     to_val e1 = None →
     (∀ σ1, state_interp σ1 ={E,∅}=∗
-      ⌜reducible e1 σ1⌝ ∗
-      ▷ ∀ e2 σ2, ⌜cstep e1 σ1 e2 σ2⌝ ={∅,E}=∗
-        state_interp σ2 ∗ WP e2 @ E {{ Φ }})
+      ⌜ reducible e1 σ1⌝ ∗
+      ▷ ∀ e2 σ2 efs, ⌜step e1 σ1 e2 σ2 efs⌝ ={∅,E}=∗
+        state_interp σ2 ∗ WP e2 @ E {{ Φ }} ∗ [∗ list] ef ∈ efs, WP ef {{ _, True }})
     ⊢ WP e1 @ E {{ Φ }}.
   Proof. iIntros (?) "H". rewrite wp_unfold /wp_pre; auto. Qed.
 
   Lemma wp_lift_pure_step E Φ e1 :
     (∀ σ1, reducible e1 σ1) →
-    (∀ σ1 σ2 cur2, cstep e1 σ1 cur2 σ2 → σ1 = σ2) →
-    (▷ ∀ cur2 σ1 σ2, ⌜ cstep e1 σ1 cur2 σ2 ⌝ →
-                WP cur2 @ E {{ Φ }})
+    (∀ σ1 σ2 cur2 efs, step e1 σ1 cur2 σ2 efs → σ1 = σ2) →
+    (▷ ∀ cur2 σ1 σ2 efs, ⌜ step e1 σ1 cur2 σ2 efs ⌝ →
+                WP cur2 @ E {{ Φ }} ∗ [∗ list] ef ∈ efs, WP ef {{ _, True }})
       ⊢ WP e1 @ E {{ Φ }}.
   Proof.
     iIntros (Hsafe ?) "H".
-    iApply wp_lift_step;
-      [ eapply reducible_not_val, (Hsafe inhabitant)|].
+    iApply wp_lift_step.
+    { eapply (@reducible_not_val clang_lang), (Hsafe inhabitant). }
     iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
-    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ?).
+    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ? ?).
     iMod "Hclose"; iModIntro.
-    destruct (H0 _ _ _ H1) as [? ?]. subst. iFrame.    
+    destruct (H0 _ _ _ _ H1) as [? ?]. subst. iFrame.
     by iApply "H".
   Qed.
 
