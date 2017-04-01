@@ -120,11 +120,14 @@ Definition fill_ectxs := foldr (λ x y, fill_expr y x).
 
 Definition heap := gmap addr byteval.
 Definition text := gmap ident function.
+Definition cont := list exprctx.
+Definition stack := list cont.
 
 Record state :=
   State {
       s_heap : heap;
-      s_text : text
+      s_text : text;
+      s_stack : stack
     }.
 
 (* XXX: not precise *)
@@ -189,8 +192,7 @@ Fixpoint storebytes l bs (σ: heap) :=
     | _ => σ
   end.
 
-Definition alloc_heap (l: addr) (v: val) (σ: state) : state :=
-  State (storebytes l (encode_val v) (s_heap σ)) (s_text σ).
+Definition alloc_heap (l: addr) (v: val) (σ: heap) : heap := storebytes l (encode_val v) σ.
 
 Definition to_val (c: expr) :=
   match c with
@@ -346,7 +348,7 @@ Proof.
   auto.
 Qed.
 
-Inductive estep : expr → state → expr → state → Prop :=
+Inductive estep : expr → heap → expr → heap → Prop :=
 | ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
              estep (Ebinop op (Evalue lv) (Evalue rv)) σ
@@ -354,7 +356,7 @@ Inductive estep : expr → state → expr → state → Prop :=
 | ESderef_typed:
     ∀ σ l v t,
       typeof v t →
-      readbytes l (encode_val v) (s_heap σ) →
+      readbytes l (encode_val v) σ →
       estep (Ederef_typed t (Evalue (Vptr l))) σ
             (Evalue v) σ
 | ESfst:
@@ -366,14 +368,14 @@ Inductive estep : expr → state → expr → state → Prop :=
 | ESalloc:
     ∀ t v σ b o,
       typeof v t →
-      (∀ o', (s_heap σ) !! (b, o') = None) →
+      (∀ o', σ !! (b, o') = None) →
       estep (Ealloc t (Evalue v)) σ (Evalue (Vptr (b, o)))
             (alloc_heap (b, o) v σ)
 | ESassign:
     ∀ l v σ,
       estep (Eassign (Evalue (Vptr l)) (Evalue v))
             σ (Evalue Vvoid)
-            (State (storebytes l (encode_val v) (s_heap σ)) (s_text σ))
+            (storebytes l (encode_val v) σ)
 | ESseq: ∀ s v σ, estep (Eseq (Evalue v) s) σ s σ
 | ESwhile_true:
     ∀ s cond σ,
@@ -398,9 +400,6 @@ Proof. induction kes=>//. intros. apply ESbind'=>//. Qed.
 Lemma estep_not_val e σ e' σ':
   estep e σ e' σ' → to_val e = None.
 Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
-
-Definition cont := list exprctx.
-Definition stack := list cont.
 
 Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
   match e with
@@ -624,17 +623,17 @@ Lemma cont_incl {e' kes kes' e}:
   ∃ kes'', e' = fill_ectxs e kes''.
 Proof. move: cont_incl' => /= H. intros. by eapply H. Qed.
 
-Inductive jstep: state → expr → stack → expr → stack → Prop :=
+Inductive jstep: text → expr → stack → expr → stack → Prop :=
 | JSrete:
-    ∀ σ v k k' ks,
+    ∀ t v k k' ks,
       unfill (Erete (Evalue v)) k' →
-      jstep σ (fill_ectxs (Erete (Evalue v)) k') (k::ks) (fill_ectxs (Evalue v) k) ks
+      jstep t (fill_ectxs (Erete (Evalue v)) k') (k::ks) (fill_ectxs (Evalue v) k) ks
 | JScall:
-    ∀ σ es ls retty params f_body f_body' f k ks,
+    ∀ t es ls retty params f_body f_body' f k ks,
       es = map (fun l => Evalue (Vptr l)) ls →
-      s_text σ !! f = Some (Function retty params f_body) →
+      t !! f = Some (Function retty params f_body) →
       instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
-      jstep σ (fill_ectxs (Ecall f es) k) ks f_body' (k::ks).
+      jstep t (fill_ectxs (Ecall f es) k) ks f_body' (k::ks).
 
 Bind Scope val_scope with val.
 Delimit Scope val_scope with V.
@@ -643,14 +642,14 @@ Delimit Scope expr_scope with E.
 Bind Scope prim_scope with prim.
 Delimit Scope prim_scope with prim.
 
-Inductive cstep: expr → state → stack → expr → state → stack → Prop :=
+Inductive cstep: expr → state → expr → state → Prop :=
 | CSestep:
-    ∀ e σ e' σ' ks, estep e σ e' σ' → cstep e σ ks e' σ' ks
+    ∀ s t e h e' h', estep e h e' h' → cstep e (State h t s) e' (State h' t s)
 | CSjstep:
-    ∀ e e' σ ks ks', jstep σ e ks e' ks' → cstep e σ ks e' σ ks'.
+    ∀ e e' h t s s' , jstep t e s e' s' → cstep e (State h t s) e' (State h t s').
 
-Lemma cstep_not_val e σ ks e' σ' ks':
-  cstep e σ ks e' σ' ks' → to_val e = None.
+Lemma cstep_not_val e σ e' σ':
+  cstep e σ e' σ' → to_val e = None.
 Proof.
   inversion 1; subst.
   - by eapply estep_not_val.
@@ -673,10 +672,10 @@ Proof.
 Qed.
   
 Lemma CSbind':
-    ∀ e e' σ σ' k kes ks,
+    ∀ e e' σ σ' k kes,
       is_jmp e = false →
-      cstep e σ ks e' σ' ks →
-      cstep (fill_ectxs e (k::kes)) σ ks (fill_ectxs e' (k::kes)) σ' ks.
+      cstep e σ e' σ' →
+      cstep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'.
 Proof.
   intros. inversion H0; subst.
   - apply CSestep. apply ESbind=>//.
@@ -684,40 +683,40 @@ Proof.
 Qed.
 
 Lemma CSbind:
-    ∀ e e' σ σ' kes ks,
+    ∀ e e' σ σ' kes,
       is_jmp e = false →
-      cstep e σ ks e' σ' ks →
-      cstep (fill_ectxs e kes) σ ks (fill_ectxs e' kes) σ' ks.
+      cstep e σ e' σ' →
+      cstep (fill_ectxs e kes) σ (fill_ectxs e' kes) σ'.
 Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
-Definition reducible cur σ ks := ∃ cur' σ' ks', cstep cur σ ks cur' σ' ks'.
+Definition reducible cur σ := ∃ cur' σ', cstep cur σ cur' σ'.
 
 (* Proven from operational semantics *)
-Lemma reducible_not_val c σ ks: reducible c σ ks → to_val c = None.
+Lemma reducible_not_val c σ: reducible c σ → to_val c = None.
 Proof.
-  intros (?&?&?&?).
+  intros (?&?&?).
   inversion H; subst.
   - inversion H0; subst; eauto.
     simpl. apply fill_ectx_not_val.
   - inversion H0; subst; apply fill_ectxs_not_val; done.
 Qed.
 
-Instance state_inhabited: Inhabited state := populate (State ∅ ∅).
+Instance state_inhabited: Inhabited state := populate (State ∅ ∅ []).
 
-Lemma not_jmp_preserves_stack e e' σ σ' ks ks':
-  is_jmp e = false → cstep e σ ks e' σ' ks' → ks = ks'.
+Lemma not_jmp_preserves_stack e e' σ σ':
+  is_jmp e = false → cstep e σ e' σ' → s_stack σ = s_stack σ'.
 Proof.
   intros. inversion H0; subst=>//.
   exfalso. by eapply is_jmp_jstep_false.
 Qed.
 
-Lemma fill_step_inv e1' σ1 e2 σ2 K kes kes':
+Lemma fill_step_inv e1' σ1 e2 σ2 K:
   to_val e1' = None →
   is_jmp e1' = false →
-  cstep (fill_ectxs e1' K) σ1 kes e2 σ2 kes' →
-  ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 kes e2' σ2 kes' ∧ kes = kes'.
+  cstep (fill_ectxs e1' K) σ1 e2 σ2 →
+  ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 e2' σ2 ∧ s_stack σ1 = s_stack σ2.
 Proof.
-  intros. inversion H1; subst.
+  inversion 3; subst.
   - eapply fill_estep_inv in H2=>//.
     destruct H2 as (?&?&?).
     exists x. split; [done | split; [ by constructor | done ] ].
@@ -734,13 +733,13 @@ Lemma estep_preserves_not_jmp e σ1 e2' σ2:
   is_jmp e = false → estep e σ1 e2' σ2 → is_jmp e2' = false.
 Admitted.
 
-Lemma cstep_preserves_not_jmp e σ1 ks ks2 e2' σ2:
-  is_jmp e = false → cstep e σ1 ks e2' σ2 ks2 → is_jmp e2' = false.
+Lemma cstep_preserves_not_jmp e σ1 e2' σ2:
+  is_jmp e = false → cstep e σ1 e2' σ2 → is_jmp e2' = false.
 Proof.
   inversion 2; subst.
   - inversion H1; subst=>//.
     + simpl in H. simpl.
-      destruct (is_jmp cond); destruct (is_jmp s)=>//.
+      destruct (is_jmp cond); destruct (is_jmp s0)=>//.
     + by eapply estep_preserves_not_jmp.
   - exfalso. by eapply is_jmp_jstep_false.
 Qed.
