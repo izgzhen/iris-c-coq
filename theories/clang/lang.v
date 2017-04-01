@@ -782,14 +782,14 @@ Proof.
   apply forall_is_val.
 Qed.
 
-Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ'.
+Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ' ∧ efs = [].
 
 Lemma step_not_val e σ e' σ' efs:
   step e σ e' σ' efs → to_val e = None.
 Proof.
-  inversion 1; subst.
+  destruct 1. inversion H; subst.
   - by eapply estep_not_val.
-  - inversion H0; by apply fill_ectxs_not_val.
+  - inversion H1; by apply fill_ectxs_not_val.
 Qed.
 
 Definition clang_lang :=

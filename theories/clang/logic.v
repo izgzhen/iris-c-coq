@@ -70,9 +70,6 @@ Notation "l ↦ - @ t" := (l ↦{1} - @ t)%I (at level 20) : uPred_scope.
 
 Section rules.
   Context `{clangG Σ}.
-  Implicit Types P Q : iProp Σ.
-  Implicit Types Φ : val → iProp Σ.
-  Implicit Types σ : state.
 
   Lemma wp_bind' kes E e Φ :
     ⌜ is_jmp e = false ⌝ ∗
@@ -86,10 +83,12 @@ Section rules.
     iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
     iModIntro; iSplit.
     { iPureIntro. unfold reducible in *.
-      destruct H2 as (cur'&σ'&?&?). eexists _, _, []. apply CSbind=>//. apply H2. }
-    iNext. iIntros (e2 σ2 ? Hstep).
+      destruct H2 as (cur'&σ'&?&?&?). eexists _, _, [].
+      split; last done. apply CSbind=>//. }
+    iNext. iIntros (e2 σ2 ? (Hstep & ?)).
     destruct (fill_step_inv e σ1 e2 σ2 kes) as (e2'&->&?&?); auto; subst.
-    iMod ("H" $! _ _ _ with "[%]") as "($ & H & ?)"; eauto; first apply H3.
+    iMod ("H" $! _ _ _ with "[%]") as "($ & H & ?)"; eauto.
+    { split; done. }
     iFrame "~".
     iApply "IH". iSplit=>//.
     iPureIntro. eapply cstep_preserves_not_jmp=>//.
@@ -134,10 +133,8 @@ Section rules.
     iIntros "[Hs' Hs]".
     rewrite /stack_interp /gen_stack.
     iDestruct (own_valid_2 with "Hs Hs'") as "%".
-    iPureIntro.
-    destruct H0 as [? ?].
-    simpl in H1.
-    by apply to_agree_comp_valid in H1.
+    iPureIntro. destruct H0 as [? ?].
+    simpl in H1. by apply to_agree_comp_valid in H1.
   Qed.
 
   Lemma stack_pop k k' ks ks':
@@ -181,20 +178,22 @@ Section rules.
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit.
     { iDestruct (stack_agree with "[Hstk Hs]") as "%"; first iFrame.
-      subst. iPureIntro. destruct a. eexists _, (State s_heap s_text _).
-      apply CSjstep. simpl in H0. subst. constructor.
+      subst. iPureIntro. destruct a. eexists _, (State s_heap s_text _), [].
+      split; last done. apply CSjstep. simpl in H0. subst. constructor.
       apply cont_uninj. done. }
-    iNext. iIntros (???).
-    inversion H0; subst; first by apply fill_estep_false in H1.
-    inversion H1; subst.
+    iNext. iIntros (??? (? & ?)).
+    inversion H0; subst.
+    { by apply fill_estep_false in H2. }
+    inversion H2; subst.
     - assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
       { apply cont_inj=>//. }
       inversion H3. subst. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
       destruct H5; subst.
       iFrame. iMod "Hclose" as "_".
-      iModIntro. by iApply "HΦ".
-    - apply cont_inj in H2=>//.
-      destruct H2 as [? ?]; done.
+      iModIntro. iSplitL; first by iApply "HΦ".
+      by rewrite big_sepL_nil.
+    - apply cont_inj in H1=>//.
+      destruct H1 as [? ?]; done.
       simpl. apply forall_is_val.
   Qed.
 
@@ -202,28 +201,28 @@ Section rules.
     ▷ WP s @ E {{ Φ }} ⊢ WP Eseq (Evalue v) s @ E {{ Φ }}.
   Proof.
     iIntros "Φ". iApply wp_lift_pure_step; eauto.
-    - destruct σ1. eexists _, _. by constructor.
-    - inversion 1.
-      + inversion H1=>//.
-        simplify_eq. inversion H1=>//. simplify_eq.
-        exfalso. replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H2; last done.
-        replace (fill_expr (fill_ectxs e kes0) k0)
-        with (fill_ectxs e (k0::kes0)) in H2; last done.
-        by eapply (escape_false H9 H2).
-      + simplify_eq. inversion H1; subst.
-        * unfold unfill in H4. rewrite H2 in H4.
+    - destruct σ1. eexists _, _, [].
+      split; last done. constructor. constructor.
+    - destruct 1.
+      inversion H0=>//.
+      + simplify_eq. inversion H2=>//. simplify_eq.
+        exfalso. replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1; last done.
+        replace (fill_expr (fill_ectxs e kes) k)
+        with (fill_ectxs e (k::kes)) in H1; last done.
+        by eapply (escape_false H4 H1).
+      + simplify_eq. inversion H2; subst.
+        * unfold unfill in H4. rewrite H1 in H4.
           simpl in H4. done.
-        * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H2 =>//.
-          apply cont_inj in H2=>//.
-          by destruct H2.
+        * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
+          apply cont_inj in H1=>//. by destruct H1.
           by apply forall_is_val.
-    - iNext. iIntros (??? Hstep).
-      inversion Hstep.
-      + simplify_eq. inversion H0.
-        { simplify_eq. done. }
-        { simplify_eq. exfalso. by eapply (escape_false H3 H1). }
-      + simplify_eq. inversion H0; subst.
-        * simplify_eq. by rewrite /unfill H1 /= in H3.
+    - iNext. iIntros (???? (?& ?)).
+      inversion H0; subst.
+      + inversion H2; subst.
+        { iFrame. by rewrite big_sepL_nil. }
+        { exfalso. by eapply (escape_false H4 H1). }
+      + simplify_eq. inversion H2; subst.
+        * by rewrite /unfill H1 /= in H4.
         * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
           apply cont_inj in H1=>//.
           by destruct H1.
@@ -247,13 +246,14 @@ Section rules.
     iIntros (?) "H". iApply (wp_lift_step E _ s1)=>//; iIntros (σ1) "Hσ1".
     iMod ("H" $! σ1 with "Hσ1") as "[$ H]".
     iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
-    iModIntro; iNext; iIntros (s2 σ2) "%". iMod "Hclose" as "_".
+    iModIntro; iNext; iIntros (s2 σ2 ? (? &?)). iMod "Hclose" as "_".
     iMod ("H" $! _ _ with "[#]") as "($ & H)"=>//.
     destruct (to_val s2) eqn:?; last by iExFalso.
-    by iApply wp_value.
+    iSplitL; first by iApply wp_value.
+    subst. by rewrite big_sepL_nil.
   Qed.
 
-  Lemma gen_heap_update_bytes σ:
+  Lemma gen_heap_update_bytes (σ: heap):
     ∀ bs l bs',
       length bs = length bs' →
       gen_heap_ctx σ -∗ mapstobytes l 1 bs ==∗
@@ -306,7 +306,7 @@ Section rules.
     iApply wp_lift_atomic_step=>//.
     iIntros (σ1) "[Hσ [HΓ ?]] !>".
     rewrite /mapstoval. iSplit; first eauto.
-    { iPureIntro. destruct σ1. eexists _, _. by constructor. }
+    { iPureIntro. destruct σ1. eexists _, _, []. split; last done. constructor. constructor. }
     iNext; iIntros (v2 σ2 Hstep).
     iDestruct "Hl" as "[% Hl]".
     iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
@@ -359,7 +359,7 @@ Section rules.
     iFrame. iPureIntro. by constructor.
   Qed.
 
-  Lemma mapsto_readbytes q σ:
+  Lemma mapsto_readbytes q (σ: heap):
     ∀ bs l, mapstobytes l q bs ∗ gen_heap_ctx σ ⊢ ⌜ readbytes l bs σ ⌝.
   Proof.
     induction bs.
@@ -392,7 +392,7 @@ Section rules.
     iDestruct "Hl" as "[>% >Hl]".
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
     iModIntro. iSplit; first eauto.
-    { iPureIntro. destruct σ1. eexists _, _. constructor. simpl in H1. by constructor. }
+    { iPureIntro. destruct σ1. eexists _, _, []. simpl in H1. split; last done. by repeat constructor. }
     iNext; iIntros (s2 σ2 Hstep). iModIntro.
     atomic_step Hstep.
     simpl. iFrame.
@@ -406,12 +406,13 @@ Section rules.
   Proof.
     iIntros (?) "HΦ".
     iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _. constructor. by constructor. }
-    { intros. atomic_step H1=>//. }
-    iNext. iIntros (????).
+    { destruct σ1. eexists _, _, _. by repeat constructor. }
+    { destruct 1. atomic_step H1=>//. }
+    iNext. iIntros (????(?&?)).
     atomic_step H1.
     rewrite H0 in H9. inversion H9. subst.
-    iApply wp_value=>//.
+    iSplitL; first by iApply wp_value=>//.
+    by rewrite big_sepL_nil.
   Qed.
 
   Lemma wp_while_true cond s Φ:
@@ -420,10 +421,12 @@ Section rules.
   Proof.
     iIntros "Hnext".
     iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _. constructor. by constructor. }
-    { intros. atomic_step H0=>//. }
-    iNext. iIntros (????).
-    by atomic_step H0.
+    { destruct σ1. eexists _, _, []. by repeat constructor. }
+    { destruct 1. atomic_step H0=>//. }
+    iNext. iIntros (???? (?&?)).
+    atomic_step H0.
+    iSplitL=>//.
+    by rewrite big_sepL_nil.
   Qed.
 
   Lemma wp_while_false cond s Φ:
@@ -432,11 +435,12 @@ Section rules.
   Proof.
     iIntros "HΦ".
     iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _. constructor. by constructor. }
-    { intros. atomic_step H0=>//. }
-    iNext. iIntros (????).
+    { destruct σ1. eexists _, _, []. by repeat constructor. }
+    { destruct 1. atomic_step H0=>//. }
+    iNext. iIntros (???? (?&?)).
     atomic_step H0.
-    by iApply wp_value.
+    iSplitL; first by iApply wp_value.
+    by rewrite big_sepL_nil.
   Qed.
 
   Lemma wp_while_inv I Q cond s:
@@ -463,10 +467,11 @@ Section rules.
   Proof.
     iIntros "HΦ".
     iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _. constructor. by constructor. }
-    { intros. atomic_step H0=>//. }
-    iNext. iIntros (????).
-    atomic_step H0. by iApply wp_value.
+    { destruct σ1. eexists _, _, _. by repeat constructor. }
+    { destruct 1. atomic_step H0=>//. }
+    iNext. iIntros (???? (?&?)).
+    atomic_step H0. iSplitL; first by iApply wp_value.
+    by rewrite big_sepL_nil.
   Qed.
 
   Lemma wp_snd v1 v2 Φ:
@@ -475,10 +480,11 @@ Section rules.
   Proof.
     iIntros "HΦ".
     iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _. constructor. by constructor. }
-    { intros. atomic_step H0=>//. }
-    iNext. iIntros (????).
-    atomic_step H0. by iApply wp_value.
+    { destruct σ1. eexists _, _, _. by repeat constructor. }
+    { destruct 1. atomic_step H0=>//. }
+    iNext. iIntros (????(?&?)).
+    atomic_step H0. iSplitL; first by iApply wp_value.
+    by rewrite big_sepL_nil.
   Qed.
 
   (* Freshness and memory allocation *)
@@ -543,7 +549,7 @@ Section rules.
     iApply wp_lift_atomic_step=>//.
     iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]".
     iModIntro. iSplit.
-    { iPureIntro. eexists _, _. apply CSestep. by apply alloc_fresh. }
+    { iPureIntro. eexists _, _, []. split; last done. apply CSestep. by apply alloc_fresh. }
     iNext. iIntros (e2 σ2 ?).
     atomic_step H1.
     iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//.
@@ -593,10 +599,10 @@ Section rules.
     iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
     simpl in H2.
     iModIntro. iSplit.
-    { iPureIntro. eexists _, _. apply CSjstep. eapply JScall=>//. }
-    iNext. iIntros (e2 σ2 ?).
-    iMod "Hclose". inversion H3; subst; first by apply fill_estep_false in H10.
-    inversion H10; subst.
+    { iPureIntro. eexists _, _, []. split; last done. apply CSjstep. eapply JScall=>//. }
+    iNext. iIntros (e2 σ2 ? (?&?)).
+    iMod "Hclose". inversion H3; subst; first by apply fill_estep_false in H11.
+    inversion H11; subst.
     + apply cont_inj in H0=>//; last by apply forall_is_val.
         by destruct H0.
     + apply cont_inj in H0=>//; try apply forall_is_val.
@@ -609,7 +615,9 @@ Section rules.
       subst. clear H0 H9 H4.
       rewrite H5 in H2. inversion H2. subst. clear H2.
       rewrite H1 in H7. inversion H7.
-      by iApply "HΦ".
+      iSplitL; first by iApply "HΦ".
+      by rewrite big_sepL_nil.
   Qed.
 
 End rules.
+
