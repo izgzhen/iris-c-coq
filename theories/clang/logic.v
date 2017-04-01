@@ -32,14 +32,17 @@ Section wp.
   Definition stack_interp (s: stack) :=
     own clangG_stackG_name ((1/2)%Qp, (to_agree (s: discreteC stack))).
 
-  Definition gen_text (m: text) : iProp Σ :=
-    own clangG_textG_name (● (fmap (λ v, to_agree (v : leibnizC _)) m)).
+  Definition to_gen_text (t: text) := fmap (λ v, to_agree (v : leibnizC function)) t.
+  
+  Definition own_text (m: text) : iProp Σ :=
+    own clangG_textG_name (● to_gen_text m).
 
-  Definition gen_stack (s: stack) : iProp Σ :=
-    own clangG_stackG_name ((1/2)%Qp, (to_agree (s: discreteC stack))).
+  Definition to_gen_stack (s: stack) := ((1/2)%Qp, (to_agree (s: discreteC stack))).
+  
+  Definition own_stack (s: stack) : iProp Σ := own clangG_stackG_name (to_gen_stack s).
 
-  Definition state_interp (s: state) : iProp Σ:=
-    (gen_heap_ctx (s_heap s) ∗ gen_text (s_text s) ∗ gen_stack (s_stack s))%I.
+  Definition clang_state_interp (s: state) : iProp Σ:=
+    (gen_heap_ctx (s_heap s) ∗ own_text (s_text s) ∗ own_stack (s_stack s))%I.
 
   Fixpoint mapstobytes l q bytes: iProp Σ :=
     let '(b, o) := l in
@@ -55,7 +58,7 @@ End wp.
 
 Instance heapG_irisG `{clangG Σ}: irisG clang_lang Σ := {
   iris_invG := clangG_invG;
-  state_interp := state_interp
+  state_interp := clang_state_interp
 }.
 
 Global Opaque iris_invG.
@@ -128,22 +131,22 @@ Section rules.
   Qed.
 
   Lemma stack_agree ks ks':
-    stack_interp ks ∗ gen_stack ks' ⊢ ⌜ ks = ks' ⌝.
+    stack_interp ks ∗ own_stack ks' ⊢ ⌜ ks = ks' ⌝.
   Proof.
     iIntros "[Hs' Hs]".
-    rewrite /stack_interp /gen_stack.
+    rewrite /stack_interp /own_stack.
     iDestruct (own_valid_2 with "Hs Hs'") as "%".
     iPureIntro. destruct H0 as [? ?].
     simpl in H1. by apply to_agree_comp_valid in H1.
   Qed.
 
   Lemma stack_pop k k' ks ks':
-    stack_interp (k::ks) ∗ gen_stack (k'::ks') ==∗ stack_interp (ks) ∗ gen_stack (ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
+    stack_interp (k::ks) ∗ own_stack (k'::ks') ==∗ stack_interp (ks) ∗ own_stack (ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
   Proof.
     iIntros "[Hs Hs']".
     iDestruct (stack_agree with "[-]") as "%"; first iFrame.
     inversion H0. subst.
-    rewrite /stack_interp /gen_stack.
+    rewrite /stack_interp /own_stack.
     iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
     rewrite pair_op frac_op' Qp_div_2.
     apply cmra_update_exclusive.
@@ -153,12 +156,12 @@ Section rules.
   Qed.
 
   Lemma stack_push k ks ks':
-    stack_interp (ks) ∗ gen_stack (ks') ==∗ stack_interp (k::ks) ∗ gen_stack (k::ks') ∗ ⌜ ks = ks' ⌝.
+    stack_interp (ks) ∗ own_stack (ks') ==∗ stack_interp (k::ks) ∗ own_stack (k::ks') ∗ ⌜ ks = ks' ⌝.
   Proof.
     iIntros "[Hs Hs']".
     iDestruct (stack_agree with "[-]") as "%"; first iFrame.
     inversion H0. subst.
-    rewrite /stack_interp /gen_stack.
+    rewrite /stack_interp /own_stack.
     iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
     - rewrite pair_op frac_op' Qp_div_2.
       apply cmra_update_exclusive.
@@ -575,11 +578,11 @@ Section rules.
   Qed.
 
   Lemma lookup_text f x Γ:
-    text_interp f x ∗ gen_text Γ
+    text_interp f x ∗ own_text Γ
     ⊢ ⌜ Γ !! f = Some x⌝.
   Proof.
     iIntros "[Hf HΓ]".
-    rewrite /gen_text /text_interp. iDestruct (own_valid_2 with "HΓ Hf")
+    rewrite /own_text /text_interp. iDestruct (own_valid_2 with "HΓ Hf")
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
     done.
   Qed.
@@ -620,4 +623,3 @@ Section rules.
   Qed.
 
 End rules.
-
