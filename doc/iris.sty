@@ -448,9 +448,9 @@
 \newcommand{\tychk}[2]{\vdash_{\text{tychk}} {#1} : {#2}}
 \newcommand{\tyinf}[2]{\vdash_{\text{tyinf}} {#1} : {#2}}
 
-\newcommand{\estep}[4]{({#1}, {#2}) \ra_{\Expr} ({#3}, {#4})}
+\newcommand{\estep}[4]{({#1}, {#2}) \ra_{local} ({#3}, {#4})}
 \newcommand{\jstep}[5]{({#2}, {#3}) \ra_{jump}^{#1} ({#4}, {#5})}
-\newcommand{\cstep}[6]{({#1}, {#2}, {#3}) \ra_{\text{cur}} ({#4}, {#5}, {#6})}
+\newcommand{\cstep}[4]{({#1}, {#2}) \ra_c ({#3}, {#4})}
 \newcommand{\sstep}[4]{({#1}, {#2}) \ra_{spec} ({#3}, {#4})}
 \newcommand{\sstepstar}[4]{({#1}, {#2}) \ra^{*}_{spec} ({#3}, {#4})}
 

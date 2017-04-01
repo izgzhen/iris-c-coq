@@ -70,7 +70,7 @@ easier manipulation of spatial assertions and also a clean, unified language syn
 
 We define the HNF small step semantics for both non-jumping expression ($\estep{e}{\sigma}{e'}{\sigma'}$) and
 jumping expressions ($\jstep{\sigma}{e}{s: \stack}{e'}{s': \stack}$),
-and then combine them together ($\cstep{e}{\sigma}{s}{e'}{\sigma'}{s'}$).
+and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$).
 
 \begin{figure}
 \begin{mathpar}
@@ -94,6 +94,14 @@ and then combine them together ($\cstep{e}{\sigma}{s}{e'}{\sigma'}{s'}$).
 \infer[ES-WHILE-FALSE]{}{\estep{\swhile{e}{\vfalse}{s}}{\sigma}{\sskip}{\sigma}}
 
 \infer[ES-BIND']{\isjmp(e) = \FALSE \quad \estep{e}{\sigma}{e'}{\sigma'}}{\estep{(k::ks)e}{\sigma}{(k::ks)e'}{\sigma'}}
+
+\infer[JS-RETE]
+  {\unfill(k(\srete{v})) = (k, \srete{v})}
+  {\jstep{\sigma}{k'(\srete{v})}{k::ks}{k(v)}{ks}}
+
+\infer[JS-CALL]
+  {\sigma(f) = \Funct(ps, e)}
+  {\jstep{\sigma}{k(\scall{f}{ls})}{ks}{\instantiate(ps, ls, e)}{k::ks}}
 
 \end{mathpar}
 \caption{Semantics rules}

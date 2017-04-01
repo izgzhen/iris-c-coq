@@ -30,20 +30,20 @@ For our heap state,
 \]
 
 \begin{align*}
-  \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, \cureval, \pred, \predret. \\
-        & (\Exists v. \toval(\cureval) = v \land \pvs[\mask] \pred(v)) \lor {}\\
-        & (\Exists v. \toretval(\cureval) = v \land \pvs[\mask] \predret (v)) \lor {}\\
-        & \Bigl(\toval(\cureval) = \bot \land \toretval(\cureval) = \bot \land \\
+  \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, e, \pred. \\
+        & (\Exists v. \toval(e) = v \land \pvs[\mask] \pred(v)) \lor {}\\
+        & \Bigl(\toval(e) = \bot \,\land \\
         &\qquad \All \state. S(\state) \vsW[\mask][\emptyset] {}\\
-        &\qquad \red(e, \state) * \later\All \cureval', \state'. (\cureval, \state \step \cureval', \state') \vsW[\emptyset][\mask] {}\\
-        &\qquad\qquad S(\state') * \textdom{wp}(\mask, \cureval', \pred, \predret)\Bigr) \\
+        &\qquad \red(e, \state) * \later\All e', \state'. \cstep{e}{\state}{e'}{\state'} \vsW[\emptyset][\mask] {}\\
+        &\qquad\qquad S(\state') * \textdom{wp}(\mask, e', \pred)\Bigr) \\
 \end{align*}
+
+The definition of WP is exactly the same as in Iris's program logic. In fact, I instantiated this part in Coq instead of reinventing the wheel.
 
 Here are some conventions:
 
 \begin{itemize}
 \item If we leave away the mask, we assume it to default to $\top$.
-\item We will leave $\dag$ out when writing $\cureval$ in WP.
 \item $\pred$ in post-condition might or might not take a value parameter, depending on the context.
 \end{itemize}
 
@@ -146,7 +146,18 @@ The following rules can all be derived:
 
 \end{mathpar}
 
+\subsection{Soundness}
+
+The soundness of WP-style program is proven by showing that it is \emph{adequate}: For all $e, \sigma, \pred: \Val \ra \Prop$,
+
+\begin{align*}
+&\TRUE \proves \wpre{e}[\top]{\pred} \ra \\
+&\quad (\All v, \sigma'. \cstep{e}{\sigma}{v}{\sigma'} \ra \pred(v)) \land \\
+&\quad (\All e', \sigma'. \cstep{e}{\sigma}{e'}{\sigma'} \ra (\Exists v. e = v) \lor \red(e', \sigma'))
+\end{align*}
+
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "iris"
 %%% End:
+
