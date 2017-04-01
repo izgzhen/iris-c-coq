@@ -10,12 +10,15 @@ Import uPred.
 Instance equiv_type_function: Equiv function := (=).
 Instance equiv_type_stack: Equiv stack := (=).
 
+Definition textG := authR (gmapUR ident (agreeR (discreteC function))).
+Definition stackG := prodR fracR (agreeR (discreteC stack)).
+
 Class clangG Σ := ClangG {
-  clangG_invG :> invG.invG Σ;
+  clangG_invG :> invG Σ;
   clangG_heapG :> gen_heapG addr byteval Σ;
-  clangG_textG :> inG Σ (authR (gmapUR ident (agreeR (discreteC function))));
+  clangG_textG :> inG Σ textG;
   clangG_textG_name : gname;
-  clangG_stackG :> inG Σ (prodR fracR (agreeR (discreteC stack)));
+  clangG_stackG :> inG Σ stackG;
   clangG_stackG_name : gname
 }.
 

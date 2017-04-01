@@ -206,24 +206,24 @@ Admitted.
 
 Class clangPreG Σ := ClangPreG {
   clang_preG_iris :> invPreG Σ;
-  clang_preG_clang :> gen_heapPreG addr val Σ;
-  clangG_preG_textG :> inG Σ (authR (gmapUR ident (agreeR (discreteC function))));
-  clangG_preG_stackG :> inG Σ (prodR fracR (agreeR (discreteC stack)));
+  clang_preG_clang :> gen_heapPreG addr byteval Σ;
+  clangG_preG_textG :> inG Σ textG;
+  clangG_preG_stackG :> inG Σ stackG;
 }.
 
-(* Definition heapΣ : gFunctors := #[invΣ; gen_heapΣ loc val]. *)
-(* Instance subG_heapPreG {Σ} : subG heapΣ Σ → heapPreG Σ. *)
-(* Proof. solve_inG. Qed. *)
+Definition clangΣ : gFunctors := #[invΣ; gen_heapΣ addr byteval; GFunctor textG; GFunctor stackG].
+Instance subG_clangPreG {Σ} : subG clangΣ Σ → clangPreG Σ.
+Proof. solve_inG. Qed.
 
 Definition clang_adequacy Σ `{clangPreG Σ} e σ ks φ :
   (∀ `{clangG Σ}, True ⊢ WP e {{ v, ⌜φ v⌝ }}) →
   adequate e σ ks φ.
 Proof.
-(*   intros Hwp; eapply (wp_adequacy _ _); iIntros (?) "". *)
-(*   iMod (own_alloc (● to_gen_heap σ)) as (γ) "Hh". *)
-(*   { apply: auth_auth_valid. exact: to_gen_heap_valid. } *)
-(*   iModIntro. iExists (λ σ, own γ (● to_gen_heap σ)); iFrame. *)
-(*   set (Hheap := GenHeapG loc val Σ _ _ _ γ). *)
-(*   iApply (Hwp (HeapG _ _ _)). *)
-(* Qed. *)
-Admitted.
+  intros Hwp; eapply (wp_adequacy Σ _); iIntros (?) "".
+  iMod (own_alloc (● to_gen_heap (s_heap σ))) as (γ) "Hh".
+  { apply: auth_auth_valid. exact: to_gen_heap_valid. }
+  iModIntro. rewrite /state_interp /gen_heap_ctx. 
+  set (Hheap := GenHeapG loc val Σ _ _ _ γ).
+  iApply (Hwp (HeapG _ _ _)).
+Qed.
+
