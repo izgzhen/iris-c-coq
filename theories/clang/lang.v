@@ -3,6 +3,7 @@
 From iris.base_logic Require Export gen_heap big_op.
 From iris.algebra Require Import gmap.
 From iris_os.lib Require Export smap prelude.
+From iris.program_logic Require Export language.
 From iris_os.clang Require Export memory types.
 
 Open Scope Z_scope.
@@ -200,7 +201,10 @@ Definition to_val (c: expr) :=
     | _ => None
   end.
 
-Lemma of_to_val e v : to_val e = Some v → e = Evalue v.
+Lemma to_of_val v: to_val (Evalue v) = Some v.
+Proof. done. Qed.
+
+Lemma of_to_val e v : to_val e = Some v → Evalue v = e.
 Proof. induction e; crush. Qed.
 
 Lemma fill_ectx_not_val e K: to_val (fill_expr e K) = None.
@@ -648,14 +652,6 @@ Inductive cstep: expr → state → expr → state → Prop :=
 | CSjstep:
     ∀ e e' h t s s' , jstep t e s e' s' → cstep e (State h t s) e' (State h t s').
 
-Lemma cstep_not_val e σ e' σ':
-  cstep e σ e' σ' → to_val e = None.
-Proof.
-  inversion 1; subst.
-  - by eapply estep_not_val.
-  - inversion H0; by apply fill_ectxs_not_val.
-Qed.
-
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
@@ -797,3 +793,16 @@ Proof.
   intros. inversion H. subst. eapply (escape_false H2)=>//.
   apply forall_is_val.
 Qed.
+
+Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ'.
+
+Lemma step_not_val e σ e' σ' efs:
+  step e σ e' σ' efs → to_val e = None.
+Proof.
+  inversion 1; subst.
+  - by eapply estep_not_val.
+  - inversion H0; by apply fill_ectxs_not_val.
+Qed.
+
+Definition clang_lang :=
+  Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
