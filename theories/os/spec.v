@@ -10,6 +10,7 @@ From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
+
 Definition spec_state := gmap ident val. (* XXX: should be parameterized *)
 
 Definition spec_rel := spec_state → option val → spec_state → Prop.
@@ -81,6 +82,21 @@ Notation "l S↦ v" :=
 Section rules.
   Context `{specG Σ}.
 
+  Parameter spec_snapshot: list (spec_state * spec_code) → iProp Σ.
+  Parameter spec_master: list (spec_state * spec_code) → iProp Σ.
+
+  Parameter spec_prefix:
+    ∀ cs cs',
+      spec_master cs ∗ spec_snapshot cs'
+      ⊢ ∃ cs'', ⌜ cs = cs'' ++ cs'⌝.
+
+  Parameter spec_snap:
+    ∀ cs,
+      spec_master cs ⊢ spec_master cs ∗ spec_snapshot cs.
+
+  Parameter spec_grow:
+    ∀ c cs, spec_master cs ⊢ spec_master (c::cs).
+  
   Definition γ_sstate := @gen_heap_name _ _ _ _ _ specG_spstG.
 
   Definition sstate (s: spec_state) := ([⋅ map] l ↦ v ∈ s, l S↦ v)%I.
@@ -91,8 +107,9 @@ Section rules.
   Proof. by rewrite /sstate big_sepM_singleton. Qed.
 
   Definition spec_inv :=
-    (∃ c0 s0 c s,
-     scode c ∗ own γ_sstate (● to_gen_heap s) ∗ ⌜ spec_step_star c0 s0 c s⌝)%I.
+    (∃ c0 s0 c s cs,
+       scode c ∗ own γ_sstate (● to_gen_heap s) ∗
+       spec_master ((s, c)::cs) ∗ ⌜ spec_step_star c0 s0 c s ⌝)%I.
 
   Lemma sstate_update s ss ss':
     own γ_sstate (● to_gen_heap s) ∗
@@ -131,22 +148,46 @@ Section rules.
   Lemma spec_update ss sc ss' sc':
     spec_step sc ss sc' ss' →
     spec_inv ∗ sstate ss ∗ scode sc
-    ⊢ |==> spec_inv ∗ sstate ss' ∗ scode sc'.
+    ⊢ |==> (∃ cs, spec_inv ∗ sstate ss' ∗ scode sc' ∗ spec_snapshot ((ss', sc')::(ss, sc)::cs)).
   Proof.
-    iIntros (?) "(Hinv & Hss & Hsc)".
-    iDestruct "Hinv" as (c0 s0 c s) "(HSC & HSS & %)".
-    rewrite /sstate /scode.
-    (* HSC Hsc and sc' are easy to prove *)
-    (* ss, s => ss' are hard, might need some framing properties *)
-    iDestruct (sstate_update s ss ss' with "[HSS Hss]") as (s') "(HSS' & Hss' & %)"; first iFrame.
-    iMod (scode_update _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame.
-    iSplitL "HSS' HSC'".
-    { iExists c0, s0, sc', s'. iFrame.
-      destruct H2 as (sf & ? & ? & ?).
-      subst. iPureIntro.
-      eapply SStrans=>//.
-      apply spec_step_framing=>//.
-    }
-    by iFrame.
-  Qed.
+    (* iIntros (?) "(Hinv & Hss & Hsc)". *)
+    (* iDestruct "Hinv" as (c0 s0 c s) "(HSC & HSS & %)". *)
+    (* rewrite /sstate /scode. *)
+    (* (* HSC Hsc and sc' are easy to prove *) *)
+    (* (* ss, s => ss' are hard, might need some framing properties *) *)
+    (* iDestruct (sstate_update s ss ss' with "[HSS Hss]") as (s') "(HSS' & Hss' & %)"; first iFrame. *)
+    (* iMod (scode_update _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame. *)
+    (* iSplitL "HSS' HSC'". *)
+    (* { iExists c0, s0, sc', s'. iFrame. *)
+    (*   destruct H2 as (sf & ? & ? & ?). *)
+    (*   subst. iPureIntro. *)
+    (*   eapply SStrans=>//. *)
+    (*   apply spec_step_framing=>//. *)
+    (* } *)
+    (* by iFrame. *)
+  Admitted.
+
+  Lemma spec_recover ss sc cs ss0 sc0:
+    spec_inv ∗ sstate ss ∗ scode sc ∗ spec_snapshot ((ss0, sc0)::cs)
+    ⊢ ⌜ spec_step_star sc0 ss0 sc ss ⌝.
+  Admitted.
+
 End rules.
+
+Section sound.
+  Context `{specG Σ, clangG Σ}.
+
+  Inductive simulate: expr → spec_code → Prop :=
+  | SimVal: ∀ v, simulate (Evalue v) (SCdone (Some v))
+  | SimStep:
+      ∀ σ σ' (Σ Σ': spec_state) e c e' c',
+        cstep e σ e' σ' →
+        spec_step_star c Σ c' Σ →
+        simulate e c.
+  
+  Lemma soundness c σ σ' e:
+    (scode c ∗ sstate σ ⊢ WP e {{ v, scode (SCdone (Some v)) ∗ sstate σ' }}) →
+    simulate e c.
+  Admitted.
+End sound.
+  
