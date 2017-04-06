@@ -1,7 +1,7 @@
 (* Spec Monoid *)
 
 Require Import logic.
-From iris.base_logic Require Import gen_heap.
+From iris.base_logic Require Import soundness gen_heap.
 From iris.base_logic Require Export big_op.
 From iris.algebra Require Import gmap agree auth frac.
 From iris.base_logic.lib Require Import wsat fancy_updates.
@@ -9,7 +9,6 @@ From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
 Set Default Proof Using "Type".
 Import uPred.
-
 
 Definition spec_state := gmap ident val. (* XXX: should be parameterized *)
 
@@ -184,10 +183,46 @@ Section sound.
         cstep e σ e' σ' →
         spec_step_star c Σ c' Σ →
         simulate e c.
-  
-  Lemma soundness c σ σ' e:
-    (scode c ∗ sstate σ ⊢ WP e {{ v, scode (SCdone (Some v)) ∗ sstate σ' }}) →
-    simulate e c.
+
+  Require Import iris.program_logic.language.
+
+  Lemma wp_step_spec e1 σ1 e2 σ2 c1 Σ1 c2 Σ2 Φ:
+    cstep e1 σ1 e2 σ2 →
+    spec_step c1 Σ1 c2 Σ2 →
+    sstate Σ1 ∗ scode c1 ∗ spec_inv ∗ WP e1 {{ Φ }} ==∗
+    ▷ |==> ◇ (sstate Σ2 ∗ scode c2 ∗ WP e2 {{ Φ }}).
   Admitted.
+
+  Lemma wp_steps_spec n e1 σ1 e2 σ2 c1 Σ1 c2 Σ2 Φ:
+  nsteps (@step clang_lang) n ([e1], σ1) ([e2], σ2) →
+  sstate Σ1 ∗ scode c1 ∗ spec_inv ∗ WP e1 {{ Φ }} ⊢
+  Nat.iter (S n) (λ P, |==> ▷ P) (∃ e2,
+    sstate Σ2 ∗ scode c2 ∗ WP e2 {{ Φ }}).
+  Admitted.
+
+  Lemma wptp_result_spec n e1 σ1 v2 σ2 Σ1 c1 Φ:
+    nsteps (@step clang_lang) n ([e1], σ1) ([Evalue v2], σ2) →
+    sstate Σ1 ∗ scode c1 ∗ spec_inv ∗ WP e1 {{ v, ⌜Φ v⌝ }} ⊢
+    Nat.iter (S (S n)) (λ P, |==> ▷ P) ⌜Φ v2⌝.
+  Admitted.
+
+  Lemma soundness c Σ1 Σ2 σ σ' e v:
+    (spec_inv ∗ scode c ∗ sstate Σ1
+     ⊢ WP e {{ v, spec_inv ∗ scode (SCdone (Some v)) ∗ sstate Σ2 }}) →
+    rtc step ([e], σ) ([Evalue v], σ') →
+    simulate e c.
+  Proof.
+    intros Hwp [n ?]%rtc_nsteps.
+    destruct (to_val e) eqn:?.
+    - assert (e = Evalue v0) as ?; first admit. subst.
+      
+      eapply (soundness (M:=iResUR Σ) _ (S (S n))); iIntros "".
+      
+      iAssert (spec_inv ∗ scode c ∗ sstate Σ1)%I as "[? [? ?]]"; first admit.
+      iDestruct (Hwp with "[-]") as "?"; first iFrame.
+      
+      iApply wptp_result_spec.
+    
+    
 End sound.
   
