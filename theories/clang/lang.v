@@ -792,5 +792,10 @@ Proof.
   - inversion H1; by apply fill_ectxs_not_val.
 Qed.
 
+Lemma unfill_app e eh K K':
+  unfill_expr e [] = Some (K, eh) →
+  unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
+Admitted.
+
 Definition clang_lang :=
   Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
