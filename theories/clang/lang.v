@@ -239,7 +239,7 @@ Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
       end
     | Ederef e =>
       match type_infer ev e, resolve_rhs ev e with
-        | Some (Tptr t), Some e' => Some (Ederef_typed t e') 
+        | Some (Tptr t), Some e' => Some (Ederef_typed t e')
         | _, _ => None
       end
     | Eaddrof e => Eaddrof <$> resolve_rhs ev e
@@ -513,7 +513,7 @@ Proof. induction e; crush. Qed.
 
 Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
-Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.  
+Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.
 
 Lemma cont_inj {e e' kes kes'}:
   enf e = true → enf e' = true →
@@ -604,15 +604,14 @@ Lemma focus_estep_inv'' {eh1 σ1 σ2}:
     ∃ eh2, estep eh1 σ1 eh2 σ2 ∧ e2 = fill_ectxs eh2 K.
 Proof. intros H. move: (focus_estep_inv' eh1 σ1 σ2 H) => /= H'. done. Qed.
 
-Lemma focus_estep {e1 σ1 e2 σ2}:
+Axiom focus_estep: ∀ e1 σ1 e2 σ2,
   estep e1 σ1 e2 σ2 → ∃ K eh1, e1 = fill_ectxs eh1 K ∧ enf eh1 = true.
-Admitted.
 
 Lemma focus_estep_inv {e1 σ1 e2 σ2}:
   estep e1 σ1 e2 σ2 →
   ∃ e1' e2' K, enf e1' = true ∧ e1 = fill_ectxs e1' K ∧ estep e1' σ1 e2' σ2 ∧ e2 = fill_ectxs e2' K.
 Proof.
-  intros H. move: (focus_estep H) => [K [eh1 [? H']]].
+  intros H. move: (focus_estep _ _ _ _ H) => [K [eh1 [? H']]].
   subst. exists eh1.
   destruct (@focus_estep_inv'' eh1 σ1 σ2 H' K e2) as [e' [? ?]]=>//.
   eexists e', K.
@@ -727,7 +726,7 @@ Proof.
   - by rewrite is_jmp_ret in H.
   - by rewrite is_jmp_call in H.
 Qed.
-  
+
 Lemma CSbind':
     ∀ e e' σ σ' k kes,
       is_jmp e = false →
