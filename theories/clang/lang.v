@@ -555,11 +555,20 @@ Ltac gen_eq H E1 E2 KS :=
 Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
 Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 
+Lemma fill_cons e K K': fill_expr (fill_ectxs e K) K' = fill_ectxs e (K' :: K).
+Proof. induction K'=>//. Qed.
+
 Axiom cont_ind:
   ∀ P: cont → Prop,
     (P []) →
-    (∀ ks, (∀ ks', length ks' < length ks → P ks') → P ks) →
+    (∀ ks, (∀ ks', length ks' < length ks → P ks')%nat → P ks) →
     (∀ ks, P ks). (* TODO: it should be provable *)
+
+Lemma unfill_segment {e ks eh ks'}:
+  enf eh = true →
+  fill_ectxs e ks = fill_ectxs eh ks' →
+  ∃ ks'', ks' = ks ++ ks'' ∧ e = fill_ectxs eh ks''.
+Admitted.
 
 Lemma focus_estep_inv' eh1 σ1 σ2:
   enf eh1 = true →
@@ -573,15 +582,20 @@ Proof.
   intros H P. apply (cont_ind P).
   - unfold P. eauto.
   - unfold P. intros.
-    inversion H1=>//.
-    admit. admit. admit. admit. admit. admit. admit. admit. admit.
-    assert (∃ K', (k::kes) ++ K' = ks ∧ e = fill_ectxs eh1 K') as [K' [? ?]]; first admit.
-    subst. apply (H0 K') in H4; last admit.
-    destruct H4 as [eh2 [? ?]].
-    subst. exists eh2.
-    split=>//.
-    rewrite fill_app. done.
-Admitted.
+    inversion H1=>//;
+    try (match goal with
+      | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
+      | [ H : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq H E1 E2 KS; eauto
+    end).
+    subst. gen_eq H3 (Eseq (Evalue v) e2) eh1 ks. eauto.
+    rewrite fill_cons in H2.
+    destruct (unfill_segment H H2) as [K' [? ?]].
+    subst. apply (H0 K') in H4.
+    + destruct H4 as [eh2 [? ?]].
+      subst. exists eh2.
+      split=>//. by rewrite fill_app.
+    + rewrite app_length. simpl. omega.
+Qed.
 
 Lemma focus_estep_inv'' {eh1 σ1 σ2}:
   enf eh1 = true →
@@ -605,12 +619,10 @@ Proof.
   split=>//; split=>//.
 Qed.
   
-(* Difficulty: super hard *)
 Lemma fill_estep_false {e kes e' σ σ'}:
   is_jmp e = true →
   estep (fill_ectxs e kes) σ e' σ' → False.
 Admitted.
-
 
 Axiom not_val_ind:
   ∀ P: expr → Prop,
