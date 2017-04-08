@@ -7,7 +7,7 @@ Section wp_ret.
     (wpr : coPset -c> expr -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ) :
     coPset -c> expr -c> (val -c> iProp Σ) -c> (val -c> iProp Σ) -c> iProp Σ := λ E e1 Φ Φret, (
   (* value case *)
-  (∃ v, ⌜to_val e1 = Some v⌝ ∧ |={E}=> Φ v) ∨
+  (∃ v, ⌜to_val e1 = Some v⌝ ∧ Φ v) ∨
   (* local case *)
   (∃ eh K,
      ⌜to_val e1 = None ∧ unfill_expr e1 [] = Some (K, eh) ⌝ ∧
@@ -42,7 +42,9 @@ Section wp_ret.
   Proof.
     iIntros "H". iLöb as "IH" forall (E e Φ Φret). rewrite !wpr_unfold /wp_pre.
     iDestruct "H" as "[H | H]".
-    - admit.
+    - iDestruct "H" as (v) "[% ?]".
+      apply of_to_val in H0. subst.
+      by rewrite wpr_unfold /wpr_pre.
     - iDestruct "H" as (eh K) "(% & [[% ?] | [% ?]])"; destruct H0.
       + iRight. iExists eh, (kes ++ K).
         iSplit.
@@ -59,7 +61,7 @@ Section wp_ret.
         * iPureIntro. split.
           { by apply fill_ectxs_not_val. }
           { by apply unfill_app. }
-        * iRight. by iSplitL "".         
-  Admitted.
+        * iRight. by iSplitL "".
+  Qed.
   
 End wp_ret.
