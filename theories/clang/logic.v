@@ -171,10 +171,10 @@ Section rules.
       + by apply to_agree_comp_valid.
   Qed.
 
-  Lemma wp_ret k k' ks v Φ:
-    stack_interp (k'::ks)  ∗
-    (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' {{ Φ }})
-    ⊢ WP fill_ectxs (Erete (Evalue v)) k {{ Φ }}.
+  Lemma wp_ret k k' ks v E Φ:
+    stack_interp (k'::ks) ∗
+    (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' @ E {{ Φ }})
+    ⊢ WP fill_ectxs (Erete (Evalue v)) k @ E {{ Φ }}.
   Proof.
     iIntros "[Hs HΦ]". iApply wp_lift_step; eauto; first by apply fill_ectxs_not_val.
     iIntros (?) "[Hσ [HΓ Hstk]]".
@@ -587,13 +587,13 @@ Section rules.
     done.
   Qed.
 
-  Lemma wp_call k ks es ls params f_body f_body' f retty Φ:
+  Lemma wp_call E k ks es ls params f_body f_body' f retty Φ:
     es = map (fun l => Evalue (Vptr l)) ls →
     instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
     text_interp f (Function retty params f_body) ∗
     stack_interp ks ∗
-    ▷ (stack_interp (k::ks) -∗ WP f_body' {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall f es) k {{ Φ }}.
+    ▷ (stack_interp (k::ks) -∗ WP f_body' @ E {{ Φ }})
+    ⊢ WP fill_ectxs (Ecall f es) k @ E {{ Φ }}.
   Proof.
     iIntros (??) "[Hf [Hstk HΦ]]".
     iApply wp_lift_step=>//.

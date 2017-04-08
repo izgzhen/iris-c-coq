@@ -405,6 +405,22 @@ Lemma estep_not_val e σ e' σ':
   estep e σ e' σ' → to_val e = None.
 Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
 
+Definition is_val e := is_some (to_val e).
+
+Lemma to_val_is_val e:
+  to_val e = None ↔ is_val e = false.
+Proof. induction e; crush. Qed.
+
+Lemma forall_is_val ls:
+  forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
+Proof. by induction ls=>//. Qed.
+
+Definition is_loc e :=
+  match to_val e with
+    | Some (Vptr _) => true
+    | _ => false
+  end.
+
 Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
   match e with
     | Evalue _ => None
@@ -459,7 +475,7 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
       end
     | Erete e =>
       match e with
-        | Evalue v => Some (ks, e)
+        | Evalue v => Some (ks, Erete e)
         | _ => unfill_expr e (EKrete :: ks)
       end
     | Eseq e1 e2 =>
@@ -467,23 +483,11 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
         | Evalue v => Some (ks, e)
         | _ => unfill_expr e1 (EKseq e2 :: ks)
       end
+    | Ecall f es =>
+      if forallb is_val es
+        then Some (ks, e)
+        else None (* Unsound *)
     | _ => None
-  end.
-
-Definition is_val e := is_some (to_val e).
-
-Lemma to_val_is_val e:
-  to_val e = None ↔ is_val e = false.
-Proof. induction e; crush. Qed.
-
-Lemma forall_is_val ls:
-  forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
-Proof. by induction ls=>//. Qed.
-
-Definition is_loc e :=
-  match to_val e with
-    | Some (Vptr _) => true
-    | _ => false
   end.
 
 Definition enf (e: expr) :=

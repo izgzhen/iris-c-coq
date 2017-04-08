@@ -45,7 +45,7 @@ Section example.
     ⊢ WP fill_ectxs (Ecall f [Evalue (Vptr px); Evalue (Vptr py)]) k {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & Hx & HΦ)".
-    iApply (wp_call _ _ _ [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
+    iApply (wp_call ⊤ _ _ _ [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
     iFrame. iNext. iIntros "Hstk". iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
@@ -54,7 +54,7 @@ Section example.
     iInv N as ">Hspec" "Hclose".
     iMod (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
                with "[Hspec HY Hsc]")
-      as "(Hspec & Hss' & Hsc')"; [ | iFrame; by iApply mapsto_singleton | ].
+      as (?) "(Hspec & Hss' & Hsc' & ?)"; [ | iFrame; by iApply mapsto_singleton | ].
     { apply spec_step_rel'. unfold f_rel.
       exists vy. gmap_simplify=>//. by gmap_rewrite. }
     (* close invariant *)

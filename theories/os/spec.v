@@ -83,6 +83,8 @@ Section rules.
 
   Parameter spec_snapshot: list (spec_state * spec_code) → iProp Σ.
   Parameter spec_master: list (spec_state * spec_code) → iProp Σ.
+  Instance spec_snapshot_timeless: ∀ l, TimelessP (spec_snapshot l). Admitted.
+  Instance spec_master_timeless: ∀ l, TimelessP (spec_master l). Admitted.
 
   Parameter spec_prefix:
     ∀ cs cs',
@@ -110,6 +112,8 @@ Section rules.
        scode c ∗ own γ_sstate (● to_gen_heap s) ∗
        spec_master ((s, c)::cs) ∗ ⌜ spec_step_star c0 s0 c s ⌝)%I.
 
+  Global Instance spec_inv_timeless: TimelessP spec_inv. Proof. apply _. Qed.
+  
   Lemma sstate_update s ss ss':
     own γ_sstate (● to_gen_heap s) ∗
     ([∗ map] l↦v ∈ ss, l S↦ v)
