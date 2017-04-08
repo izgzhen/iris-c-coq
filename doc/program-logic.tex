@@ -121,10 +121,9 @@ The following rules can all be derived:
 {\wpre{\swhile{e}{\vfalse}{s}}[\mask]{\pred}}
 
 \infer[wp-while-inv]
-{\begin{inbox}
- \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{e}{\pred} \\
- \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
- \end{inbox}}
+{ {\begin{inbox}
+ \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{e}{\pred} \\ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
+ \end{inbox}} }
 {I \proves \wpre{\swhile{e}{e}{s}}{Q}}
 
 \infer[wp-fst]
