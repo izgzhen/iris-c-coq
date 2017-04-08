@@ -552,20 +552,65 @@ Ltac gen_eq H E1 E2 KS :=
   assert (E1 = E2 ∧ [] = KS) as [? ?];
   [ apply cont_inj=>// | subst; clear H ].
 
-(* Difficulty: super hard *)
+Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
+Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
+
+Axiom cont_ind:
+  ∀ P: cont → Prop,
+    (P []) →
+    (∀ ks, (∀ ks', length ks' < length ks → P ks') → P ks) →
+    (∀ ks, P ks). (* TODO: it should be provable *)
+
+Lemma focus_estep_inv' eh1 σ1 σ2:
+  enf eh1 = true →
+  let P K :=
+      (∀ e2,
+         estep (fill_ectxs eh1 K) σ1 e2 σ2 →
+         ∃ eh2, estep eh1 σ1 eh2 σ2 ∧ e2 = fill_ectxs eh2 K
+      )
+  in ∀ K, P K.
+Proof.
+  intros H P. apply (cont_ind P).
+  - unfold P. eauto.
+  - unfold P. intros.
+    inversion H1=>//.
+    admit. admit. admit. admit. admit. admit. admit. admit. admit.
+    assert (∃ K', (k::kes) ++ K' = ks ∧ e = fill_ectxs eh1 K') as [K' [? ?]]; first admit.
+    subst. apply (H0 K') in H4; last admit.
+    destruct H4 as [eh2 [? ?]].
+    subst. exists eh2.
+    split=>//.
+    rewrite fill_app. done.
+Admitted.
+
+Lemma focus_estep_inv'' {eh1 σ1 σ2}:
+  enf eh1 = true →
+  ∀ K e2,
+    estep (fill_ectxs eh1 K) σ1 e2 σ2 →
+    ∃ eh2, estep eh1 σ1 eh2 σ2 ∧ e2 = fill_ectxs eh2 K.
+Proof. intros H. move: (focus_estep_inv' eh1 σ1 σ2 H) => /= H'. done. Qed.
+
+Lemma focus_estep {e1 σ1 e2 σ2}:
+  estep e1 σ1 e2 σ2 → ∃ K eh1, e1 = fill_ectxs eh1 K ∧ enf eh1 = true.
+Admitted.
+
 Lemma focus_estep_inv {e1 σ1 e2 σ2}:
   estep e1 σ1 e2 σ2 →
   ∃ e1' e2' K, enf e1' = true ∧ e1 = fill_ectxs e1' K ∧ estep e1' σ1 e2' σ2 ∧ e2 = fill_ectxs e2' K.
-Admitted.
-
+Proof.
+  intros H. move: (focus_estep H) => [K [eh1 [? H']]].
+  subst. exists eh1.
+  destruct (@focus_estep_inv'' eh1 σ1 σ2 H' K e2) as [e' [? ?]]=>//.
+  eexists e', K.
+  split=>//; split=>//.
+Qed.
+  
 (* Difficulty: super hard *)
 Lemma fill_estep_false {e kes e' σ σ'}:
   is_jmp e = true →
   estep (fill_ectxs e kes) σ e' σ' → False.
 Admitted.
 
-Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
-Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 
 Axiom not_val_ind:
   ∀ P: expr → Prop,
