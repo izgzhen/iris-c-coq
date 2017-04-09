@@ -490,33 +490,32 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
     | _ => None
   end.
 
-Definition enf (e: expr) :=
-  match e with
-    | Ecall _ es => forallb is_val es
-    | Erete e => is_val e
-    | Ebinop _ e1 e2 => is_val e1 && is_val e2
-    | Ederef e => is_val e
-    | Ederef_typed _ e => is_val e
-    | Eaddrof e => is_val e
-    | Efst e => is_val e
-    | Esnd e => is_val e
-    | Ealloc _ e => is_val e
-    | Eassign e1 e2 => is_loc e1 && is_val e2
-    | Eif e1 e2 e3 => is_val e1
-    | Eseq e1 e2 => is_val e1
-    | Ewhile _ e _ => is_val e
-    | _ => false
-  end.
+Inductive enf: expr → Prop :=
+  | NFcall: ∀ f ls, enf (Ecall f (map (λ l, Evalue (Vptr l)) ls))
+  | NFrete: ∀ v, enf (Erete (Evalue v))
+  | NFbinop: ∀ op v1 v2, enf (Ebinop op (Evalue v1) (Evalue v2))
+  | NFderef: ∀ v, enf (Ederef (Evalue v))
+  | NFderef_typed: ∀ t v, enf (Ederef_typed t (Evalue v))
+  | NFaddrof: ∀ v, enf (Eaddrof (Evalue v))
+  | NFfst: ∀ v, enf (Efst (Evalue v))
+  | NFsnd: ∀ v, enf (Esnd (Evalue v))
+  | NFalloc: ∀ t v, enf (Ealloc t (Evalue v))
+  | NFassign: ∀ l v, enf (Eassign (Evalue (Vptr l)) (Evalue v))
+  | NFif: ∀ v e2 e3, enf (Eif (Evalue v) e2 e3)
+  | NFseq: ∀ v e2, enf (Eseq (Evalue v) e2)
+  | NFwhile: ∀ c v s, enf (Ewhile c (Evalue v) s).
 
-Lemma enf_not_val e: enf e = true → to_val e = None.
-Proof. induction e; crush. Qed.
+Global Hint Constructors enf.
+
+Lemma enf_not_val e: enf e → to_val e = None.
+Proof. induction e; crush. inversion H. Qed.
 
 Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
-Axiom cont_uninj: ∀ kes e, enf e = true → unfill e kes.
+Axiom cont_uninj: ∀ kes e, enf e → unfill e kes.
 
 Lemma cont_inj {e e' kes kes'}:
-  enf e = true → enf e' = true →
+  enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
 Proof.
   intros. apply (cont_uninj kes) in H.
@@ -525,26 +524,25 @@ Proof.
   rewrite H1 in H. by simplify_eq.
 Qed.
 
-
 Lemma fill_not_enf e k:
-  is_val e = false → enf (fill_expr e k) = false.
-Proof. induction k=>//.
-       - intros H. simpl. rewrite H. done.
-       - intros H. simpl. rewrite forallb_app.
-         replace (e::args) with ([e] ++ args); last done.
-         rewrite forallb_app. simpl. rewrite H.
-         by rewrite andb_false_r.
-       - intros H. simpl. induction e; crush.
+  is_val e = false → enf (fill_expr e k) → False.
+Proof. induction k=>//; simpl; intros H1 H2;
+       try (inversion H2; by subst).
+       inversion H2. subst.
+       assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
+       { rewrite -H3. apply forall_is_val. }
+       rewrite forallb_app in Hcontra.
+       replace (e::args) with ([e] ++ args) in Hcontra; last done.
+       rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
+       by rewrite andb_false_r in Hcontra.
 Qed.
 
 Lemma escape_false {e a e' a2 kes k0 e''}:
   estep e a e' a2 →
-  fill_expr (fill_ectxs e kes) k0 = e'' → enf e'' = true → False.
+  fill_expr (fill_ectxs e kes) k0 = e'' → enf e'' → False.
 Proof.
-  intros. assert (enf e'' = false) as Hfalse; last by rewrite Hfalse in H1.
-  rewrite -H0. apply fill_not_enf.
-  apply to_val_is_val.
-  apply fill_ectxs_not_val. eapply estep_not_val. done.
+  intros. subst. eapply fill_not_enf=>//.
+  apply to_val_is_val, fill_ectxs_not_val. by eapply estep_not_val.
 Qed.
 
 Ltac gen_eq H E1 E2 KS :=
@@ -565,13 +563,13 @@ Axiom cont_ind:
     (∀ ks, P ks). (* TODO: it should be provable *)
 
 Lemma unfill_segment {e ks eh ks'}:
-  enf eh = true →
+  enf eh →
   fill_ectxs e ks = fill_ectxs eh ks' →
   ∃ ks'', ks' = ks ++ ks'' ∧ e = fill_ectxs eh ks''.
 Admitted.
 
 Lemma focus_estep_inv' eh1 σ1 σ2:
-  enf eh1 = true →
+  enf eh1 →
   let P K :=
       (∀ e2,
          estep (fill_ectxs eh1 K) σ1 e2 σ2 →
@@ -598,18 +596,18 @@ Proof.
 Qed.
 
 Lemma focus_estep_inv'' {eh1 σ1 σ2}:
-  enf eh1 = true →
+  enf eh1 →
   ∀ K e2,
     estep (fill_ectxs eh1 K) σ1 e2 σ2 →
     ∃ eh2, estep eh1 σ1 eh2 σ2 ∧ e2 = fill_ectxs eh2 K.
 Proof. intros H. move: (focus_estep_inv' eh1 σ1 σ2 H) => /= H'. done. Qed.
 
 Axiom focus_estep: ∀ e1 σ1 e2 σ2,
-  estep e1 σ1 e2 σ2 → ∃ K eh1, e1 = fill_ectxs eh1 K ∧ enf eh1 = true.
+  estep e1 σ1 e2 σ2 → ∃ K eh1, e1 = fill_ectxs eh1 K ∧ enf eh1.
 
 Lemma focus_estep_inv {e1 σ1 e2 σ2}:
   estep e1 σ1 e2 σ2 →
-  ∃ e1' e2' K, enf e1' = true ∧ e1 = fill_ectxs e1' K ∧ estep e1' σ1 e2' σ2 ∧ e2 = fill_ectxs e2' K.
+  ∃ e1' e2' K, enf e1' ∧ e1 = fill_ectxs e1' K ∧ estep e1' σ1 e2' σ2 ∧ e2 = fill_ectxs e2' K.
 Proof.
   intros H. move: (focus_estep _ _ _ _ H) => [K [eh1 [? H']]].
   subst. exists eh1.
@@ -617,15 +615,33 @@ Proof.
   eexists e', K.
   split=>//; split=>//.
 Qed.
-  
+
+Lemma estep_call_false f ls σ1 e' σ2:
+  estep (Ecall f (map (λ l, Evalue (Vptr l)) ls)) σ1 e' σ2 → False.
+Proof. intros. inversion H. subst. eapply (escape_false H2)=>//. Qed.
+
+Lemma estep_ret_false v σ1 e' σ2:
+  estep (Erete (Evalue v)) σ1 e' σ2 → False.
+Proof. intros. inversion H. subst. eapply (escape_false H2)=>//. Qed.
+
+(* Lemma fill_estep_false' e σ σ': *)
+(*   is_jmp e = true → enf e = true → *)
+(*   let P K := *)
+(*       (∀ e', estep (fill_ectxs e K) σ e' σ' → False) *)
+(*   in ∀ K, P K. *)
+(* Proof. *)
+(*   intros H1 H2 P. apply (cont_ind P). *)
+(*   - unfold P. simpl. intros. *)
+    
+
 Lemma fill_estep_false {e kes e' σ σ'}:
-  is_jmp e = true →
+  is_jmp e = true → enf e →
   estep (fill_ectxs e kes) σ e' σ' → False.
 Admitted.
 
 Axiom not_val_ind:
   ∀ P: expr → Prop,
-    (∀ e, enf e = true → P e) →
+    (∀ e, enf e → P e) →
     (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) →
     (∀ e, to_val e = None → P e).
 
@@ -663,7 +679,7 @@ Proof. move: fill_estep_inv' => /= H. intros. apply H=>//. Qed.
 Lemma cont_incl':
   let P e' :=
       (∀ e kes kes',
-        enf e = true →
+        enf e →
         fill_ectxs e kes = fill_ectxs e' kes' →
         ∃ kes'', e' = fill_ectxs e kes'')
   in ∀ e', to_val e' = None → P e'.
@@ -681,7 +697,7 @@ Proof.
 Qed.
 
 Lemma cont_incl {e' kes kes' e}:
-  enf e = true →
+  enf e →
   to_val e' = None →
   fill_ectxs e kes = fill_ectxs e' kes' →
   ∃ kes'', e' = fill_ectxs e kes''.
@@ -770,7 +786,7 @@ Proof.
       by rewrite is_jmp_ret in H0.
     + eapply cont_incl in H3=>//.
       destruct H3 as (?&?); subst.
-      by rewrite is_jmp_call in H0. apply forall_is_val.
+      by rewrite is_jmp_call in H0.
 Qed.
 
 Lemma estep_preserves_not_jmp e σ1 e2' σ2:
@@ -834,13 +850,6 @@ Proof.
         { rewrite -(typeof_preserves_size v0 t1)=>//.
           rewrite -(typeof_preserves_size v1 t1)=>//. }
 Admitted.
-
-Lemma estep_call_false f ls σ1 e' σ2:
-  estep (Ecall f (map (λ l, Evalue (Vptr l)) ls)) σ1 e' σ2 → False.
-Proof.
-  intros. inversion H. subst. eapply (escape_false H2)=>//.
-  apply forall_is_val.
-Qed.
 
 Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ' ∧ efs = [].
 

@@ -197,7 +197,6 @@ Section rules.
       by rewrite big_sepL_nil.
     - apply cont_inj in H1=>//.
       destruct H1 as [? ?]; done.
-      simpl. apply forall_is_val.
   Qed.
 
   Lemma wp_skip E Φ v s:
@@ -212,13 +211,12 @@ Section rules.
         exfalso. replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1; last done.
         replace (fill_expr (fill_ectxs e kes) k)
         with (fill_ectxs e (k::kes)) in H1; last done.
-        by eapply (escape_false H4 H1).
+        eapply (escape_false H4 H1). by simpl.
       + simplify_eq. inversion H2; subst.
         * unfold unfill in H4. rewrite H1 in H4.
           simpl in H4. done.
         * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
           apply cont_inj in H1=>//. by destruct H1.
-          by apply forall_is_val.
     - iNext. iIntros (???? (?& ?)).
       inversion H0; subst.
       + inversion H2; subst.
@@ -229,7 +227,6 @@ Section rules.
         * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
           apply cont_inj in H1=>//.
           by destruct H1.
-          by apply forall_is_val.
   Qed.
 
   Lemma wp_seq E e1 e2 Φ:
@@ -275,7 +272,7 @@ Section rules.
     match goal with
       | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
         replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
-              [ by destruct HF | by apply forall_is_val ]
+              by destruct HF
     end.
 
   Ltac atomic_step H :=
@@ -604,11 +601,12 @@ Section rules.
     iModIntro. iSplit.
     { iPureIntro. eexists _, _, []. split; last done. apply CSjstep. eapply JScall=>//. }
     iNext. iIntros (e2 σ2 ? (?&?)).
-    iMod "Hclose". inversion H3; subst; first by apply fill_estep_false in H11.
+    iMod "Hclose". inversion H3; subst.
+    { apply fill_estep_false in H11=>//. }
     inversion H11; subst.
-    + apply cont_inj in H0=>//; last by apply forall_is_val.
-        by destruct H0.
-    + apply cont_inj in H0=>//; try apply forall_is_val.
+    + apply cont_inj in H0=>//.
+      by destruct H0.
+    + apply cont_inj in H0=>//.
       destruct H0. inversion H0. subst.
       iFrame. iDestruct (stack_agree with "[Hs Hstk]") as "%"; first iFrame.
       subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
