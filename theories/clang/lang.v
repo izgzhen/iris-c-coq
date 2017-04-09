@@ -332,6 +332,12 @@ Fixpoint is_jmp (e: expr) :=
     | _ => false
   end.
 
+Inductive jnf: expr → Prop :=
+  | JNFcall: ∀ f ls, jnf (Ecall f (map (λ l, Evalue (Vptr l)) ls))
+  | JNFrete: ∀ v, jnf (Erete (Evalue v)).
+
+Global Hint Constructors jnf.
+
 Lemma is_jmp_rec' e K:
   is_jmp (fill_expr e K) = false → is_jmp e = false.
 Proof.
@@ -624,20 +630,38 @@ Lemma estep_ret_false v σ1 e' σ2:
   estep (Erete (Evalue v)) σ1 e' σ2 → False.
 Proof. intros. inversion H. subst. eapply (escape_false H2)=>//. Qed.
 
-(* Lemma fill_estep_false' e σ σ': *)
-(*   is_jmp e = true → enf e = true → *)
-(*   let P K := *)
-(*       (∀ e', estep (fill_ectxs e K) σ e' σ' → False) *)
-(*   in ∀ K, P K. *)
-(* Proof. *)
-(*   intros H1 H2 P. apply (cont_ind P). *)
-(*   - unfold P. simpl. intros. *)
-    
+Lemma jnf_enf e: jnf e → enf e.
+Proof. by induction 1. Qed.
+
+Lemma fill_estep_false' e σ σ':
+  jnf e →
+  let P K :=
+      (∀ e', estep (fill_ectxs e K) σ e' σ' → False)
+  in ∀ K, P K.
+Proof.
+  intros H P. assert (enf e) as He; first by apply jnf_enf.
+  apply (cont_ind P).
+  - unfold P. simpl. intros.
+    inversion H; subst.
+    + by eapply estep_call_false.
+    + by eapply estep_ret_false.
+  - unfold P. intros.
+    inversion H1=>//;
+    try (match goal with
+      | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
+      | [ HT : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq HT E1 E2 KS; eauto; inversion H
+    end).
+    { subst. gen_eq H3 (Eseq (Evalue v) e') e ks. eauto. inversion H. }
+    rewrite fill_cons in H2.
+    destruct (unfill_segment He H2) as [K' [? ?]].
+    subst. apply (H0 K') in H4=>//.
+    rewrite app_length. simpl. omega.
+Qed.
 
 Lemma fill_estep_false {e kes e' σ σ'}:
-  is_jmp e = true → enf e →
+  jnf e →
   estep (fill_ectxs e kes) σ e' σ' → False.
-Admitted.
+Proof. intros H. move: (fill_estep_false' e σ σ' H kes e') => /= H'. done. Qed.
 
 Axiom not_val_ind:
   ∀ P: expr → Prop,
