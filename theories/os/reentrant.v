@@ -8,7 +8,7 @@ Require Import logic.
 (* }. *)
 
 (* Interface *)
-  
+
 Structure reent_lock Σ `{!clangG Σ} := ReentLock {
   (* -- operations -- *)
   newlock : ident;

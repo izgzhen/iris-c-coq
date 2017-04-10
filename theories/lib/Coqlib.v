@@ -40,7 +40,7 @@ Implicit Arguments SomeT [A].
 Implicit Arguments NoneT [A].
 
 Notation opt_predT :=
-  (fun opt:optionT _ => 
+  (fun opt:optionT _ =>
     fun f =>
       match opt with
 	| SomeT t => f t
@@ -48,7 +48,7 @@ Notation opt_predT :=
       end).
 
 Notation optpT :=
-  (fun f => fun opt:optionT _ => 
+  (fun f => fun opt:optionT _ =>
     match opt with
       | SomeT t => f t
       | NoneT => False
@@ -63,8 +63,8 @@ Notation optgT :=
       end).
 
 Notation opt_predT2 :=
-  (fun opt:optionT _ => 
-    fun opt':optionT _ => 
+  (fun opt:optionT _ =>
+    fun opt':optionT _ =>
       fun f =>
 	match opt, opt' with
 	  | SomeT t, SomeT t' => f t t'
@@ -95,21 +95,21 @@ Tactic Notation "substH" hyp (H) :=
     | |- _ => fail 1 "goal must be 'A -> B'."
   end.
 
-Tactic Notation "substH" hyp (H) "with" constr (t) := 
+Tactic Notation "substH" hyp (H) "with" constr (t) :=
   hypreplace H t.
 
-Tactic Notation "substH" hyp (H) "with" constr (t) "into" ident (Hn) := 
+Tactic Notation "substH" hyp (H) "with" constr (t) "into" ident (Hn) :=
   hypreplace2 H t Hn.
 
 Tactic Notation "bool_destruct" hyp (H) "as" simple_intropattern (pat) :=
   let H0 := fresh "H" in
     (rename H into H0;
     match type of (H0) with
-      | (andb ?a ?b = true) => 
+      | (andb ?a ?b = true) =>
         destruct (andb_prop a b H0) as pat; clear H0
       | (orb ?a ?b = true) =>
         destruct (orb_prop a b H0) as pat; clear H0
-      | _ => fail "not destructable" 
+      | _ => fail "not destructable"
     end).
 
 
@@ -119,10 +119,10 @@ Tactic Notation "destructH" hyp (H) "with" constr (t) :=
 Tactic Notation "destructH" hyp (H) "with" constr (t)
   "as" simple_intropattern (p) :=
   destruct t as p; clear H.
-  
+
 Tactic Notation "discri" :=
   match goal with
-    | H : ?a <> ?a |- _ => 
+    | H : ?a <> ?a |- _ =>
       elimtype False; apply H; reflexivity
     | |- _ -> _ => intros; discriminate
     | H : False |- _ => destruct H
@@ -135,25 +135,25 @@ Tactic Notation "gen_clear" hyp (H) :=
 Tactic Notation "gen_clear" hyp (H1) hyp (H2) :=
   generalize H1 H2; clear H1 H2.
 
-Tactic Notation "gen_clear" 
+Tactic Notation "gen_clear"
   hyp (H1) hyp (H2) hyp (H3) :=
   generalize H1 H2 H3; clear H1 H2 H3.
 
-Tactic Notation "gen_clear" 
+Tactic Notation "gen_clear"
   hyp (H1) hyp (H2) hyp (H3) hyp (H4) :=
-  generalize H1 H2 H3 H4; 
+  generalize H1 H2 H3 H4;
     clear H1 H2 H3 H4.
 
-Tactic Notation "gen_clear" 
-  hyp (H1) hyp (H2) hyp (H3) 
+Tactic Notation "gen_clear"
+  hyp (H1) hyp (H2) hyp (H3)
   hyp (H4) hyp (H5):=
-  generalize H1 H2 H3 H4 H5; 
+  generalize H1 H2 H3 H4 H5;
     clear H1 H2 H3 H4 H5.
 
-Tactic Notation "gen_clear" 
-  hyp (H1) hyp (H2) hyp (H3) 
+Tactic Notation "gen_clear"
+  hyp (H1) hyp (H2) hyp (H3)
   hyp (H4) hyp (H5) hyp (H6):=
-  generalize H1 H2 H3 H4 H5 H6; 
+  generalize H1 H2 H3 H4 H5 H6;
     clear H1 H2 H3 H4 H5 H6.
 
 Tactic Notation "split_l" :=
@@ -205,7 +205,7 @@ Tactic Notation "rew_clear" hyp (H) :=
 Tactic Notation "injection" hyp (H) :=
   injection H.
 
-Tactic Notation "injection" hyp (H) "as" 
+Tactic Notation "injection" hyp (H) "as"
   simple_intropattern (pat) :=
   injection H; intros pat.
 
@@ -219,11 +219,11 @@ Ltac InvertAll :=
       | H: ex _   |- _ => inversion_clear H
     end.
 
-Ltac arith_replace t1 t2 := 
+Ltac arith_replace t1 t2 :=
   (replace t1 with t2; fail "error") ||
     (replace t1 with t2; [trivial | try omega; fail "error" ]).
 
-Ltac arith_replaceH H t1 t2 := 
+Ltac arith_replaceH H t1 t2 :=
   (replace t1 with t2 in H; fail "error") ||
     (replace t1 with t2 in H; [trivial | try omega; fail "error" ]).
 
@@ -234,20 +234,20 @@ Tactic Notation "arith_rep" constr(t1) "with" constr (t2) "in" hyp (H):=
   arith_replaceH H t1 t2.
 
 
-Ltac clearall := 
-  match goal with 
+Ltac clearall :=
+  match goal with
     | H : _ |- _ =>
       (clear H || (generalize H; clear H)); clearall
     | _ => intros
   end.
 
-Ltac clearall_arith := 
-  match goal with 
+Ltac clearall_arith :=
+  match goal with
     | H : ?a > ?b |- _ => (generalize H; clear H); clearall_arith
     | H : ?a >= ?b |- _ => (generalize H; clear H); clearall_arith
     | H : ?a < ?b |- _ => (generalize H; clear H); clearall_arith
     | H : ?a <= ?b |- _ => (generalize H; clear H); clearall_arith
-    | H : ?a = ?b |- _ => 
+    | H : ?a = ?b |- _ =>
       match type of a with
         | nat => (generalize H; clear H); clearall_arith
         | _ => (clear H || (generalize H; clear H)); clearall_arith
@@ -345,14 +345,14 @@ Proof.
   intros. case (peq x y); intros.
   elim H; auto.
   auto.
-Qed.  
+Qed.
 
 Definition Plt: positive -> positive -> Prop := Pos.lt.
 
 Lemma Plt_ne:
   forall (x y: positive), Plt x y -> x <> y.
 Proof.
-  unfold Plt; intros. red; intro. subst y. eelim Pos.lt_irrefl; eauto. 
+  unfold Plt; intros. red; intro. subst y. eelim Pos.lt_irrefl; eauto.
 Qed.
 Hint Resolve Plt_ne: coqlib.
 
@@ -363,7 +363,7 @@ Proof (Pos.lt_trans).
 Lemma Plt_succ:
   forall (x: positive), Plt x (Psucc x).
 Proof.
-  unfold Plt; intros. apply Pos.lt_succ_r. apply Pos.le_refl. 
+  unfold Plt; intros. apply Pos.lt_succ_r. apply Pos.le_refl.
 Qed.
 Hint Resolve Plt_succ: coqlib.
 
@@ -377,7 +377,7 @@ Hint Resolve Plt_succ: coqlib.
 Lemma Plt_succ_inv:
   forall (x y: positive), Plt x (Psucc y) -> Plt x y \/ x = y.
 Proof.
-  unfold Plt; intros. rewrite Pos.lt_succ_r in H. 
+  unfold Plt; intros. rewrite Pos.lt_succ_r in H.
   apply Pos.le_lteq; auto.
 Qed.
 
@@ -480,11 +480,11 @@ Lemma positive_Peano_ind:
 Proof.
   intros.
   apply (well_founded_ind Plt_wf P).
-  intros. 
+  intros.
   case (peq x0 xH); intro.
   subst x0; auto.
   elim (Psucc_pred x0); intro. contradiction. rewrite <- H2.
-  apply H0. apply H1. apply Ppred_Plt. auto. 
+  apply H0. apply H1. apply Ppred_Plt. auto.
 Qed.
 
 End POSITIVE_ITERATION.
@@ -507,14 +507,14 @@ Proof.
   intros. case (zeq x y); intros.
   elim H; auto.
   auto.
-Qed.  
+Qed.
 
 Open Scope Z_scope.
 
 Definition zlt: forall (x y: Z), {x < y} + {x >= y} := Z_lt_dec.
 
 Lemma zlt_true:
-  forall (A: Type) (x y: Z) (a b: A), 
+  forall (A: Type) (x y: Z) (a b: A),
   x < y -> (if zlt x y then a else b) = a.
 Proof.
   intros. case (zlt x y); intros.
@@ -523,7 +523,7 @@ Proof.
 Qed.
 
 Lemma zlt_false:
-  forall (A: Type) (x y: Z) (a b: A), 
+  forall (A: Type) (x y: Z) (a b: A),
   x >= y -> (if zlt x y then a else b) = b.
 Proof.
   intros. case (zlt x y); intros.
@@ -534,7 +534,7 @@ Qed.
 Definition zle: forall (x y: Z), {x <= y} + {x > y} := Z_le_gt_dec.
 
 Lemma zle_true:
-  forall (A: Type) (x y: Z) (a b: A), 
+  forall (A: Type) (x y: Z) (a b: A),
   x <= y -> (if zle x y then a else b) = a.
 Proof.
   intros. case (zle x y); intros.
@@ -543,7 +543,7 @@ Proof.
 Qed.
 
 Lemma zle_false:
-  forall (A: Type) (x y: Z) (a b: A), 
+  forall (A: Type) (x y: Z) (a b: A),
   x > y -> (if zle x y then a else b) = b.
 Proof.
   intros. case (zle x y); intros.
@@ -565,7 +565,7 @@ Qed.
 Lemma two_power_nat_two_p:
   forall x, two_power_nat x = two_p (Z_of_nat x).
 Proof.
-  induction x. auto. 
+  induction x. auto.
   rewrite two_power_nat_S. rewrite inj_S. rewrite two_p_S. omega. omega.
 Qed.
 
@@ -573,7 +573,7 @@ Lemma two_p_monotone:
   forall x y, 0 <= x <= y -> two_p x <= two_p y.
 Proof.
   intros.
-  replace (two_p x) with (two_p x * 1) by omega. 
+  replace (two_p x) with (two_p x * 1) by omega.
   replace y with (x + (y - x)) by omega.
   rewrite two_p_is_exp; try omega.
   apply Zmult_le_compat_l.
@@ -594,7 +594,7 @@ Lemma two_p_strict:
 Proof.
   intros x0 GT. pattern x0. apply natlike_ind.
   simpl. omega.
-  intros. rewrite two_p_S; auto. generalize (two_p_gt_ZERO x H). omega. 
+  intros. rewrite two_p_S; auto. generalize (two_p_gt_ZERO x H). omega.
   omega.
 Qed.
 
@@ -604,7 +604,7 @@ Proof.
   intros. assert (x = 0 \/ x - 1 >= 0) by omega. destruct H0.
   subst. vm_compute. auto.
   replace (two_p x) with (2 * two_p (x - 1)).
-  generalize (two_p_strict _ H0). omega. 
+  generalize (two_p_strict _ H0). omega.
   rewrite <- two_p_S. decEq. omega. omega.
 Qed.
 
@@ -615,7 +615,7 @@ Lemma Zmin_spec:
 Proof.
   intros. case (zlt x y); unfold Zlt, Zge; intro z.
   unfold Zmin. rewrite z. auto.
-  unfold Zmin. caseEq (x ?= y); intro. 
+  unfold Zmin. caseEq (x ?= y); intro.
   apply Zcompare_Eq_eq. auto.
   contradiction.
   reflexivity.
@@ -649,21 +649,21 @@ Qed.
 Lemma Zdiv_small:
   forall x y, 0 <= x < y -> x / y = 0.
 Proof.
-  intros. assert (y > 0). omega. 
+  intros. assert (y > 0). omega.
   assert (forall a b,
     0 <= a < y ->
     0 <= y * b + a < y ->
     b = 0).
-  intros. 
+  intros.
   assert (b = 0 \/ b > 0 \/ (-b) > 0). omega.
   elim H3; intro.
   auto.
   elim H4; intro.
-  assert (y * b >= y * 1). apply Zmult_ge_compat_l. omega. omega. 
-  omegaContradiction. 
+  assert (y * b >= y * 1). apply Zmult_ge_compat_l. omega. omega.
+  omegaContradiction.
   assert (y * (-b) >= y * 1). apply Zmult_ge_compat_l. omega. omega.
   rewrite <- Zopp_mult_distr_r in H6. omegaContradiction.
-  apply H1 with (x mod y). 
+  apply H1 with (x mod y).
   apply Z_mod_lt. auto.
   rewrite <- Z_div_mod_eq. auto. auto.
 Qed.
@@ -672,7 +672,7 @@ Lemma Zmod_small:
   forall x y, 0 <= x < y -> x mod y = x.
 Proof.
   intros. assert (y > 0). omega.
-  generalize (Z_div_mod_eq x y H0). 
+  generalize (Z_div_mod_eq x y H0).
   rewrite (Zdiv_small x y H). omega.
 Qed.
 
@@ -680,7 +680,7 @@ Lemma Zmod_unique:
   forall x y a b,
   x = a * y + b -> 0 <= b < y -> x mod y = b.
 Proof.
-  intros. subst x. rewrite Zplus_comm. 
+  intros. subst x. rewrite Zplus_comm.
   rewrite Z_mod_plus. apply Zmod_small. auto. omega.
 Qed.
 
@@ -701,12 +701,12 @@ Proof.
   generalize (Z_div_mod_eq (a/b) c H0). generalize (Z_mod_lt (a/b) c H0). intros.
   set (q1 := a / b) in *. set (r1 := a mod b) in *.
   set (q2 := q1 / c) in *. set (r2 := q1 mod c) in *.
-  symmetry. apply Zdiv_unique with (r2 * b + r1). 
+  symmetry. apply Zdiv_unique with (r2 * b + r1).
   rewrite H2. rewrite H4. ring.
-  split. 
+  split.
   assert (0 <= r2 * b). apply Zmult_le_0_compat. omega. omega. omega.
   assert ((r2 + 1) * b <= c * b).
-  apply Zmult_le_compat_r. omega. omega. 
+  apply Zmult_le_compat_r. omega. omega.
   replace ((r2 + 1) * b) with (r2 * b + b) in H5 by ring.
   replace (c * b) with (b * c) in H5 by ring.
   omega.
@@ -728,17 +728,17 @@ Lemma Zdiv_interval_1:
   lo * b <= a < hi * b ->
   lo <= a/b < hi.
 Proof.
-  intros. 
+  intros.
   generalize (Z_div_mod_eq a b H1). generalize (Z_mod_lt a b H1). intros.
   set (q := a/b) in *. set (r := a mod b) in *.
   split.
   assert (lo < (q + 1)).
-  apply Zmult_lt_reg_r with b. omega.  
-  apply Zle_lt_trans with a. omega. 
+  apply Zmult_lt_reg_r with b. omega.
+  apply Zle_lt_trans with a. omega.
   replace ((q + 1) * b) with (b * q + b) by ring.
   omega.
   omega.
-  apply Zmult_lt_reg_r with b. omega. 
+  apply Zmult_lt_reg_r with b. omega.
   replace (q * b) with (b * q) by ring.
   omega.
 Qed.
@@ -751,7 +751,7 @@ Proof.
   intros.
   assert (lo <= a / b < hi+1).
   apply Zdiv_interval_1. omega. omega. auto.
-  assert (lo * b <= lo * 1). apply Zmult_le_compat_l_neg. omega. omega. 
+  assert (lo * b <= lo * 1). apply Zmult_le_compat_l_neg. omega. omega.
   replace (lo * 1) with lo in H3 by ring.
   assert ((hi + 1) * 1 <= (hi + 1) * b). apply Zmult_le_compat_l. omega. omega.
   replace ((hi + 1) * 1) with (hi + 1) in H4 by ring.
@@ -764,19 +764,19 @@ Lemma Zmod_recombine:
   a > 0 -> b > 0 ->
   x mod (a * b) = ((x/b) mod a) * b + (x mod b).
 Proof.
-  intros. 
-  set (xb := x/b). 
+  intros.
+  set (xb := x/b).
   apply Zmod_unique with (xb/a).
   generalize (Z_div_mod_eq x b H0); fold xb; intro EQ1.
   generalize (Z_div_mod_eq xb a H); intro EQ2.
-  rewrite EQ2 in EQ1. 
+  rewrite EQ2 in EQ1.
   eapply trans_eq. eexact EQ1. ring.
-  generalize (Z_mod_lt x b H0). intro. 
+  generalize (Z_mod_lt x b H0). intro.
   generalize (Z_mod_lt xb a H). intro.
   assert (0 <= xb mod a * b <= a * b - b).
     split. apply Zmult_le_0_compat; omega.
     replace (a * b - b) with ((a - 1) * b) by ring.
-    apply Zmult_le_compat; omega. 
+    apply Zmult_le_compat; omega.
   omega.
 Qed.
 
@@ -792,10 +792,10 @@ Definition Zdivide_dec:
   forall (p q: Z), p > 0 -> { (p|q) } + { ~(p|q) }.
 Proof.
   intros. destruct (zeq (Zmod q p) 0).
-  left. exists (q / p). 
+  left. exists (q / p).
   transitivity (p * (q / p) + (q mod p)). apply Z_div_mod_eq; auto.
   transitivity (p * (q / p)). omega. ring.
-  right; red; intros. elim n. apply Z_div_exact_1; auto. 
+  right; red; intros. elim n. apply Z_div_exact_1; auto.
   inv H0. rewrite Z_div_mult; auto. ring.
 Defined.
 Global Opaque Zdivide_dec.
@@ -805,7 +805,7 @@ Lemma Zdivide_interval:
   0 < c -> 0 <= a < b -> (c | a) -> (c | b) -> 0 <= a <= b - c.
 Proof.
   intros. destruct H1 as [x EQ1]. destruct H2 as [y EQ2]. subst. destruct H0.
-  split. omega. exploit Zmult_lt_reg_r; eauto. intros. 
+  split. omega. exploit Zmult_lt_reg_r; eauto. intros.
   replace (y * c - c) with ((y - 1) * c) by ring.
   apply Zmult_le_compat_r; omega.
 Qed.
@@ -823,9 +823,9 @@ Qed.
 Lemma nat_of_Z_max:
   forall z, Z_of_nat (nat_of_Z z) = Zmax z 0.
 Proof.
-  intros. unfold Zmax. destruct z; simpl; auto. 
+  intros. unfold Zmax. destruct z; simpl; auto.
   change (Z.of_nat (Z.to_nat (Zpos p)) = Zpos p).
-  apply Z2Nat.id. compute; intuition congruence. 
+  apply Z2Nat.id. compute; intuition congruence.
 Qed.
 
 Lemma nat_of_Z_eq:
@@ -845,7 +845,7 @@ Lemma nat_of_Z_plus:
   p >= 0 -> q >= 0 ->
   nat_of_Z (p + q) = (nat_of_Z p + nat_of_Z q)%nat.
 Proof.
-  unfold nat_of_Z; intros. apply Z2Nat.inj_add; omega. 
+  unfold nat_of_Z; intros. apply Z2Nat.inj_add; omega.
 Qed.
 
 
@@ -857,9 +857,9 @@ Definition align (n: Z) (amount: Z) :=
 
 Lemma align_le: forall x y, y > 0 -> x <= align x y.
 Proof.
-  intros. unfold align. 
+  intros. unfold align.
   generalize (Z_div_mod_eq (x + y - 1) y H). intro.
-  replace ((x + y - 1) / y * y) 
+  replace ((x + y - 1) / y * y)
      with ((x + y - 1) - (x + y - 1) mod y).
   generalize (Z_mod_lt (x + y - 1) y H). omega.
   rewrite Zmult_comm. omega.
@@ -867,7 +867,7 @@ Qed.
 
 Lemma align_divides: forall x y, y > 0 -> (y | align x y).
 Proof.
-  intros. unfold align. apply Zdivide_factor_l. 
+  intros. unfold align. apply Zdivide_factor_l.
 Qed.
 
 (** * Definitions and theorems on the data types [option], [sum] and [list] *)
@@ -947,14 +947,14 @@ Lemma list_length_z_cons:
   list_length_z (hd :: tl) = list_length_z tl + 1.
 Proof.
   intros. unfold list_length_z. simpl.
-  rewrite (list_length_z_aux_shift tl 1 0). omega. 
+  rewrite (list_length_z_aux_shift tl 1 0). omega.
 Qed.
 
 Lemma list_length_z_pos:
   forall (A: Type) (l: list A),
   list_length_z l >= 0.
 Proof.
-  induction l; simpl. unfold list_length_z; simpl. omega. 
+  induction l; simpl. unfold list_length_z; simpl. omega.
   rewrite list_length_z_cons. omega.
 Qed.
 
@@ -963,7 +963,7 @@ Lemma list_length_z_map:
   list_length_z (map f l) = list_length_z l.
 Proof.
   induction l. reflexivity. simpl. repeat rewrite list_length_z_cons. congruence.
-Qed. 
+Qed.
 
 (** Extract the n-th element of a list, as [List.nth_error] does,
     but the index [n] is of type [Z]. *)
@@ -978,7 +978,7 @@ Lemma list_nth_z_in:
   forall (A: Type) (l: list A) n x,
   list_nth_z l n = Some x -> In x l.
 Proof.
-  induction l; simpl; intros. 
+  induction l; simpl; intros.
   congruence.
   destruct (zeq n 0). left; congruence. right; eauto.
 Qed.
@@ -1000,7 +1000,7 @@ Proof.
   discriminate.
   rewrite list_length_z_cons. destruct (zeq n 0).
   generalize (list_length_z_pos l); omega.
-  exploit IHl; eauto. unfold Zpred. omega. 
+  exploit IHl; eauto. unfold Zpred. omega.
 Qed.
 
 (** Properties of [List.incl] (list inclusion). *)
@@ -1033,7 +1033,7 @@ Lemma incl_same_head:
   forall (A: Type) (x: A) (l1 l2: list A),
   incl l1 l2 -> incl (x::l1) (x::l2).
 Proof.
-  intros; red; simpl; intros. intuition. 
+  intros; red; simpl; intros. intuition.
 Qed.
 
 (** Properties of [List.map] (mapping a function over a list). *)
@@ -1086,9 +1086,9 @@ Lemma list_in_map_inv:
 Proof.
   induction l; simpl; intros.
   contradiction.
-  elim H; intro. 
+  elim H; intro.
   exists a; intuition auto.
-  generalize (IHl y H0). intros [x [EQ IN]]. 
+  generalize (IHl y H0). intros [x [EQ IN]].
   exists x; tauto.
 Qed.
 
@@ -1107,8 +1107,8 @@ Lemma list_append_map_inv:
 Proof.
   induction m1; simpl; intros.
   exists (@nil A); exists l; auto.
-  destruct l; simpl in H; inv H. 
-  exploit IHm1; eauto. intros [l1 [l2 [P [Q R]]]]. subst l. 
+  destruct l; simpl in H; inv H.
+  exploit IHm1; eauto. intros [l1 [l2 [P [Q R]]]]. subst l.
   exists (a0 :: l1); exists l2; intuition. simpl; congruence.
 Qed.
 
@@ -1135,7 +1135,7 @@ Remark list_fold_left_app:
   forall l1 l2 accu,
   list_fold_left accu (l1 ++ l2) = list_fold_left (list_fold_left accu l1) l2.
 Proof.
-  induction l1; simpl; intros. 
+  induction l1; simpl; intros.
   auto.
   rewrite IHl1. auto.
 Qed.
@@ -1145,11 +1145,11 @@ Lemma list_fold_right_eq:
   list_fold_right l base =
   match l with nil => base | x :: l' => f x (list_fold_right l' base) end.
 Proof.
-  unfold list_fold_right; intros. 
+  unfold list_fold_right; intros.
   destruct l.
   auto.
-  unfold rev'. rewrite <- ! rev_alt. simpl.  
-  rewrite list_fold_left_app. simpl. auto. 
+  unfold rev'. rewrite <- ! rev_alt. simpl.
+  rewrite list_fold_left_app. simpl. auto.
 Qed.
 
 Lemma list_fold_right_spec:
@@ -1181,7 +1181,7 @@ Proof.
   intros. apply in_or_app; simpl. elim (in_app_or _ _ _ H); intro; auto.
 Qed.
 
-(** [list_disjoint l1 l2] holds iff [l1] and [l2] have no elements 
+(** [list_disjoint l1 l2] holds iff [l1] and [l2] have no elements
   in common. *)
 
 Definition list_disjoint (A: Type) (l1 l2: list A) : Prop :=
@@ -1205,21 +1205,21 @@ Lemma list_disjoint_cons_left:
   forall (A: Type) (a: A) (l1 l2: list A),
   list_disjoint (a :: l1) l2 -> list_disjoint l1 l2.
 Proof.
-  unfold list_disjoint; simpl; intros. apply H; tauto. 
+  unfold list_disjoint; simpl; intros. apply H; tauto.
 Qed.
 
 Lemma list_disjoint_cons_right:
   forall (A: Type) (a: A) (l1 l2: list A),
   list_disjoint l1 (a :: l2) -> list_disjoint l1 l2.
 Proof.
-  unfold list_disjoint; simpl; intros. apply H; tauto. 
+  unfold list_disjoint; simpl; intros. apply H; tauto.
 Qed.
 
 Lemma list_disjoint_notin:
   forall (A: Type) (l1 l2: list A) (a: A),
   list_disjoint l1 l2 -> In a l1 -> ~(In a l2).
 Proof.
-  unfold list_disjoint; intros; red; intros. 
+  unfold list_disjoint; intros; red; intros.
   apply H with a a; auto.
 Qed.
 
@@ -1227,7 +1227,7 @@ Lemma list_disjoint_sym:
   forall (A: Type) (l1 l2: list A),
   list_disjoint l1 l2 -> list_disjoint l2 l1.
 Proof.
-  unfold list_disjoint; intros. 
+  unfold list_disjoint; intros.
   apply sym_not_equal. apply H; auto.
 Qed.
 
@@ -1238,9 +1238,9 @@ Proof.
   induction l1; intros.
   left; red; intros. elim H.
   case (In_dec eqA_dec a l2); intro.
-  right; red; intro. apply (H a a); auto with coqlib. 
+  right; red; intro. apply (H a a); auto with coqlib.
   case (IHl1 l2); intro.
-  left; red; intros. elim H; intro. 
+  left; red; intros. elim H; intro.
     red; intro; subst a y. contradiction.
     apply l; auto.
   right; red; intros. elim n0. eapply list_disjoint_cons_left; eauto.
@@ -1267,9 +1267,9 @@ Lemma list_norepet_dec:
 Proof.
   induction l.
   left; constructor.
-  destruct IHl. 
+  destruct IHl.
   case (In_dec eqA_dec a l); intro.
-  right. red; intro. inversion H. contradiction. 
+  right. red; intro. inversion H. contradiction.
   left. constructor; auto.
   right. red; intro. inversion H. contradiction.
 Defined.
@@ -1285,7 +1285,7 @@ Proof.
   constructor.
   red; intro. generalize (list_in_map_inv f _ _ H2).
   intros [x [EQ IN]]. generalize EQ. change (f hd <> f x).
-  apply H1. tauto. tauto. 
+  apply H1. tauto. tauto.
   red; intro; subst x. contradiction.
   apply IHlist_norepet. intros. apply H1. tauto. tauto. auto.
 Qed.
@@ -1295,20 +1295,20 @@ Remark list_norepet_append_commut:
   list_norepet (a ++ b) -> list_norepet (b ++ a).
 Proof.
   intro A.
-  assert (forall (x: A) (b: list A) (a: list A), 
-           list_norepet (a ++ b) -> ~(In x a) -> ~(In x b) -> 
+  assert (forall (x: A) (b: list A) (a: list A),
+           list_norepet (a ++ b) -> ~(In x a) -> ~(In x b) ->
            list_norepet (a ++ x :: b)).
     induction a; simpl; intros.
     constructor; auto.
     inversion H. constructor. red; intro.
     elim (in_app_or _ _ _ H6); intro.
     elim H4. apply in_or_app. tauto.
-    elim H7; intro. subst a. elim H0. left. auto. 
+    elim H7; intro. subst a. elim H0. left. auto.
     elim H4. apply in_or_app. tauto.
     auto.
   induction a; simpl; intros.
   rewrite <- app_nil_end. auto.
-  inversion H0. apply H. auto. 
+  inversion H0. apply H. auto.
   red; intro; elim H3. apply in_or_app. tauto.
   red; intro; elim H3. apply in_or_app. tauto.
 Qed.
@@ -1323,10 +1323,10 @@ Proof.
   tauto.
   inversion H; subst. rewrite IHl1 in H3. rewrite in_app in H2.
   intuition.
-  constructor; auto. red; intros. elim H2; intro. congruence. auto. 
-  destruct H as [B [C D]]. inversion B; subst. 
-  constructor. rewrite in_app. intuition. elim (D a a); auto. apply in_eq. 
-  rewrite IHl1. intuition. red; intros. apply D; auto. apply in_cons; auto. 
+  constructor; auto. red; intros. elim H2; intro. congruence. auto.
+  destruct H as [B [C D]]. inversion B; subst.
+  constructor. rewrite in_app. intuition. elim (D a a); auto. apply in_eq.
+  rewrite IHl1. intuition. red; intros. apply D; auto. apply in_cons; auto.
 Qed.
 
 Lemma list_norepet_append:
@@ -1371,7 +1371,7 @@ Lemma is_tail_cons_left:
   forall (A: Type) (i: A) c1 c2, is_tail (i :: c1) c2 -> is_tail c1 c2.
 Proof.
   induction c2; intros; inversion H.
-  constructor. constructor. constructor. auto. 
+  constructor. constructor. constructor. auto.
 Qed.
 
 Hint Resolve is_tail_refl is_tail_cons is_tail_in is_tail_cons_left: coqlib.
@@ -1409,10 +1409,10 @@ Inductive list_forall2: list A -> list B -> Prop :=
 
 Lemma list_forall2_app:
   forall a2 b2 a1 b1,
-  list_forall2 a1 b1 -> list_forall2 a2 b2 -> 
+  list_forall2 a1 b1 -> list_forall2 a2 b2 ->
   list_forall2 (a1 ++ a2) (b1 ++ b2).
 Proof.
-  induction 1; intros; simpl. auto. constructor; auto. 
+  induction 1; intros; simpl. auto. constructor; auto.
 Qed.
 
 Lemma list_forall2_length:
@@ -1433,7 +1433,7 @@ Lemma list_forall2_imply:
 Proof.
   induction 1; intros.
   constructor.
-  constructor. auto with coqlib. apply IHlist_forall2; auto. 
+  constructor. auto with coqlib. apply IHlist_forall2; auto.
   intros. auto with coqlib.
 Qed.
 
@@ -1448,7 +1448,7 @@ Fixpoint list_drop (A: Type) (n: nat) (x: list A) {struct n} : list A :=
 Lemma list_drop_incl:
   forall (A: Type) (x: A) n (l: list A), In x (list_drop n l) -> In x l.
 Proof.
-  induction n; simpl; intros. auto. 
+  induction n; simpl; intros. auto.
   destruct l; auto with coqlib.
 Qed.
 
@@ -1463,7 +1463,7 @@ Lemma list_map_drop:
   forall (A B: Type) (f: A -> B) n (l: list A),
   list_drop n (map f l) = map f (list_drop n l).
 Proof.
-  induction n; simpl; intros. auto. 
+  induction n; simpl; intros. auto.
   destruct l; simpl; auto.
 Qed.
 
@@ -1505,7 +1505,7 @@ Qed.
 Lemma proj_sumbool_is_true:
   forall (P: Prop) (a: {P}+{~P}), P -> proj_sumbool a = true.
 Proof.
-  intros. unfold proj_sumbool. destruct a. auto. contradiction. 
+  intros. unfold proj_sumbool. destruct a. auto. contradiction.
 Qed.
 
 Ltac InvBooleans :=
@@ -1544,7 +1544,7 @@ Lemma dec_eq_sym:
   (if dec_eq x y then ifso else ifnot) =
   (if dec_eq y x then ifso else ifnot).
 Proof.
-  intros. destruct (dec_eq x y). 
+  intros. destruct (dec_eq x y).
   subst y. rewrite dec_eq_true. auto.
   rewrite dec_eq_false; auto.
 Qed.
@@ -1590,22 +1590,22 @@ Inductive lex_ord: A*B -> A*B -> Prop :=
   | lex_ord_right: forall a b1 b2,
       ordB b1 b2 -> lex_ord (a,b1) (a,b2).
 
-Lemma wf_lex_ord: 
+Lemma wf_lex_ord:
   well_founded ordA -> well_founded ordB -> well_founded lex_ord.
 Proof.
   intros Awf Bwf.
   assert (forall a, Acc ordA a -> forall b, Acc ordB b -> Acc lex_ord (a, b)).
     induction 1. induction 1. constructor; intros. inv H3.
     apply H0. auto. apply Bwf.
-    apply H2; auto. 
+    apply H2; auto.
   red; intros. destruct a as [a b]. apply H; auto.
 Qed.
 
 Lemma transitive_lex_ord:
   transitive _ ordA -> transitive _ ordB -> transitive _ lex_ord.
 Proof.
-  intros trA trB; red; intros. 
-  inv H; inv H0. 
+  intros trA trB; red; intros.
+  inv H; inv H0.
   left; eapply trA; eauto.
   left; auto.
   left; auto.

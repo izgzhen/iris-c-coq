@@ -27,7 +27,7 @@ Section definitions.
     end.
 
   (* Interface *)
-  
+
   Structure interrupt := Interrupt {
     (* -- predicates -- *)
     name : Type;

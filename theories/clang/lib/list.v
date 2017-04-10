@@ -28,7 +28,7 @@ Section proof.
       iDestruct "H" as (??) "(% & ? & _)".
       destruct H2 as (?&?&?). subst. iPureIntro. constructor.
   Qed.
-  
+
   Parameter py pt px: addr.
   Definition x: ident := 1.
   Definition y: ident := 2.
@@ -47,7 +47,7 @@ Section proof.
          (y, (Tptr Tvoid, py));
          (t, (Tptr (tcell Tint32), pt))]
         [].
-  
+
   Lemma rev_spec Φ body xs:
     ∀ lx ly ys,
       instantiate_f_body ev (rev_list Tint32) = Some body →
@@ -86,5 +86,5 @@ Section proof.
       iSplitL "Ht"; first eauto.
       by rewrite -app_assoc.
   Qed.
-  
+
 End proof.
