@@ -430,7 +430,7 @@ Lemma ESbind:
       estep (fill_ectxs e kes) σ (fill_ectxs e' kes) σ'.
 Proof. induction kes=>//. intros. apply ESbind'=>//. Qed.
 
-Lemma estep_not_val e σ e' σ':
+Lemma estep_not_val {e σ e' σ'}:
   estep e σ e' σ' → to_val e = None.
 Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
 
@@ -539,10 +539,22 @@ Global Hint Constructors enf.
 Lemma enf_not_val e: enf e → to_val e = None.
 Proof. induction e; crush. inversion H. Qed.
 
+Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
+Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
+
 Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
 Axiom cont_uninj: ∀ kes e, enf e → unfill e kes.
+Axiom cont_uninj': ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
 
+Lemma unfill_app e eh K K':
+  unfill_expr e [] = Some (K, eh) →
+  unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
+Proof.
+  intros H. move: (cont_uninj' _ _ _ H) => [? ?].
+  subst. rewrite fill_app. by apply cont_uninj.
+Qed.
+  
 Lemma cont_inj {e e' kes kes'}:
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
@@ -579,8 +591,6 @@ Ltac gen_eq H E1 E2 KS :=
   assert (E1 = E2 ∧ [] = KS) as [? ?];
   [ apply cont_inj=>// | subst; clear H ].
 
-Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
-Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 
 Lemma fill_cons e K K': fill_expr (fill_ectxs e K) K' = fill_ectxs e (K' :: K).
 Proof. induction K'=>//. Qed.
@@ -591,11 +601,12 @@ Axiom cont_ind:
     (∀ ks, (∀ ks', length ks' < length ks → P ks')%nat → P ks) →
     (∀ ks, P ks). (* TODO: it should be provable *)
 
-Lemma unfill_segment {e ks eh ks'}:
-  enf eh →
+Axiom unfill_segment: ∀ e ks eh ks',
+  to_val e = None → enf eh →
   fill_ectxs e ks = fill_ectxs eh ks' →
   ∃ ks'', ks' = ks ++ ks'' ∧ e = fill_ectxs eh ks''.
-Admitted.
+
+Arguments unfill_segment {_ _ _ _} _ _ _.
 
 Lemma focus_estep_inv' eh1 σ1 σ2:
   enf eh1 →
@@ -615,8 +626,8 @@ Proof.
       | [ H : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq H E1 E2 KS; eauto
     end).
     subst. gen_eq H3 (Eseq (Evalue v) e2) eh1 ks. eauto.
-    rewrite fill_cons in H2.
-    destruct (unfill_segment H H2) as [K' [? ?]].
+    rewrite fill_cons in H2. move: (estep_not_val H4) => Hnv.
+    destruct (unfill_segment Hnv H H2) as [K' [? ?]].
     subst. apply (H0 K') in H4.
     + destruct H4 as [eh2 [? ?]].
       subst. exists eh2.
@@ -675,8 +686,8 @@ Proof.
       | [ HT : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq HT E1 E2 KS; eauto; inversion H
     end).
     { subst. gen_eq H3 (Eseq (Evalue v) e') e ks. eauto. inversion H. }
-    rewrite fill_cons in H2.
-    destruct (unfill_segment He H2) as [K' [? ?]].
+    rewrite fill_cons in H2. move: (estep_not_val H4)=>Hnv.
+    destruct (unfill_segment Hnv He H2) as [K' [? ?]].
     subst. apply (H0 K') in H4=>//.
     rewrite app_length. simpl. omega.
 Qed.
@@ -861,8 +872,8 @@ Proof.
     end).
     { subst. gen_eq H2 (Eseq (Evalue v) e2) e ks. eauto. }
     { subst. simpl. simpl in H1. destruct (is_jmp cond); destruct (is_jmp s)=>//. }
-    subst. rewrite fill_cons in H3.
-    destruct (unfill_segment H H3) as [K' [? ?]].
+    subst. rewrite fill_cons in H3. move:(estep_not_val H5) => Hnv.
+    destruct (unfill_segment Hnv H H3) as [K' [? ?]].
     subst. assert (is_jmp e' = false).
     { apply (H0 K')=>//.  rewrite app_length. simpl. omega. }
     rewrite -fill_app in H1.
@@ -879,9 +890,7 @@ Lemma estep_preserves_not_jmp e σ1 e2' σ2:
 Proof.
   destruct (to_val e) eqn:Heq.
   - apply of_to_val in Heq. subst. inversion 2.
-    subst. exfalso.
-    assert (to_val (fill_expr (fill_ectxs e kes) k) = to_val (Evalue v)) as HContra; first by rewrite H1.
-    simpl in HContra. by rewrite fill_ectx_not_val in HContra.
+    subst. exfalso. apply estep_not_val in H0=>//.
   - by apply estep_preserves_not_jmp''.
 Qed.
 
@@ -951,12 +960,7 @@ Proof.
   destruct 1. inversion H; subst.
   - by eapply estep_not_val.
   - inversion H1; by apply fill_ectxs_not_val.
-Qed.
-
-Lemma unfill_app e eh K K':
-  unfill_expr e [] = Some (K, eh) →
-  unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
-Admitted.
+Qed.  
 
 Definition clang_lang :=
   Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
