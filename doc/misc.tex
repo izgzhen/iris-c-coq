@@ -3,7 +3,7 @@
 
 This section contained some key formal developments claimed but not yet mechanized in Coq for reference.
 
-\subsection{Properties of Evaluation Context}
+\subsection{Basic Properties of Evaluation Context}
 
 Our expression $\Expr$ is a recursively defined algebraic data type, which can be generalized into the following form:
 
@@ -52,10 +52,12 @@ expression space as an ADT. Instead, it is a subset of $\Expr$ which represents 
 that can appear as an immediate form according to some well-defined evaluation order. We call
 such $e$ is \emph{well-formed}.
 
+\subsection{Axioms about Evaluation Context based Semantics}
+
 Here we prove two lemmas about the syntactic structure on paper:
 
 \begin{lemma}
-$\All e: \Expr, k: \cont . \isenf(e) \ra \unfill(k(e)) = (k, e)$
+$\All e: \Expr, k: \Cont . \isenf(e) \ra \unfill(k(e)) = (k, e)$
 \end{lemma}
 \begin{proof}
 
@@ -66,12 +68,21 @@ And inductively, since fill and unfill should cancel out, the final conclusion i
 \end{proof}
 
 \begin{lemma}
-Induction scheme for $\Expr$:
+  $\All e, e_h, k. \unfill(e) = (k, e_h) \ra \isenf(e_h) \land e = k(e_h)$
+\end{lemma}
+\begin{proof}
+  TODO
+\end{proof}
+
+In the following lemmas, we assume all involved $e$ to be \emph{well-formed}.
+
+\begin{lemma}
+Induction scheme I for $\Expr$:
 \begin{align*}
 \All P: \Expr \ra \Prop.
   &(\All e. \isenf(e) \ra P(e)) \ra \\
-  &(\All e, k: \cont . \toval(e) = \bot \ra \wellformed(e) \ra P(e) \ra P(k(e))) \ra\\
-  &(\All e. \toval(e) = \bot \ra \wellformed(e) \ra P(e))
+  &(\All e, k: \Cont . \toval(e) = \bot \ra P(e) \ra P(k(e))) \ra\\
+  &(\All e. \toval(e) = \bot \ra P(e))
 \end{align*}
 \end{lemma}
 \begin{proof}
@@ -82,4 +93,54 @@ The base case is when $e$ is in normal form, which corresponds to the first cond
 The inductive case is that for any well-formed $e'$ that is not in normal form,
 it must be of the form $k(e)$ for some $k, e$. With each proved given sufficient inductive
 assumption, we know that any well-formed $e$ must satisfy $P$.
+\end{proof}
+
+\begin{lemma}
+Induction scheme II for $\Expr$:
+\begin{align*}
+\All P: \Expr \ra \Prop.
+  &(\All e. \isenf(e) \ra P(e)) \ra \\
+  &(\All e, k: \Cont . \isenf(e) \ra (\All k'. |k'| < |k| \ra P (k'(e))) \ra P(k(e))) \ra\\
+  &(\All e. \toval(e) = \bot \ra P(e))
+\end{align*}
+\end{lemma}
+\begin{proof}
+  TODO
+\end{proof}
+
+\begin{lemma}
+  Induction scheme for $\Cont$:
+  \begin{align*}
+    \All P: \Cont \ra \Prop.
+      &(P(\emptyset)) \ra \\
+      &(\All k. (\All. k', |k'| < |k| \ra P(k')) \ra P(k)) \ra \\
+      &(\All k. P(k))
+  \end{align*}
+\end{lemma}
+\begin{proof}
+  TODO
+\end{proof}
+
+\begin{lemma}
+  Partial injectivitity of fill:
+  \[
+  \infer{
+    \toval(e) = \bot \quad
+    \isenf(e_h) \quad
+    k(e) = k'(e_h)}
+  {\Exists k''. k' = k \append k'' \and e = k''(e_h)}
+  \]
+\begin{proof}
+  TODO
+\end{proof}
+
+\begin{lemma}
+  Local step has a focus:
+  \[
+  \infer{\estep{e_1}{h_1}{e_2}{h_2}}
+  {\Exists e_1', e_2', k. \isenf(e_1') \land e_1 = k(e_1') \land e_2 = k(e_2') \land \estep{e_1'}{h_1}{e_2'}{h_2}}
+  \]
+\end{lemma}
+\begin{proof}
+  TODO
 \end{proof}

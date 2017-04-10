@@ -70,8 +70,8 @@ First define
 \begin{itemize}
 \item byte-size value \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
 \item Heap $h: \Heap \eqdef [ l \gmapsto \bval ]$
-\item Continuation $\ctx: \cont \eqdef [\ectx]$
-\item Stack $s: \Stack \eqdef [\cont]$
+\item Continuation $\ctx: \Cont \eqdef [\ectx]$
+\item Stack $s: \Stack \eqdef [\Cont]$
 \item Whole state \[\sigma: \State \eqdef (\text{heap}: \Heap, \text{text}: \Text, \text{stack}: \Stack)\]
 \end{itemize}
 
