@@ -33,12 +33,12 @@ Section wp.
     own clangG_stackG_name ((1/2)%Qp, (to_agree (s: discreteC stack))).
 
   Definition to_gen_text (t: text) := fmap (λ v, to_agree (v : leibnizC function)) t.
-  
+
   Definition own_text (m: text) : iProp Σ :=
     own clangG_textG_name (● to_gen_text m).
 
   Definition to_gen_stack (s: stack) := ((1/2)%Qp, (to_agree (s: discreteC stack))).
-  
+
   Definition own_stack (s: stack) : iProp Σ := own clangG_stackG_name (to_gen_stack s).
 
   Definition clang_state_interp (s: state) : iProp Σ:=
@@ -103,7 +103,7 @@ Section rules.
   Proof. iIntros (?) "?". iApply wp_bind'. iSplit; done. Qed.
 
   Definition reducible := @reducible clang_lang.
-  
+
   Lemma wp_lift_step E Φ e1 :
     to_val e1 = None →
     (∀ σ1, state_interp σ1 ={E,∅}=∗

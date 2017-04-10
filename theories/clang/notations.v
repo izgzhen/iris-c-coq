@@ -41,6 +41,3 @@ Notation "s1 ;; s2" := (Eseq s1%E s2%E)
 (* Notation "'ret'" := Eret (at level 80): expr_scope. *)
 Notation "'rete' e" := (Erete e%E) (at level 80): expr_scope.
 (* Notation "'skip'" := (Eskip) (at level 200) : expr_scope. *)
-
-Notation "'cli'" := (Eprim Pcli) (at level 80) : expr_scope.
-Notation "'sti'" := (Eprim Psti) (at level 80) : expr_scope.

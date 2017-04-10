@@ -19,11 +19,11 @@ Section wp_ret.
   ))%I.
 
   Local Instance wpr_pre_contractive : Contractive wpr_pre.
-  Proof.    
+  Proof.
     rewrite /wpr_pre=> n wp wp' Hwp E e1 Φ Φret.
     (* repeat (f_contractive || f_equiv); apply Hwp. *)
   Admitted.
-  
+
   Definition wpr_def:
   coPset → expr → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wpr_pre.
   Definition wpr_aux : { x | x = @wpr_def }. by eexists. Qed.
@@ -48,7 +48,7 @@ Section wp_ret.
     iFrame. iIntros (?) "[? ?]".
     iModIntro. iApply H1. iFrame.
   Admitted.
-    
+
   Lemma wpr_bind kes E e Φ Φret :
     wpr E e (fun v => wpr E (fill_ectxs (Evalue v) kes) Φ Φret) Φret
     ⊢ wpr E (fill_ectxs e kes) Φ Φret.
@@ -101,7 +101,7 @@ Section wp_ret.
       iIntros "?".
       by iApply wp_value.
   Qed.
-  
+
   Lemma wp_something E e Φ:
     wpr E e (λ _ : val, False) Φ
     ⊢ WP e @ E {{ v, Φ v }}.
@@ -127,7 +127,7 @@ Section wp_ret.
         iDestruct ("~1" with "H") as "?".
         admit.
   Admitted.
-  
+
   Lemma wpr_call E es ls params f_body f_body' f retty Φ Φret:
     es = map (fun l => Evalue (Vptr l)) ls →
     instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
@@ -147,5 +147,5 @@ Section wp_ret.
     iFrame. iNext. iIntros "?".
     simpl. iApply wp_something.
   Admitted.
-    
+
 End wp_ret.

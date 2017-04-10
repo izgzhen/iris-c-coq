@@ -47,7 +47,7 @@ Admitted.
 
 Lemma union_disj (sf sf0 s0: spec_state):
   gset_dom sf ⊥ gset_dom (sf0 ∪ s0) → gset_dom sf ⊥ gset_dom sf0.
-Admitted.  
+Admitted.
 
 Lemma foo (sf0 s0 sf: spec_state):
   gset_dom sf0 ⊥ gset_dom s0 →
@@ -97,7 +97,7 @@ Section rules.
 
   Parameter spec_grow:
     ∀ c cs, spec_master cs ⊢ spec_master (c::cs).
-  
+
   Definition γ_sstate := @gen_heap_name _ _ _ _ _ specG_spstG.
 
   Definition sstate (s: spec_state) := ([⋅ map] l ↦ v ∈ s, l S↦ v)%I.
@@ -113,7 +113,7 @@ Section rules.
        spec_master ((s, c)::cs) ∗ ⌜ spec_step_star c0 s0 c s ⌝)%I.
 
   Global Instance spec_inv_timeless: TimelessP spec_inv. Proof. apply _. Qed.
-  
+
   Lemma sstate_update s ss ss':
     own γ_sstate (● to_gen_heap s) ∗
     ([∗ map] l↦v ∈ ss, l S↦ v)
@@ -132,7 +132,7 @@ Section rules.
     iPureIntro. destruct H0 as [? ?]. simpl in H1.
     by apply to_agree_comp_valid in H1.
   Qed.
-  
+
   Lemma scode_update c1 c2 c3:
     scode c1 ∗ scode c2 ⊢ |==> scode c3 ∗ scode c3 ∗ ⌜ c1 = c2 ⌝.
   Proof.
@@ -147,7 +147,7 @@ Section rules.
     - by rewrite frac_op'.
     - by apply to_agree_comp_valid.
   Qed.
-    
+
   Lemma spec_update ss sc ss' sc':
     spec_step sc ss sc' ss' →
     spec_inv ∗ sstate ss ∗ scode sc
@@ -223,7 +223,7 @@ Qed.
       iDestruct "Ht" as "($ & He' & $)"; iFrame "He".
       iApply wp_step; try iFrame; eauto.
   Qed.
-  
+
   Lemma wptp_steps' R n e1 t1 t2 σ1 σ2 Φ :
     (R ⊢ |==> ▷ R) →
     nsteps (@step clang_lang) n (e1 :: t1, σ1) (t2, σ2) →
@@ -243,7 +243,7 @@ Qed.
   Proof.
     iIntros "?". iModIntro.
     by iNext. Qed.
-    
+
   Lemma soudness n e1 t1 σ1 t2 σ2 Σ1 c1 Σ2 v2:
     nsteps step n (e1 :: t1, σ1) (of_val v2 :: t2, σ2) →
     world σ1 ∗ (inv N spec_inv ∗ sstate Σ1 ∗ scode c1) ∗

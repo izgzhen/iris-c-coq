@@ -554,7 +554,7 @@ Proof.
   intros H. move: (cont_uninj' _ _ _ H) => [? ?].
   subst. rewrite fill_app. by apply cont_uninj.
 Qed.
-  
+
 Lemma cont_inj {e e' kes kes'}:
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
@@ -960,7 +960,7 @@ Proof.
   destruct 1. inversion H; subst.
   - by eapply estep_not_val.
   - inversion H1; by apply fill_ectxs_not_val.
-Qed.  
+Qed.
 
 Definition clang_lang :=
   Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
