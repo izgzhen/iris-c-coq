@@ -358,6 +358,29 @@ Proof.
   auto.
 Qed.
 
+Lemma is_jmp_out' e e' K:
+  is_jmp e' = false →
+  is_jmp (fill_expr e K) = false →
+  is_jmp (fill_expr e' K) = false.
+Proof.
+  induction K=>//; simpl; intros.
+  - destruct (is_jmp e'); destruct (is_jmp re); destruct (is_jmp e)=>//.
+  - destruct (is_jmp e'); destruct (is_jmp rhs); destruct (is_jmp e)=>//.
+  - destruct (is_jmp e'); destruct (is_jmp s1); destruct (is_jmp s2); destruct (is_jmp e)=>//.
+  - destruct (is_jmp e'); destruct (is_jmp cond); destruct (is_jmp e)=>//.
+  - destruct (is_jmp e'); destruct (is_jmp s); destruct (is_jmp e)=>//.
+Qed. (** FIXME: automate this *)
+
+Lemma is_jmp_out e e' K:
+  is_jmp e' = false →
+  is_jmp (fill_ectxs e K) = false →
+  is_jmp (fill_ectxs e' K) = false.
+Proof.
+  induction K=>//.
+  simpl. intros. eapply is_jmp_out'=>//.
+  apply IHK=>//. eapply is_jmp_rec'=>//.
+Qed.
+
 Inductive estep : expr → heap → expr → heap → Prop :=
 | ESbinop: ∀ lv rv op σ v',
              evalbop op lv rv = Some v' →
@@ -669,6 +692,12 @@ Axiom not_val_ind:
     (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) →
     (∀ e, to_val e = None → P e).
 
+Axiom not_val_ind':
+  ∀ P: expr → Prop,
+    (∀ e, enf e → P e) →
+    (∀ e ks, enf e → (∀ ks', length ks' < length ks → P (fill_ectxs e ks'))%nat → P (fill_ectxs e ks)) →
+    (∀ e, to_val e = None → P e).
+
 Lemma fill_estep_inv':
   let P e :=
     (∀ e' σ σ' ks,
@@ -813,9 +842,48 @@ Proof.
       by rewrite is_jmp_call in H0.
 Qed.
 
+Lemma estep_preserves_not_jmp' σ1 σ2:
+  let P e1 :=
+      (∀ e2, is_jmp e1 = false → estep e1 σ1 e2 σ2 → is_jmp e2 = false)
+  in ∀ e1, to_val e1 = None → P e1.
+Proof.
+  intros P. apply (not_val_ind' P).
+  - unfold P. intros.
+    inversion H1=>//; subst; simpl in H0=>//.
+    + inversion H0. simpl. destruct (is_jmp cond); destruct (is_jmp s)=>//.
+    + simpl in H. exfalso.
+      eapply (escape_false H3)=>//.
+  - unfold P. intros.
+    inversion H2=>//;
+    try (match goal with
+      | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
+      | [ HT : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq HT E1 E2 KS; eauto; inversion H
+    end).
+    { subst. gen_eq H2 (Eseq (Evalue v) e2) e ks. eauto. }
+    { subst. simpl. simpl in H1. destruct (is_jmp cond); destruct (is_jmp s)=>//. }
+    subst. rewrite fill_cons in H3.
+    destruct (unfill_segment H H3) as [K' [? ?]].
+    subst. assert (is_jmp e' = false).
+    { apply (H0 K')=>//.  rewrite app_length. simpl. omega. }
+    rewrite -fill_app in H1.
+    eapply is_jmp_out in H1=>//.
+Qed.
+
+Lemma estep_preserves_not_jmp'' e σ1 e2' σ2:
+  to_val e = None → is_jmp e = false → estep e σ1 e2' σ2 → is_jmp e2' = false.
+Proof.
+  intros H. move: (estep_preserves_not_jmp' σ1 σ2 e H e2') => /= H'. done. Qed.
+
 Lemma estep_preserves_not_jmp e σ1 e2' σ2:
   is_jmp e = false → estep e σ1 e2' σ2 → is_jmp e2' = false.
-Admitted.
+Proof.
+  destruct (to_val e) eqn:Heq.
+  - apply of_to_val in Heq. subst. inversion 2.
+    subst. exfalso.
+    assert (to_val (fill_expr (fill_ectxs e kes) k) = to_val (Evalue v)) as HContra; first by rewrite H1.
+    simpl in HContra. by rewrite fill_ectx_not_val in HContra.
+  - by apply estep_preserves_not_jmp''.
+Qed.
 
 Lemma cstep_preserves_not_jmp e σ1 e2' σ2:
   is_jmp e = false → cstep e σ1 e2' σ2 → is_jmp e2' = false.
