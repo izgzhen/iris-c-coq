@@ -53,45 +53,19 @@ Instance sizeof_type: Sizeof type :=
 
 Lemma typeof_preserves_size v t:
   typeof v t → sizeof t = length (encode_val v).
-Admitted.
+Proof.
+  induction 1=>//.
+  simpl. simpl in IHtypeof1, IHtypeof2.
+  rewrite IHtypeof1 IHtypeof2. by rewrite app_length.
+Qed.
 
 Lemma type_infer_preserves_size v:
   sizeof (type_infer_v v) = length (encode_val v).
-Admitted.
-
-(* Fixpoint decode_val (t: type) (vl: list byteval) : option val := *)
-(*   match t with *)
-(*     | Tprod t1 t2 => *)
-(*       (match decode_val t1 (take (sizeof t1) vl), *)
-(*              decode_val t2 (drop (sizeof t1) vl) with *)
-(*          | Some v1, Some v2 => Some (Vpair v1 v2) *)
-(*          | _, _ => None *)
-(*        end) *)
-(*     | _ => *)
-(*       (match proj_bytes vl with *)
-(*          | Some bl => *)
-(*            match t with *)
-(*              | Tint8  => Some (Vint32 (Int.zero_ext 8 (Int.repr (decode_int bl)))) *)
-(*              | Tint32 => Some (Vint32 (Int.repr (decode_int bl))) *)
-(*              | _ => None *)
-(*            end *)
-(*          | None => *)
-(*            match vl with *)
-(*              | BVnull :: BVnull ::BVnull :: BVnull :: nil => *)
-(*                match t with *)
-(*                  | Tnull => Some Vnull *)
-(*                  | Tptr _ => Some Vnull *)
-(*                  | _ => None *)
-(*                end *)
-(*              | _ => *)
-(*                match t with *)
-(*                  | Tptr _ => proj_pointer vl *)
-(*                  | _ => None *)
-(*                end *)
-(*            end *)
-(*        end) *)
-(*   end. *)
-
+Proof.
+  induction v=>//.
+  simpl. simpl in IHv1, IHv2.
+  rewrite IHv1 IHv2. by rewrite app_length.
+Qed.
 
 Inductive assign_type_compatible : type → type → Prop :=
 | assign_id: ∀ t, assign_type_compatible t t
