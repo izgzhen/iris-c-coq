@@ -5,9 +5,8 @@
 
 \paragraph{Syntax.}\label{p:type}
 
-The language is a simplified version of C. It consists of \Prim{} (primitives), \Expr{} (expressions), \Type{} (types) and \Val{} (values).
-
-Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, offset $o \in \integer^{+}$.
+The language is a simplified version of C. It mainly consists of \Prim{} (assembly primitives),
+\Expr{} (expressions), \Type{} (types) and \Val{} (values).
 
 \begin{align*}
     \tau : \Type \bnfdef{}&
@@ -26,90 +25,103 @@ Memory address $l: \Addr \eqdef \vaddr{b}{o}$ where block address $b \in \nat$, 
 \\
 \end{align*}
 
-The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is in source,
-and the later one is ``instantiated'' with type information and used in inference rules.
-It is part of the efforts of removing lexical analysis from core program logic.
+We also have following non-syntactical definitions:
 
-Note: the C program is usually more restrictive by differentiating statements and expressions. For simplicity and
-expressivity, we merged them together into a coherent expression $\Expr$ without loss of generality.
+\begin{itemize}
+  \item block address $b \in \nat$
+  \item offset $o \in \integer^{+}$
+  \item Memory address $l: \Addr \eqdef \vaddr{b}{o}$
+  \item Program $\Sigma: \Text \eqdef [x \gmapsto \Funct]$ is a list of functions indexed by names
+  \item Function $F: \Funct \eqdef (\tau_{ret} \times (x_1 : \tau_1, ...) \times e)$ consists of return type,
+    parameter declarations and function body.
+\end{itemize}
 
-\paragraph{Program.}
+(NOTE) The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is only used in source,
+and the later one is used in the actual semantics and inference rules.
+By adding a pre-processing step which instantiates all source-only expression to substituted/typed ones,
+we can remove lexical and typing environement from core program logic. The details are in \ref{par:tyev}
 
-A program is considered to be a set of functions $\Funct$, each identified by its name. Each
-function is a triple of return type $\tau_{ret}$, parameter declarations $(x_1 : \tau_1, ...)$,
-and function body $e$.
+(NOTE) Compared with C, there are several notable differences:
+\begin{enumerate}
+  \item We currently don't support declarations of local variables, \texttt{for} loop and \texttt{switch},
+    \texttt{break} and \texttt{continue}
+  \item C differentiates statements and expressions (so do many other program logic). For simplicity and
+    expressivity, we merged them together into a coherent expression $\Expr$ instead
+\end{enumerate}
 
 \paragraph{Evaluation Context.}
 
-To make the evaluation order explicit and reusable by the $\text{WP-BIND}$ rule, we define evaluation context.
+To make the evaluation order explicit and reflected into the logic through the bind rule,
+we define evaluation context:
 
 \begin{align*}
     \ctx : \ectx \eqdef{}&
-        \emptyctx \mid \emptyctx \oplus e \mid v \oplus \emptyctx \mid
+        \emptyctx \oplus e \mid v \oplus \emptyctx \mid
         \deref{\emptyctx} \mid \& \emptyctx \mid
         \efst{\emptyctx} \mid \esnd{\emptyctx} \mid \\&
         \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{e}{e} \mid \swhile{e}{\emptyctx}{e} \mid \\&
         \srete{\emptyctx} \mid \scall{f}{v_1, ..., \emptyctx, e_1, ...} \mid \alloc{\tau}{\emptyctx} \mid \emptyctx ; e
 \end{align*}
 
-\subsection{Semantics}
+\subsection{Semantics}\label{sec:semantics}
 \paragraph{Model.}
 
-Define continuation $\cont \eqdef [\ctx]$, and stack $\stack \eqdef [\cont]$.
+First define
+\begin{itemize}
+\item byte-size value \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
+\item Heap $h: \Heap \eqdef [ l \gmapsto \bval ]$
+\item Continuation $\ctx: \cont \eqdef [\ectx]$
+\item Stack $s: \Stack \eqdef [\cont]$
+\item Whole state \[\sigma: \State \eqdef (\text{heap}: \Heap, \text{text}: \Text, \text{stack}: \Stack)\]
+\end{itemize}
 
-We define byte-size value and memory model:
-
-\[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
-
-We define state $\sigma: \State \eqdef (\text{heap}: [ l \gmapsto \bval ], \text{text}: [x \gmapsto \Funct], \text{stack}: \stack)$,
-
-You may notice the difference between $\Val$ and $\byteval$, it is intentional to create a layer of abstraction for
-easier manipulation of spatial assertions and also a clean, unified language syntax.
+(NOTE) You may notice the difference between $\Val$ and $\byteval$, it is intended to create a layer of abstraction for
+easier manipulation of spatial assertions and also for a clean, unified language syntax.
 
 \paragraph{Small-Step Operational Semantics.}
 
-We define the HNF small step semantics for both non-jumping expression ($\estep{e}{\sigma}{e'}{\sigma'}$) and
-jumping expressions ($\jstep{\sigma}{e}{s: \stack}{e'}{s': \stack}$),
-and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$).
+We define the small-step semantics (see figure \ref{fig:semantics}) for both local reduction ($\estep{e}{h}{e'}{h'}$) and
+non-local reductions ($\jstep{\Sigma}{e}{s: \Stack}{e'}{s': \Stack}$),
+and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) pointwise.
 
-\begin{figure}
-\begin{mathpar}
+%% XXX: Define $\sigma \vdash l \mapsto \vec \bval$
 
-\infer[ES-BINOP]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{\sigma}{v'}{\sigma}}
+\begin{figure}[!ht]
+\begin{mathpar}\label{fig:semantics}
 
-\infer[ES-DEREF-TYPED]{\tychk{v}{\tau} \quad \sigma \vdash l \mapsto \encode(v)}{\estep{\dereft{\tau}{l}}{\sigma}{v}{\sigma}}
+\infer[ES-BINOP]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{h}{v'}{h}}
 
-\infer[ES-FST]{}{\estep{\efst{(v_1, v_2)}}{\sigma}{v_1}{\sigma}}
+\infer[ES-DEREF-TYPED]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\dereft{\tau}{l}}{h}{v}{h}}
 
-\infer[ES-SND]{}{\estep{\esnd{(v_1, v_2)}}{\sigma}{v_2}{\sigma}}
+\infer[ES-FST]{}{\estep{\efst{(v_1, v_2)}}{h}{v_1}{h}}
 
-\infer[ES-ASSIGN]{}{\estep{l \la v}{\sigma}{\sskip}{\sigma[ l \mapsto \encode(v) ]}}
+\infer[ES-SND]{}{\estep{\esnd{(v_1, v_2)}}{h}{v_2}{h}}
 
-\infer[ES-SEQ]{}{\estep{v ; e}{\sigma}{e}{\sigma}}
+\infer[ES-ASSIGN]{}{\estep{l \la v}{h}{\sskip}{h[ l \mapsto \encode(v) ]}}
 
-\infer[ES-ALLOC]{\tychk{v}{\tau} \quad \All o'. \sigma(b, o') = \bot}{\estep{\alloc{\tau}{v}}{\sigma}{\vaddr{b}{o}}{\sigma[\vaddr{b}{o} \mapsto v]}}
+\infer[ES-SEQ]{}{\estep{v ; e}{h}{e}{h}}
 
-\infer[ES-WHILE-TRUE]{}{\estep{\swhile{e}{\vtrue}{s}}{\sigma}{s; \swhile{e}{e}{s}}{\sigma}}
+\infer[ES-ALLOC]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\alloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
 
-\infer[ES-WHILE-FALSE]{}{\estep{\swhile{e}{\vfalse}{s}}{\sigma}{\sskip}{\sigma}}
+\infer[ES-WHILE-TRUE]{}{\estep{\swhile{c}{\vtrue}{s}}{h}{s; \swhile{c}{c}{s}}{h}}
 
-\infer[ES-BIND']{\isjmp(e) = \FALSE \quad \estep{e}{\sigma}{e'}{\sigma'}}{\estep{(k::ks)e}{\sigma}{(k::ks)e'}{\sigma'}}
+\infer[ES-WHILE-FALSE]{}{\estep{\swhile{c}{\vfalse}{s}}{h}{\sskip}{h}}
+
+\infer[ES-BIND']{\isjmp(e) = \FALSE \quad \estep{e}{h}{e'}{h'}}{\estep{(k::ks)e}{h}{(k::ks)e'}{h'}}
 
 \infer[JS-RETE]
-  {\unfill(k(\srete{v})) = (k, \srete{v})}
-  {\jstep{\sigma}{k'(\srete{v})}{k::ks}{k(v)}{ks}}
+  {\unfill(k(\srete{v})) = (k', \srete{v})}
+  {\jstep{\Sigma}{k'(\srete{v})}{k::ks}{k(v)}{ks}}
 
 \infer[JS-CALL]
-  {\sigma(f) = \Funct(ps, e)}
-  {\jstep{\sigma}{k(\scall{f}{ls})}{ks}{\instantiate(ps, ls, e)}{k::ks}}
+  {\Sigma(f) = \Funct(\any, ps, e)}
+  {\jstep{\Sigma}{k(\scall{f}{ls})}{ks}{e[ls/ps]}{k::ks}}
 
 \end{mathpar}
 \caption{Semantics rules}
 \end{figure}
 
-XXX: Define $\sigma \vdash l \mapsto \vec \bval$
-
-\subsection{Type System and Environment}
+\subsection{Type System and Lexical Environment}
 
 \paragraph{Local Typing Rules.}
 
@@ -118,52 +130,54 @@ The types are defined in \Sref{p:type}, and all values in $\val$ can be \emph{lo
 Here we define local typing judgment $\tychk{v}{\tau}$ for values.
 
 \begin{mathpar}
-\infer[tychk-void]{}{\tychk{\void}{\tyvoid}}
+\infer[typeof-void]{}{\tychk{\void}{\tyvoid}}
 
-\infer[tychk-null]{}{\tychk{\vnull}{\tynull}}
+\infer[typeof-null]{}{\tychk{\vnull}{\tynull}}
 
-\infer[tychk-int8]{}{\tychk{i \in [0, 2^8)}{\tybyte}}
+\infer[typeof-int8]{}{\tychk{i \in [0, 2^8)}{\tybyte}}
 
-\infer[tychk-int32]{}{\tychk{i \in [0, 2^{32})}{\tyword}}
+\infer[typeof-int32]{}{\tychk{i \in [0, 2^{32})}{\tyword}}
 
-\infer[tychk-null-ptr]{}{\All \tau. \tychk{\vnull}{\typtr{\tau}}}
+\infer[typeof-null-ptr]{}{\All \tau. \tychk{\vnull}{\typtr{\tau}}}
 
-\infer[tychk-ptr]{}{\All \tau, l. \tychk{l}{\typtr{\tau}}}
+\infer[typeof-ptr]{}{\All \tau, l. \tychk{l}{\typtr{\tau}}}
 
-\infer[tychk-prod]{\tychk{v_1}{\tau_1} \quad \tychk{v_2}{\tau_2}}{\tychk{(v_1, v_2)}{\tau_1 \times \tau_2}}
+\infer[typeof-prod]{\tychk{v_1}{\tau_1} \quad \tychk{v_2}{\tau_2}}{\tychk{(v_1, v_2)}{\tau_1 \times \tau_2}}
 
 \end{mathpar}
 
-\paragraph{Typing Environment}
+Note that rule TYPEOF-NULL-PTR means that $\vnull$ can be of any pointer type,
+and TYPEOF-PTR means that a pointer can have \emph{any} pointer type.
 
-When variables are introduced, we will need an environment $\Gamma : \Env \eqdef [x \gmapsto (\tau, l)]$
-to ``unfold'' the meaning of variables.
+\paragraph{Lexical Environment}\label{par:tyev}
 
-In Iris-OS, variables are all unfolded before the running the function body,
-which saves the program logic from caring about the lexical environment.
-During this unfolding, we will replace variables with either their location (left-hand side)
-or the dereference of their location (right-hand side). And we will also produce a pointer arithmetic
-expression when processing the left-hand side expression, which requires type inference $\tyinf{e}{\tau}$
+In \irisc{}, before we do any real work over a function body,
+variables are all replaced with their bindings, and type information is tagged to the untyped parts when in need.
+More specifically, we will replace variables with either their location (when in left-hand side)
+or the dereference of their location (when in right-hand side). We will produce a pointer arithmetic
+expression when processing the left-hand side expression, which in turn requires type inference $\tyinf{e}{\tau}$
 (since it is standard and trivial, we will leave out the details here).
 
-Then we define the rules for ``interpreting'' left-hand side expression ($\reslhs{e}$)
-and right-hand side expression ($\resrhs{e}$). In all rules below, a $\Gamma$ is implicitly
-captured, and if any operation on $\Gamma$ failed, then the rule will be returning ``invalid'' in implementation.
+Now we write down the algorithmic rules  for rewriting left-hand side expression ($\reslhs{e}$)
+and right-hand side expression ($\resrhs{e}$). Essentially, $\reslhs{e}$ will rewrite the left-hand side $e$ into its location
+in memory, while $\resrhs{e}$ will rewrite variables into the dereference of its locations.
 
-\begin{align*}
+Note that environment $\Gamma : \Env \eqdef [x \gmapsto (\tau, l)]$ is assumed, and if any operation fails, like missing something in $\Gamma$,
+then the rule will indicate it in the actual implementation.
+And also, the cases not covered are defined trivially.
+
+\begin{align*}\label{envrules}
 \reslhs{e_1 \la e_2} =&\, \reslhs{e_1} \la e_2\\
 \reslhs{x} =&\, \Gamma(x).l \\
 \reslhs{\deref{e}} =&\, \resrhs{e} \\
 \reslhs{\efst{e}} =&\, \reslhs{e} \\
-\reslhs{\esnd{e}} =&\, \reslhs{e} + \sizeof(\tau) \quad \text{if } \tyinf{\reslhs{e}}{\typtr{(\tau_1 \times \tau_2)}}\\
+\reslhs{\esnd{e}} =&\, \reslhs{e} + \sizeof(\tau_1) \quad \text{if } \tyinf{\reslhs{e}}{\typtr{(\tau_1 \times \tau_2)}}\\
 \reslhs{l} =&\, l\\
 \\
 \resrhs{e_1 \la e_2} =&\, e_1 \la \resrhs{e_2}\\
 \resrhs{x} =&\, \dereft{\Gamma(x).t}{\Gamma(x).l} \\
 \resrhs{\deref{e}} =&\, \dereft{\tau}{\resrhs{e}} \quad \text{if } \tyinf{e}{\typtr{\tau}}
 \end{align*}
-
-The cases not covered are defined recursively (and trivially)
 
 %%% Local Variables:
 %%% mode: latex

@@ -439,13 +439,15 @@
 \newcommand{\allctx}{\ensuremath{\textmon{Ctx}}}
 \newcommand{\cont}{\ensuremath{\textmon{Cont}}}
 \newcommand{\SpecCode}{\ensuremath{\textmon{SpecCode}}}
-\newcommand{\stack}{\ensuremath{\textmon{Stack}}}
+\newcommand{\Stack}{\ensuremath{\textmon{Stack}}}
+\newcommand{\Heap}{\ensuremath{\textmon{Heap}}}
+\newcommand{\Text}{\ensuremath{\textmon{Text}}}
 \newcommand{\cureval}{E_{\text{cur}}}
 \newcommand{\curctx}{K_{\text{cur}}}
 \newcommand{\emptyctx}{\bullet}
 
 % Misc
-\newcommand{\tychk}[2]{\vdash_{\text{tychk}} {#1} : {#2}}
+\newcommand{\tychk}[2]{\vdash_{\text{typeof}} {#1} : {#2}}
 \newcommand{\tyinf}[2]{\vdash_{\text{tyinf}} {#1} : {#2}}
 
 \newcommand{\estep}[4]{({#1}, {#2}) \ra_{local} ({#3}, {#4})}
@@ -536,6 +538,7 @@
 \newtheorem{corollary}{Corollary}[theorem]
 \newtheorem{lemma}[theorem]{Lemma}
 
+\newcommand{\irisc}{$\mathrm{Iris}^{\mathcal{C}}$}
 
 \endinput
 
