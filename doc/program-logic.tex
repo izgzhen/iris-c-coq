@@ -10,23 +10,25 @@ Using the standard Iris assertions and the ownership of ghost heap resource, we 
 \begin{align*}
 l \mapsto_q v : t \eqdef{}&  l \mapsto_q \encode(v) \land \tychk{v}{t} \\
 l \mapsto v : t              \eqdef{}& l \mapsto_1 v : t\\
-l \mapsto_q - : t            \eqdef{}& \Exists v. l \mapsto_q v : t
+l \mapsto_q - : t            \eqdef{}& \Exists v. l \mapsto_q v : t\\
+\ownstack(s) \eqdef{}& \ownGhost{\Stack}{(\frac12, \aginj s)} \\
+f \tmapsto F \eqdef{}& \ownGhost{\Text}{\authfrag \mapsingleton{f}{\aginj F}}
 \end{align*}
 
 \subsection{Weakest Precondition}
 
 Finally, we can define the core piece of the program logic, the assertion that reasons about program behavior:
-Weakest precondition, from which Hoare triples will be derived.
+Weakest precondition, from which Hoare triples can be derived.
 
 \paragraph{Defining weakest precondition.}
 
-While we have fixed the program state $\sigma$ in language definition, but it can be any state, as long as it has a predicate
-$S : \State \to \iProp$ that interprets the physical state as an Iris assertion.
-For our heap state, 
+The state interpretating predicate $S : \State \to \iProp$ for our \irisc{} language is defined below, as required for
+instantiating the parametric WP of Iris (whose definition is also copied below for reference).
+
 \[S(\sigma) \eqdef 
-  \ownM{\authfull \fmap (\lambda v. (1, \aginj v), \sigma.\text{heap})} *
-  \ownM{\authfull \sigma.\text{text}} *
-  \ownM{(\frac12, \sigma.\text{stack})}
+  \ownGhost{\Heap}{\authfull \fmap (\lambda v. (1, \aginj v), \sigma.\text{heap})} *
+  \ownGhost{\Text}{\authfull \fmap (\aginj, \sigma.\text{text})} *
+  \ownGhost{\Stack}{(\frac12, \sigma.\text{stack})}
 \]
 
 \begin{align*}
@@ -38,12 +40,10 @@ For our heap state,
         &\qquad\qquad S(\state') * \textdom{wp}(\mask, e', \pred)\Bigr) \\
 \end{align*}
 
-The definition of WP is exactly the same as in Iris's program logic. In fact, I instantiated this part in Coq instead of reinventing the wheel.
-
 Here are some conventions:
 
 \begin{itemize}
-\item If we leave away the mask, we assume it to default to $\top$.
+\item If we leave away the mask $\mask$, we assume it to be $\top$.
 \item $\pred$ in post-condition might or might not take a value parameter, depending on the context.
 \end{itemize}
 
@@ -52,12 +52,6 @@ The following rules can all be derived:
 \begin{mathpar}
 \infer[wp-value]
 {}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}}
-
-\infer[wp-skip]
-{}{\later \wpre{e}[\mask]{\pred} \proves \wpre{\val; e}[\mask]{\pred}}
-
-\infer[wp-ret]
-{}{\stk(k'::ks) * (\stk(ks) \wand \wpre{k'(v)}[\mask]{\pred}) \proves \wpre{k(\srete{v})}[\mask]{\pred}}
 
 \infer[wp-strong-mono]
 {\mask_1 \subseteq \mask_2}
@@ -69,6 +63,14 @@ The following rules can all be derived:
 
 \infer[wp-fup]
 {}{\wpre\cureval[\mask]{\Ret\var.\pvs[\mask] \pred(\var)}{\Ret\var.\pvs[\mask] \predret(\var)} \proves \wpre\expr[\mask]{\pred}}
+
+%%%% The following ones are Iris-C specific
+
+\infer[wp-skip]
+{}{\later \wpre{e}[\mask]{\pred} \proves \wpre{\val; e}[\mask]{\pred}}
+
+\infer[wp-ret]
+{}{\ownstack(k'::ks) * (\ownstack(ks) \wand \wpre{k'(v)}[\mask]{\pred}) \proves \wpre{k(\srete{v})}[\mask]{\pred}}
 
 % \infer[wp-atomic]
 % {\physatomic{\expr}}
@@ -96,13 +98,13 @@ The following rules can all be derived:
 
  \infer[wp-assign]
 {\tychk{v}{\tau'} \quad \assigncomp{\tau}{\tau'}}
-{ l \mapsto - : \tau * (l \mapsto v : \tau \wand \pred)
+{ \later l \mapsto - : \tau * \later (l \mapsto v : \tau \wand \pred)
  \proves
  \wpre{l \la v}[\mask]{\pred}}
 
  \infer[wp-load]
 {}
-{ l \mapsto_q v : \tau  * (l \mapsto_q v : \tau \wand \pred (v))
+{ \later l \mapsto_q v : \tau  * \later (l \mapsto_q v : \tau \wand \pred (v))
  \proves
  \wpre{\dereft{\tau}{l}}[\mask]{\pred}}
 
@@ -113,18 +115,18 @@ The following rules can all be derived:
  \wpre{e_1 ; e_2}[\mask]{\pred}}
 
 \infer[wp-while-true]
-{\wpre{s; \swhile{e}{e}{s}}[\mask]{\pred}}
-{\wpre{\swhile{e}{\vtrue}{s}}[\mask]{\pred}}
+{}{\later \wpre{s; \swhile{c}{c}{s}}[\mask]{\pred}
+   \proves \wpre{\swhile{c}{\vtrue}{s}}[\mask]{\pred}}
 
 \infer[wp-while-false]
-{\pred(\void)}
-{\wpre{\swhile{e}{\vfalse}{s}}[\mask]{\pred}}
+{}{\later \pred(\void)
+   \proves \wpre{\swhile{c}{\vfalse}{s}}[\mask]{\pred}}
 
 \infer[wp-while-inv]
 { {\begin{inbox}
- \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{e}{\pred} \\ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
+      \qquad\qquad\qquad \isjmp(s) = \FALSE \qquad \isjmp(c) = \FALSE \\ \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{c}{\pred} \\ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
  \end{inbox}} }
-{I \proves \wpre{\swhile{e}{e}{s}}{Q}}
+{I \proves \wpre{\swhile{c}{c}{s}}{Q}}
 
 \infer[wp-fst]
 {}
@@ -140,8 +142,8 @@ The following rules can all be derived:
 
 \infer[wp-call]
 {}
-{ f \mapsto_{\text{text}} (ps, e) * \stk(ks) * \later (\stk(k::ks) \wand \wpre{\instantiate(ps, ls, e)}[\mask]{\pred})
-  \proves \wpre{k(\scall{f}{vs})}[\mask]{\pred}}
+{ f \tmapsto \Funct(\any, ps, e) * \ownstack(ks) * \later (\ownstack(k::ks) \wand \wpre{e[ps/ls]}[\mask]{\pred})
+  \proves \wpre{k(\scall{f}{ls})}[\mask]{\pred}}
 
 \end{mathpar}
 
@@ -154,6 +156,8 @@ The soundness of WP-style program is proven by showing that it is \emph{adequate
 &\quad (\All v, \sigma'. \cstep{e}{\sigma}{v}{\sigma'} \ra \pred(v)) \land \\
 &\quad (\All e', \sigma'. \cstep{e}{\sigma}{e'}{\sigma'} \ra (\Exists v. e = v) \lor \red(e', \sigma'))
 \end{align*}
+
+(NOTE) However, that doesn't look strong enough.
 
 %%% Local Variables:
 %%% mode: latex

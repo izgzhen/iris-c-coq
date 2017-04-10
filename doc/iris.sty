@@ -244,6 +244,7 @@
 \newcommand{\fmapsto}[1][]{\xmapsto{#1}}
 \newcommand{\gmapsto}{\hookrightarrow}%
 \newcommand{\fgmapsto}[1][\mathrm{-}]{\xhookrightarrow{#1}}%
+\newcommand{\tmapsto}{\mapsto_\Text}
 
 \NewDocumentCommand\wpre{m O{} m}%
   {\textlog{wp}_{#2}\spac#1\spac{\left\{{#3}\right\}}}
@@ -379,7 +380,8 @@
 \newcommand{\Scode}{\mathrm{scode}}
 \newcommand{\Sstate}{\mathrm{sstate}}
 \newcommand{\instantiate}{\mathrm{instantiate}}
-\newcommand{\stk}{\mathrm{stack}}
+\newcommand{\ownstack}{\mathrm{own\any stack}}
+\newcommand{\owntext}{\mathrm{own\any text}}
 \newcommand{\isjmp}{\mathrm{is \any jump}}
 \newcommand{\isenf}{\mathrm{is \any enf}}
 \newcommand{\unfill}{\mathrm{unfill}}
@@ -459,7 +461,7 @@
 \newcommand{\reslhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{LHS}}}
 \newcommand{\resrhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{RHS}}}
 
-\newcommand{\assigncomp}[2]{\surd({#1} \la {#2})}
+\newcommand{\assigncomp}[2]{\mathrm{assign\any compatible}({#1} \la {#2})}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STANDARD DERIVED CONSTRUCTIONS

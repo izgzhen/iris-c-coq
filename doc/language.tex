@@ -115,7 +115,7 @@ and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) pointwise.
 
 \infer[JS-CALL]
   {\Sigma(f) = \Funct(\any, ps, e)}
-  {\jstep{\Sigma}{k(\scall{f}{ls})}{ks}{e[ls/ps]}{k::ks}}
+  {\jstep{\Sigma}{k(\scall{f}{ls})}{ks}{e[ps/ls]}{k::ks}}
 
 \end{mathpar}
 \caption{Semantics rules}
