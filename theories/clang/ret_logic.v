@@ -19,10 +19,7 @@ Section wp_ret.
   ))%I.
 
   Local Instance wpr_pre_contractive : Contractive wpr_pre.
-  Proof.
-    rewrite /wpr_pre=> n wp wp' Hwp E e1 Φ Φret.
-    (* repeat (f_contractive || f_equiv); apply Hwp. *)
-  Admitted.
+  Admitted. (* XXX: We will first prove on paper instead *)
 
   Definition wpr_def:
   coPset → expr → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wpr_pre.
