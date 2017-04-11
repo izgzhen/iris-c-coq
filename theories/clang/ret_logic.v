@@ -55,7 +55,7 @@ Section wp_ret.
   Proof.
     iLöb as "IH" forall (Φ1 Φ2 eh). rewrite !wpr_unfold /wpr_pre.
     iIntros "[#? ?]". iDestruct "~1" as "[H | H]".
-    - by iDestruct "H" as (?) "[? %]".
+    - iDestruct "H" as (?) "[? ?]". eauto.
     - iDestruct "H" as (??) "[% [[% H] | [H | H]]]"; destruct H2.
       + iRight. iExists _, _.
         iSplit=>//. iLeft. iSplitL ""=>//.
@@ -74,6 +74,13 @@ Section wp_ret.
         done.
   Qed.
 
+  Lemma wpr_value E v Φ Φret:
+    Φ v ⊢ wpr E (Evalue v) Φ Φret.
+  Proof.
+    rewrite wpr_unfold /wpr_pre. iIntros "?".
+    iLeft. eauto.
+  Qed.
+    
   Lemma wpr_bind kes E e Φ Φret :
     wpr E e (fun v => wpr E (fill_ectxs (Evalue v) kes) Φ Φret) Φret
     ⊢ wpr E (fill_ectxs e kes) Φ Φret.
@@ -141,9 +148,20 @@ Section wp_ret.
     iSplitL "".
     { iPureIntro. split=>//. by subst. }
     iNext. iApply wpr_step_mono. iFrame.
-    iAlways. iIntros (?) "?".
-    simpl. rewrite wpr_unfold /wpr_pre.
-    iLeft. eauto.
+    iAlways. iIntros (?). iApply wpr_value.
+  Qed.
+  
+  Lemma wpr_op E op v1 v2 v' Φ Φret:
+    evalbop op v1 v2 = Some v' →
+    Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
+  Proof.
+    iIntros (?) "?".
+    rewrite wpr_unfold /wpr_pre.
+    iRight. iExists _, _.
+    iSplit=>//.
+    iLeft. iSplitL ""=>//.
+    iApply wp_op=>//.
+    by iApply wpr_value.
   Qed.
 
 End wp_ret.

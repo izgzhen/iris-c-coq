@@ -147,6 +147,54 @@ The following rules can all be derived:
 
 \end{mathpar}
 
+\subsection{Extending Weakest Precondition}
+
+We extend the unary-exit WP into a binary-exit $\wprer{e}[\mask]{\pred}{\predret}$,
+by defining it as below:
+
+\begin{align*}
+  \textdom{wp}^{+} \eqdef{}& \MU \textdom{wp}^{+}. \Lam \mask, e, \pred, \predret. \\
+        & (\Exists v. \toval(e) = v \land \pred(v)) \lor {}\\
+        & (\toval(e) = \bot \,\land \Exists e_h, K. e = K(e_h) \land \Bigl({}\\
+        &\qquad (\isjmp(e_h) = \FALSE * \wpre{e_h}[\mask]{\Ret v. \wprer{K(v)}[\mask]{\pred}{\predret}}) \lor \\
+        &\qquad (\Exists v. e_h = \srete{v} * \later \predret(v)) \lor \\
+        &\qquad (\Exists f, ps, ls, F. \\
+                           & \qquad \qquad f \tmapsto \Funct(\any, ps, F) * \\
+                           & \qquad \qquad \later (\wprer{F[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v.
+                             \wprer{K(v)}[\mask]{\pred}{\predret}})) \\
+        &\Bigr) )\\
+\end{align*}
+
+And this definition supports the following inference rules:
+
+\begin{mathpar}
+\infer[wpr-value]{}{\pred(v) \proves \wprer{v}[\mask]{\pred}{\predret}}
+
+\infer[wpr-ret]{}{\predret(v) \proves \wprer{\srete{v}}[\mask]{\pred}{\predret}}
+
+\infer[wpr-bind]
+{}
+{\wprer\expr[\mask]{\Ret\var. \wprer{k(\var)}[\mask]{\pred}{\predret}}{\predret}
+ \proves 
+ \wprer{k(\expr)}[\mask]{\pred}{\predret}}
+
+\infer[wpr-call]
+{}
+{ f \tmapsto \Funct(\any, ps, e) * \later (\wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\pred})
+  \proves \wprer{k(\scall{f}{ls})}[\mask]{\pred}{\predret}}
+
+ \infer[wpr-op]
+{\llbracket oplus \rrbracket (v_1, v_2) = v'}
+{\pred(v')
+ \proves
+ \wprer{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
+
+\end{mathpar}
+
+Note how WP-CALL, WP-RET, and WP-BIND are simplified in their new, corresponding versions,
+also the fact that we can recover local evaluation like WP-OP trivially
+(and we won't duplicate too much here).
+
 \subsection{Soundness}
 
 The soundness of WP-style program is proven by showing that it is \emph{adequate}: For all $e, \sigma, \pred: \Val \ra \Prop$,

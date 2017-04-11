@@ -251,6 +251,9 @@
 \NewDocumentCommand\wpre{m O{} m}%
   {\textlog{wp}_{#2}\spac#1\spac{\left\{{#3}\right\}}}
 
+\NewDocumentCommand\wprer{m O{} m m}%
+  {\textlog{wp}^{+}_{#2}\spac#1\spac{\left\{{#3}\,;\,{#4}\right\}}}
+
 \newcommand{\later}{\mathop{{\triangleright}}}
 \newcommand*{\lateropt}[1]{\mathop{{\later}^{#1}}}
 \newcommand{\always}{\mathop{\Box}}
