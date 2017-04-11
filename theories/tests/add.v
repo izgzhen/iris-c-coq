@@ -1,13 +1,13 @@
 From iris.base_logic.lib Require Export wsat.
 From iris_os.clang Require Import logic tactics notations.
 From iris.base_logic Require Import big_op.
-From iris_os.os Require Import spec interrupt.
+From iris_os.os Require Import refine interrupt.
 Require Import lib.gmap_solve.
 From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 
 Section example.
-  Context `{clangG Σ, specG Σ} {N: namespace}.
+  Context `{clangG Σ, specG K Σ} {N: namespace}.
 
   Parameter px py: addr.
   Definition x: ident := 1.
