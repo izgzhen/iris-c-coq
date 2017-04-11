@@ -31,6 +31,8 @@ Inductive typeof: val → type → Prop :=
 | typeof_null_ptr: ∀ t, typeof Vnull (Tptr t)
 | typeof_ptr: ∀ l t, typeof (Vptr l) (Tptr t).
 
+Global Hint Constructors typeof.
+
 Lemma null_typeof v: typeof v Tnull → v = Vnull. Proof. induction v; inversion 1=>//. Qed.
 Lemma void_typeof v: typeof v Tvoid → v = Vvoid. Proof. induction v; inversion 1=>//. Qed.
 Lemma int8_typeof v: typeof v Tint8 → (∃ i, v = Vint8 i). Proof. induction v; inversion 1=>//. eauto. Qed.
@@ -38,7 +40,7 @@ Lemma int32_typeof v: typeof v Tint32 → (∃ i, v = Vint32 i). Proof. inductio
 
 Lemma typeof_any_ptr l t1 t2:
   typeof l (Tptr t1) → typeof l (Tptr t2).
-Proof. induction l; inversion 1; subst=>//; constructor. Qed.
+Proof. induction l; inversion 1; subst=>//. Qed.
 
 Instance sizeof_type: Sizeof type :=
   fix go (t : type) : nat :=
@@ -79,7 +81,8 @@ Proof. inversion 1; subst=>//. Qed.
 Lemma assign_preserves_typeof t1 t2 v:
   assign_type_compatible t1 t2 → typeof v t2 → typeof v t1.
 Proof.
-  inversion 1=>//.
-  { subst. intros. inversion H0; subst. constructor. }
-  { intros. inversion H2; subst; constructor. }
+  inversion 1=>//; subst; intros;
+  match goal with
+    | [ H: typeof _ _ |- _ ] => inversion H; subst=>//
+  end.
 Qed.

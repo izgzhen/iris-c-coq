@@ -792,6 +792,8 @@ Inductive cstep: expr → state → expr → state → Prop :=
 | CSjstep:
     ∀ e e' h t s s' , jstep t e s e' s' → cstep e (State h t s) e' (State h t s').
 
+Global Hint Constructors estep jstep cstep.
+
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
@@ -843,7 +845,7 @@ Proof.
   inversion 3; subst.
   - eapply fill_estep_inv in H2=>//.
     destruct H2 as (?&?&?).
-    exists x. split; [done | split; [ by constructor | done ] ].
+    exists x. split; [| split ]; auto.
   - inversion H2; subst.
     + eapply cont_incl in H3=>//.
       destruct H3 as (?&?); subst.

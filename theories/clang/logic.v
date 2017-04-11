@@ -170,7 +170,7 @@ Section rules.
       + done.
       + by apply to_agree_comp_valid.
   Qed.
-
+  
   Lemma wp_ret k k' ks v E Φ:
     stack_interp (k'::ks) ∗
     (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' @ E {{ Φ }})
@@ -183,7 +183,7 @@ Section rules.
     { iDestruct (stack_agree with "[Hstk Hs]") as "%"; first iFrame.
       subst. iPureIntro. destruct a. eexists _, (State s_heap s_text _), [].
       split; last done. apply CSjstep. simpl in H0. subst. constructor.
-      apply cont_uninj. done. }
+      by apply cont_uninj. }
     iNext. iIntros (??? (? & ?)).
     inversion H0; subst.
     { by apply fill_estep_false in H2. }
@@ -203,8 +203,7 @@ Section rules.
     ▷ WP s @ E {{ Φ }} ⊢ WP Eseq (Evalue v) s @ E {{ Φ }}.
   Proof.
     iIntros "Φ". iApply wp_lift_pure_step; eauto.
-    - destruct σ1. eexists _, _, [].
-      split; last done. constructor. constructor.
+    - destruct σ1. eexists _, _, []. split; auto.
     - destruct 1.
       inversion H0=>//.
       + simplify_eq. inversion H2=>//. simplify_eq.
@@ -306,7 +305,7 @@ Section rules.
     iApply wp_lift_atomic_step=>//.
     iIntros (σ1) "[Hσ [HΓ ?]] !>".
     rewrite /mapstoval. iSplit; first eauto.
-    { iPureIntro. destruct σ1. eexists _, _, []. split; last done. constructor. constructor. }
+    { iPureIntro. destruct σ1. eexists _, _, []. split; auto. }
     iNext; iIntros (v2 σ2 Hstep).
     iDestruct "Hl" as "[% Hl]".
     iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
@@ -392,7 +391,7 @@ Section rules.
     iDestruct "Hl" as "[>% >Hl]".
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
     iModIntro. iSplit; first eauto.
-    { iPureIntro. destruct σ1. eexists _, _, []. simpl in H1. split; last done. by repeat constructor. }
+    { iPureIntro. destruct σ1. eexists _, _, []. simpl in H1. split; auto. by repeat constructor. }
     iNext; iIntros (s2 σ2 Hstep). iModIntro.
     atomic_step Hstep.
     simpl. iFrame.
@@ -584,7 +583,7 @@ Section rules.
     done.
   Qed.
 
-  Lemma wp_call E k ks es ls params f_body f_body' f retty Φ:
+  Lemma wp_call {E k ks es} ls params f_body f_body' f retty Φ:
     es = map (fun l => Evalue (Vptr l)) ls →
     instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
     text_interp f (Function retty params f_body) ∗

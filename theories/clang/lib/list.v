@@ -8,8 +8,7 @@ Section proof.
   Context `{clangG Σ}.
 
   (* de brujin with autosubst? *)
-  Definition tcell (telem: type): type := Tprod telem (Tptr Tvoid).
-  (* Definition tlist (telem: type): type := Tptr (tcell telem). *)
+  Definition tcell (t: type): type := Tprod t (Tptr Tvoid).
 
   Fixpoint isList (l: val) (xs: list val) (t: type) :=
     match xs with
@@ -23,10 +22,10 @@ Section proof.
     isList l xs t ⊢ ⌜ typeof l (Tptr Tvoid) ⌝.
   Proof.
     destruct xs as [|x xs'].
-    - iIntros "%". iPureIntro. subst. constructor.
+    - iIntros "%". iPureIntro. by subst.
     - simpl. iIntros "H".
       iDestruct "H" as (??) "(% & ? & _)".
-      destruct H2 as (?&?&?). subst. iPureIntro. constructor.
+      destruct H2 as (?&?&?). by subst.
   Qed.
 
   Parameter py pt px: addr.

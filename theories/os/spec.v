@@ -148,7 +148,7 @@ Section rules.
     - by apply to_agree_comp_valid.
   Qed.
 
-  Lemma spec_update ss sc ss' sc':
+  Lemma spec_update {sc sc'} ss ss':
     spec_step sc ss sc' ss' →
     spec_inv ∗ sstate ss ∗ scode sc
     ⊢ |==> (∃ cs, spec_inv ∗ sstate ss' ∗ scode sc' ∗ spec_snapshot ((ss', sc')::(ss, sc)::cs)).
@@ -188,11 +188,12 @@ Section sound.
         spec_step_star c Σ c' Σ →
         simulate e c.
 
+  Local Hint Constructors simulate.
+  
   From iris.program_logic Require Import language adequacy.
 
   Notation world σ := (wsat ∗ ownE ⊤ ∗ state_interp σ)%I.
   Notation wptp t := ([∗ list] ef ∈ t, WP ef {{ _, True }})%I.
-
 
 Lemma wp_step R e1 σ1 e2 σ2 efs Φ :
   (R ⊢ |==> ▷ R) →
@@ -257,7 +258,7 @@ Qed.
     iMod ("H" with "[Hw HE]") as ">(_ & _ & (?&?))"; first iFrame.
     iModIntro. iNext.
     iDestruct (scode_agree with "[~3 ~1]") as "%"; first iFrame.
-    iPureIntro. subst. constructor.
+    iPureIntro. by subst.
   Qed.
 
 End sound.

@@ -45,25 +45,22 @@ Section example.
     ⊢ WP fill_ectxs (Ecall f [Evalue (Vptr px); Evalue (Vptr py)]) k {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & Hx & HΦ)".
-    iApply (wp_call ⊤ _ _ _ [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
+    iApply (wp_call [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
     iFrame. iNext. iIntros "Hstk". iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
     (* Open invariant *)
     iInv N as ">Hspec" "Hclose".
-    iMod (spec_update {[ Y := Vint32 vy ]} _ {[ Y := Vint32 (Int.add vx vy) ]}
-               with "[Hspec HY Hsc]")
+    iMod (spec_update {[ Y := Vint32 vy ]} {[ Y := Vint32 (Int.add vx vy) ]} with "[Hspec HY Hsc]")
       as (?) "(Hspec & Hss' & Hsc' & ?)"; [ | iFrame; by iApply mapsto_singleton | ].
-    { apply spec_step_rel'. unfold f_rel.
-      exists vy. by gmap_simplify. }
+    { apply spec_step_rel'. unfold f_rel. eexists _. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     wp_run. iApply wp_seq=>//. iApply sti_spec.
     iFrame. iFrame "#".  iSplitL "Hss' Hy".
-    { iExists (Int.add vy vx). iFrame.
-      rewrite Int.add_commut. by iApply mapsto_singleton. }
-    iIntros "Hp". wp_skip. wp_load. iApply (wp_ret []). iFrame.
+    { iExists _. iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
+    iIntros "Hp". wp_run. iFrame.
     iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
   Qed.
 

@@ -142,11 +142,14 @@ end.
 
 Tactic Notation "wp_skip" := iApply wp_skip; iNext.
 
+Tactic Notation "wp_ret" := iApply (wp_ret []).
+
 Ltac wp_run :=
   (match goal with
    | |- _ ⊢ wp ?E (Eassign _ _) ?P => wp_assign
    | |- _ ⊢ wp ?E (Eseq _ _) ?P => wp_skip
    | |- _ => wp_load
+   | |- _ => wp_ret
    | |- _ => wp_op
   end; wp_run) || idtac.
 
