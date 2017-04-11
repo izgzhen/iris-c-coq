@@ -12,7 +12,7 @@ e : \Expr \bnfdef{} \Expr_1(A_1, e^{r_1}) \mid ... \mid \Expr_n(A_n, e^{r_n}) \m
 \]
 
 Here, $\Expr_i$ is tag for $i$-th class of expression, $A_i$ is its arbitrary non-recursive payload, and $e^{r_i}$ means
-it has $r_i \in \nat$ recursive occurences.
+it has $r_i \in \nat$ recursive occurrences.
 
 It is apparent that $\ectx$ is a direct translation of $\Expr$ plus some ordering considerations, though in actual Coq development we don't mechanize this fact.
 But we will make it explicit here to support some stronger claims than what we can do in Coq.
@@ -122,7 +122,7 @@ Induction scheme II for $\Expr$:
 \end{proof}
 
 \begin{lemma}
-  Partial injectivitity of fill:
+  Partial injectivity of fill:
   \[
   \infer{
     \toval(e) = \bot \quad
@@ -151,5 +151,5 @@ Induction scheme II for $\Expr$:
 $\textlog{wp}^{+}$ is contractive.
 \end{lemma}
 \begin{proof}
-  TODO
+  
 \end{proof}

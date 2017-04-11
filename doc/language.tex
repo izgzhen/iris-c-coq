@@ -39,7 +39,7 @@ We also have following non-syntactical definitions:
 (NOTE) The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is only used in source,
 and the later one is used in the actual semantics and inference rules.
 By adding a pre-processing step which instantiates all source-only expression to substituted/typed ones,
-we can remove lexical and typing environement from core program logic. The details are in \ref{par:tyev}
+we can remove lexical and typing environment from core program logic. The details are in \ref{par:tyev}
 
 (NOTE) Compared with C, there are several notable differences:
 \begin{enumerate}
@@ -82,7 +82,7 @@ easier manipulation of spatial assertions and also for a clean, unified language
 
 We define the small-step semantics (see figure \ref{fig:semantics}) for both local reduction ($\estep{e}{h}{e'}{h'}$) and
 non-local reductions ($\jstep{\Sigma}{e}{s: \Stack}{e'}{s': \Stack}$),
-and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) pointwise.
+and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) point-wise.
 
 %% XXX: Define $\sigma \vdash l \mapsto \vec \bval$
 
