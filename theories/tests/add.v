@@ -59,11 +59,10 @@ Section example.
       exists vy. gmap_simplify=>//. by gmap_rewrite. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-    wp_skip. wp_load. wp_load. wp_op. wp_assign. wp_skip.
-    wp_load. wp_assign. wp_skip. iApply wp_seq=>//.
-    iApply sti_spec.
+    wp_run. iApply wp_seq=>//. iApply sti_spec.
     iFrame. iFrame "#".  iSplitL "Hss' Hy".
-    { iExists (Int.add vy vx). iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
+    { iExists (Int.add vy vx). iFrame.
+      rewrite Int.add_commut. by iApply mapsto_singleton. }
     iIntros "Hp". wp_skip. wp_load. iApply (wp_ret []). iFrame.
     iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
   Qed.

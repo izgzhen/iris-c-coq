@@ -140,15 +140,16 @@ Tactic Notation "wp_op" :=
   | _ => fail "wp_op: not a 'wp'"
 end.
 
-(* Ltac wp_run := *)
-(*   (match goal with *)
-(*    | |- _ ⊢ wp ?E (Eassign _ _) ?P => wp_assign *)
-(*    (* | |- _ ⊢ wp ?E (Eseq _ _) ?P => iApply wp_seq *) *)
-(*    | |- _ => wp_load *)
-(*    | |- _ => wp_op *)
-(*   end; wp_run) || idtac. *)
+Tactic Notation "wp_skip" := iApply wp_skip; iNext.
+
+Ltac wp_run :=
+  (match goal with
+   | |- _ ⊢ wp ?E (Eassign _ _) ?P => wp_assign
+   | |- _ ⊢ wp ?E (Eseq _ _) ?P => wp_skip
+   | |- _ => wp_load
+   | |- _ => wp_op
+  end; wp_run) || idtac.
 
 Ltac unfold_f_inst :=
   rewrite /instantiate_f_body /resolve_rhs; repeat gmap_rewrite.
 
-Tactic Notation "wp_skip" := iApply wp_skip; iNext.

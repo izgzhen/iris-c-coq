@@ -1,0 +1,26 @@
+\section{Automation}
+\label{sec:auto}
+
+We also developed some basic tactics for automatically solving the goals,
+mostly related to our new language, some enhancing what Iris provides.
+
+\subsection{Tactics for ``Symbolic Execution''}
+
+Similar to what exists in Iris's heap-lang, we also provide convenient tactics
+including:
+
+\begin{itemize}
+    \item \texttt{wp\_bind <p>}: bind to a head term, or a term containing the head term, with pattern \texttt{p}
+    \item \texttt{wp\_assign}: make a step by evaluating assignment's head term $l \la v$
+        (it also shifts following statements by applying \texttt{wp\_seq} repetitively beforehand)
+    \item \texttt{wp\_load}, \texttt{wp\_op} are similar to the one above
+    \item \texttt{wp\_skip}: skip over any value before a sequencing operator
+    \item \texttt{wp\_run}: keep executing as long as any of the above applies, which feels like doing
+        symbolic execution automatically
+\end{itemize}
+
+\subsection{Other Tactics}
+
+\begin{itemize}
+    \item \texttt{gmap\_rewrite}: simplify expressions involving \texttt{gmap} based on some algebraic rules
+\end{itemize}
