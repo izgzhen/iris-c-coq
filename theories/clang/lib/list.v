@@ -33,7 +33,7 @@ Section proof.
   Definition y: ident := 2.
   Definition t: ident := 3.
 
-  Definition rev_list (telem: type) : expr :=
+  Definition rev_list : expr :=
     while [ x != null ] ( x != null ) <{
       t <- snd (!?x) ;;
       snd (!?x) <- y ;;
@@ -41,47 +41,44 @@ Section proof.
       x <- t
     }>.
 
+  Notation "'Tlist'" := (Tptr (tcell Tint32)).
+
   Definition ev : env :=
-    Env [(x, (Tptr (tcell Tint32), px));
+    Env [(x, (Tlist, px));
          (y, (Tptr Tvoid, py));
-         (t, (Tptr (tcell Tint32), pt))]
+         (t, (Tlist, pt))]
         [].
 
   Lemma rev_spec Φ body xs:
     ∀ lx ly ys,
-      instantiate_f_body ev (rev_list Tint32) = Some body →
-      isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - @ Tptr (tcell Tint32) ∗
-      px ↦ lx @ Tptr (tcell Tint32) ∗ py ↦ ly @ Tptr Tvoid ∗
+      instantiate_f_body ev rev_list = Some body →
+      isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ pt ↦ - @ Tlist ∗
+      px ↦ lx @ Tlist ∗ py ↦ ly @ Tptr Tvoid ∗
       (∀ ly', py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ Vvoid)
       ⊢ WP body {{ Φ }}.
   Proof.
     unfold_f_inst; destruct px; subst;
     induction xs as [|x xs' IHxs']; intros ??? [=]; subst.
     - iIntros "(% & Hlr & Ht & Hpx & Hpy & HΦ)".
-      subst. wp_load. wp_op.
-      iApply wp_while_false.
+      subst. wp_run.
       iNext. iApply "HΦ". iFrame.
     - iIntros "(Hl & Hlr & Ht & Hpx & Hpy & HΦ)".
       wp_load. iDestruct "Hl" as (p l') "(% & Hp & Hl')".
       destruct H0 as [? [? ?]]. subst.
-      wp_op. iApply wp_while_true.
-      iNext. wp_load. wp_load. wp_bind (Esnd _). iApply wp_snd. iNext.
+      wp_run. iNext. wp_run. iNext.
       iDestruct "Ht" as (?) "Ht".
-      wp_assign. wp_skip. wp_load.
-      destruct p as [pb po]. wp_op.
+      wp_assign. wp_load. destruct p as [pb po]. wp_op.
       rewrite /offset_by_byte.
-      replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
-      wp_load. iDestruct (isList_ptr with "Hlr") as "%".
-      unfold tcell.
+      replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done. wp_load.
+      iDestruct (isList_ptr with "Hlr") as "%". unfold tcell.
       iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
-      wp_assign. wp_skip. wp_load. wp_assign. wp_skip. wp_load. wp_assign. wp_skip.
+      wp_assign. wp_load. wp_assign. wp_load. wp_assign.
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)); first by unfold_f_inst.
-      iFrame.
-      iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".
+      iFrame. iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".
       { iSplitL "Hp1"; by simpl. }
       iSplitL "Hp Hlr".
       { iExists (pb, po), ly. iFrame.
-        iPureIntro. repeat (split; first done). by eapply typeof_any_ptr. }
+        iPureIntro. split; [|split]=>//. by eapply typeof_any_ptr. }
       iSplitL "Ht"; first eauto.
       by rewrite -app_assoc.
   Qed.

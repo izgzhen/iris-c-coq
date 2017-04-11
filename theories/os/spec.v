@@ -189,7 +189,7 @@ Section sound.
         simulate e c.
 
   Local Hint Constructors simulate.
-  
+
   From iris.program_logic Require Import language adequacy.
 
   Notation world σ := (wsat ∗ ownE ⊤ ∗ state_interp σ)%I.

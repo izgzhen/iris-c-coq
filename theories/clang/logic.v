@@ -170,7 +170,7 @@ Section rules.
       + done.
       + by apply to_agree_comp_valid.
   Qed.
-  
+
   Lemma wp_ret k k' ks v E Φ:
     stack_interp (k'::ks) ∗
     (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' @ E {{ Φ }})

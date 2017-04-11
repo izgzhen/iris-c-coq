@@ -89,6 +89,8 @@ Qed.
 
 End heap.
 
+Tactic Notation "wp_skip" := iApply wp_skip; iNext.
+
 Tactic Notation "wp_assign" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
@@ -108,7 +110,7 @@ Tactic Notation "wp_assign" :=
          iAssumptionCore || fail "wp_assign: cannot find" l "↦ ?"
         |env_cbv; reflexivity
         | auto (* wp_finish *)]
-    end)
+    end); wp_skip
   | _ => fail "wp_assign: not a 'wp'"
   end.
 
@@ -140,7 +142,27 @@ Tactic Notation "wp_op" :=
   | _ => fail "wp_op: not a 'wp'"
 end.
 
-Tactic Notation "wp_skip" := iApply wp_skip; iNext.
+Tactic Notation "wp_fst" :=
+  iStartProof;
+  repeat (iApply wp_seq; first by simpl);
+  lazymatch goal with
+  | |- _ ⊢ wp ?E ?s ?P => reshape_expr s ltac:(fun Kes e' =>
+    lazymatch eval hnf in e' with
+    | Esnd _ => wp_bind_core Kes; iApply wp_fst=>//
+    end) || fail "wp_op: cannot find Efst in" s
+  | _ => fail "wp_op: not a 'wp'"
+end.
+
+Tactic Notation "wp_snd" :=
+  iStartProof;
+  repeat (iApply wp_seq; first by simpl);
+  lazymatch goal with
+  | |- _ ⊢ wp ?E ?s ?P => reshape_expr s ltac:(fun Kes e' =>
+    lazymatch eval hnf in e' with
+    | Esnd _ => wp_bind_core Kes; iApply wp_snd=>//
+    end) || fail "wp_op: cannot find Esnd in" s
+  | _ => fail "wp_op: not a 'wp'"
+end.
 
 Tactic Notation "wp_ret" := iApply (wp_ret []).
 
@@ -148,6 +170,10 @@ Ltac wp_run :=
   (match goal with
    | |- _ ⊢ wp ?E (Eassign _ _) ?P => wp_assign
    | |- _ ⊢ wp ?E (Eseq _ _) ?P => wp_skip
+   | |- _ ⊢ wp ?E (Ewhile _ (Evalue vfalse) _) ?P => iApply wp_while_false
+   | |- _ ⊢ wp ?E (Ewhile _ (Evalue vtrue) _) ?P => iApply wp_while_true
+   | |- _ => wp_snd
+   | |- _ => wp_fst
    | |- _ => wp_load
    | |- _ => wp_ret
    | |- _ => wp_op

@@ -80,7 +80,7 @@ Section wp_ret.
     rewrite wpr_unfold /wpr_pre. iIntros "?".
     iLeft. eauto.
   Qed.
-    
+
   Lemma wpr_bind kes E e Φ Φret :
     wpr E e (fun v => wpr E (fill_ectxs (Evalue v) kes) Φ Φret) Φret
     ⊢ wpr E (fill_ectxs e kes) Φ Φret.
@@ -150,7 +150,7 @@ Section wp_ret.
     iNext. iApply wpr_step_mono. iFrame.
     iAlways. iIntros (?). iApply wpr_value.
   Qed.
-  
+
   Lemma wpr_op E op v1 v2 v' Φ Φret:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
