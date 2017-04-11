@@ -56,7 +56,7 @@ Section example.
                with "[Hspec HY Hsc]")
       as (?) "(Hspec & Hss' & Hsc' & ?)"; [ | iFrame; by iApply mapsto_singleton | ].
     { apply spec_step_rel'. unfold f_rel.
-      exists vy. gmap_simplify=>//. by gmap_rewrite. }
+      exists vy. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     wp_run. iApply wp_seq=>//. iApply sti_spec.

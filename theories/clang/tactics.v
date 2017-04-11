@@ -151,5 +151,4 @@ Ltac wp_run :=
   end; wp_run) || idtac.
 
 Ltac unfold_f_inst :=
-  rewrite /instantiate_f_body /resolve_rhs; repeat gmap_rewrite.
-
+  rewrite /instantiate_f_body /resolve_rhs; repeat gmap_simplify.
