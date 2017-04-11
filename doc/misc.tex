@@ -54,7 +54,7 @@ such $e$ is \emph{well-formed}.
 
 \subsection{Axioms about Evaluation Context based Semantics}
 
-Here we prove two lemmas about the syntactic structure on paper:
+In the following lemmas, we assume all involved $e$ to be \emph{well-formed}.
 
 \begin{lemma}
 $\All e: \Expr, k: \Cont . \isenf(e) \ra \unfill(k(e)) = (k, e)$
@@ -71,10 +71,15 @@ And inductively, since fill and unfill should cancel out, the final conclusion i
   $\All e, e_h, k. \unfill(e) = (k, e_h) \ra \isenf(e_h) \land e = k(e_h)$
 \end{lemma}
 \begin{proof}
-  TODO
+    First, $e$ can't be a value, so we just need to consider $e$ in each legal case, which basically
+    mean that either $e$ is normal form itself, or $e = K(e')$ and $\Exists k', k = K::k' \land \unfill(e') = (k', e_h)$.
+    \begin{enumerate}
+        \item In the first case, $k$ is forced to be $\emptyset$ and $e_h = e$, so this case is proved
+        \item In the second case, we can inductively know that $e_h$ is normal form and $e' = k'(e_h)$,
+              so $e = K(k'(e_h)) = (K::k')(e_h) = k(e_h)$, so this case is proved as well
+    \end{enumerate}
 \end{proof}
 
-In the following lemmas, we assume all involved $e$ to be \emph{well-formed}.
 
 \begin{lemma}
 Induction scheme I for $\Expr$:
@@ -96,19 +101,6 @@ assumption, we know that any well-formed $e$ must satisfy $P$.
 \end{proof}
 
 \begin{lemma}
-Induction scheme II for $\Expr$:
-\begin{align*}
-\All P: \Expr \ra \Prop.
-  &(\All e. \isenf(e) \ra P(e)) \ra \\
-  &(\All e, k: \Cont . \isenf(e) \ra (\All k'. |k'| < |k| \ra P (k'(e))) \ra P(k(e))) \ra\\
-  &(\All e. \toval(e) = \bot \ra P(e))
-\end{align*}
-\end{lemma}
-\begin{proof}
-  TODO
-\end{proof}
-
-\begin{lemma}
   Induction scheme for $\Cont$:
   \begin{align*}
     \All P: \Cont \ra \Prop.
@@ -118,7 +110,26 @@ Induction scheme II for $\Expr$:
   \end{align*}
 \end{lemma}
 \begin{proof}
-  TODO
+    Intuitively, this is about property of natural number as the length of $k$.
+    When we know $P(\emptyset)$, we know $\All K_1. P(K_1::[])$, then we know
+    $\All K_2. \All K_1. P(K_2::K_1::[])$ .... Until for arbitrarily big, finite $n$,
+    $\All K_n, K_{n - 1}, ..., K_1. P(K_n::K_{n-1}::...::K_1::[])$, or for any finite
+    $k$, $P(k)$ holds.
+\end{proof}
+
+\begin{lemma}
+Induction scheme II for $\Expr$:
+\begin{align*}
+\All P: \Expr \ra \Prop.
+  &(\All e. \isenf(e) \ra P(e)) \ra \\
+  &(\All e, k: \Cont . \isenf(e) \ra (\All k'. |k'| < |k| \ra P (k'(e))) \ra P(k(e))) \ra\\
+  &(\All e. \toval(e) = \bot \ra P(e))
+\end{align*}
+\end{lemma}
+\begin{proof}
+    First, the $e$ in the final goal is implicitly well-formed, which means that $e = K(e_h)$
+    for some $K, e_h$. So we prove inductively on the length of such $K$, in a similar way to
+    the last lemma, and reach our final conclusion.
 \end{proof}
 
 \begin{lemma}
@@ -131,7 +142,10 @@ Induction scheme II for $\Expr$:
   {\Exists k''. k' = k \append k'' \and e = k''(e_h)}
   \]
 \begin{proof}
-  TODO
+  \begin{enumerate}
+    Since $e$ is well-formed and not a value, so it can be unfilled such that $e = k''(e_h')$,
+    then by \texttt{cont\_inj}, $e_h = e_h'$ and $k' = k ++ k''$, which proves our claim
+  \end{enumerate}
 \end{proof}
 
 \begin{lemma}
