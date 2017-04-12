@@ -12,41 +12,6 @@ Interrupt is a hardware features, thus we will only write down its abstract spec
 without proving it. However, in the OS's perspective, multi-level interrupt will enable us to
 open/close OS-global invariants for different level of priorities.
 
-\subsection{Simulation}
-
-Simulation piggybacks on the WP-based program logic through two special kinds of assertions:
-spec state witnessing assertion ($\Sstate(\sstate : [X \gmapsto \val])$)
-and spec code assertion ($\Scode(\scode)$, more defined below).
-
-\begin{align*}
-    \scode : \SpecCode \bnfdef{}&
-        \texttt{done}(v?) \mid \texttt{rel}(r: \sstate \ra v? \ra \sstate \ra \Prop) \mid ...
-\end{align*}
-
-Then we define specification stepping relationship
-$\sstep{\scode}{\sstate}{\scode'}{\sstate'}$:
-
-
-\begin{mathpar}
-\infer[ss-rel]
-{\tilde{\sigma_f} \bot \sstate \quad r(\sstate, v, \sstate')}
-{\sstep{\texttt{rel}(r)}{\tilde{\sigma_f} \cup \sstate}
-  {\texttt{done}(v)}{\tilde{\sigma_f} \cup \sstate'}}
-\end{mathpar}
-
-We can also define the reflective transitive closure
-$\sstepstar{\scode}{\sstate}{\scode'}{\sstate'}$ trivially.
-
-With this, we can give refinement style proofs for certain kernel APIs.
-The following proof rule is proved in Coq:
-
-\begin{mathpar}
-\infer[spec-update]
-{\sstep{\scode}{\sstate}{\scode'}{\sstate'}}
-{\knowInv{\iname}{I_{spec}} * \Sstate(\sstate) * \Scode(\scode)
- \proves \upd \knowInv{\iname}{I_{spec}} * \Sstate(\sstate') * \Scode(\scode')}
-\end{mathpar}
-
 \subsection{VMM}
 
 We will first write down the abstract spec for page table primitives:

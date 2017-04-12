@@ -1,0 +1,92 @@
+\section{Refinement}\label{sec:refinement}
+
+\subsection{Spec State and Spec Code}
+
+Considering a STS composed of spec code $\scode$ (as below),
+spec state $\state : [X \gmapsto \val]$,
+and semantic rules $\sstep{\scode}{\sstate}{\scode'}{\sstate'}$
+(as well as $\sstepstar{\scode}{\sstate}{\scode'}{\sstate'}$ trivially derived).
+
+\begin{align*}
+    \scode : \SpecCode \bnfdef{}&
+        \texttt{done}(v?) \mid \texttt{rel}(r: \sstate \ra v? \ra \sstate \ra \Prop) \mid ...
+\end{align*}
+
+\subsection{Refinement RA}
+
+We defined a new RA $\refineM$ to capture the history of spec code execution:
+\begin{align*}
+\view &\eqdef \vmaster \mid \vsnap \\
+\refineM &\eqdef \view \times [\SpecState \times \SpecCode]
+\end{align*}
+
+The validity of $\refineM$:
+\begin{mathpar}
+\infer{}{\valid{\refineinj{v}{\emptyset}}}
+
+\infer{}{\valid{\refineinj{v}{[(\sstate, \scode)]}}}
+
+\infer{
+\sstep{\scode}{\sstate}{\scode'}{\sstate'}\qquad
+\valid{\refineinj{v}{[(\sstate, \scode) :: cs]}}
+}
+{\valid{\refineinj{v}{[(\sstate', \scode') :: (\sstate, \scode) :: cs]}}}
+\end{mathpar}
+
+The multiplication of $\view$ and $\refineM$ is defined as:
+
+\begin{align*}
+\vmaster \cdot \any &\eqdef \vmaster\\
+\any \cdot \vmaster &\eqdef \vmaster\\
+\vsnap \cdot \vsnap &\eqdef \vsnap
+\end{align*}
+
+\[
+\refineinj{v_1}{cs_1} \cdot \refineinj{v_2}{cs_2} \eqdef
+\begin{cases}
+\refineinj{v_1 \cdot v_2}{cs_1} \qquad |cs_1| \geq |cs_2|\\
+\refineinj{v_1 \cdot v_2}{cs_2} \qquad |cs_1| < |cs_2|
+\end{cases}
+\]
+
+The disjointness of multiplication is refined as:
+
+\begin{mathpar}
+\infer{\Exists cs'. cs_1 \append cs = cs_2 \lor \Exists cs'. cs_2 \append cs = cs_1}
+{\refineinj{\vsnap}{cs_1} \disj \refineinj{\vsnap}{cs_2}}
+
+\infer{}{\refineinj{\vsnap}{cs_1} \disj \refineinj{\vmaster}{cs_1 \append cs_1}}
+
+\infer{}{\refineinj{\vmaster}{cs_1 \append cs_1} \disj \refineinj{\vsnap}{cs_1}}
+\end{mathpar}
+
+In the end, $\refineM$ can be proven to be a CMRA with an unit element $\refineinj{\vsnap}{\emptyset}$.
+
+\subsection{Refinement Ghost State, Invariant and Rules}
+
+The refinement ghost state \texttt{refineG} contains three part:
+one for $refineM$, and two for \emph{paired} ownership of $\SpecCode$ and $\SpecState$.
+The predicates are defined as below:
+
+\begin{align*}
+\Sstate(\sstate) \eqdef&\, \ownGhost{\SpecState}{(\frac12, \aginj \sstate)} \\
+\Scode(\scode) \eqdef&\, \ownGhost{\SpecCode}{(\frac12, \aginj \scode)} \\
+\master'(cs) \eqdef&\, \ownGhost{\refineM}{\refineinj{\vmaster}{cs}} \\
+\master(c) \eqdef&\, \Exists cs. \ownGhost{\refineM}{\refineinj{\vmaster}{c::cs}}\\
+\snap'(cs) \eqdef&\, \ownGhost{\refineM}{\refineinj{\vsnap}{cs}} \\
+\snap(c) \eqdef&\, \Exists cs. \ownGhost{\refineM}{\refineinj{\vsnap}{c::cs}}
+\end{align*}
+
+Then we define refinement invariant:
+\[I_\refineM \eqdef \Exists \sstate, \scode. \Sstate(\sstate) * \Scode(\scode) * \master(\sstate, \scode)\]
+
+With this, we can give refinement style proofs for certain kernel APIs,
+using the following derived rules:
+
+\begin{mathpar}
+\infer[spec-update]
+{\sstep{\scode}{\sstate}{\scode'}{\sstate'}}
+{\knowInv{\iname}{I_\refineM} * \Sstate(\sstate) * \Scode(\scode)
+ \proves \upd \knowInv{\iname}{I_\refineM} * \Sstate(\sstate') *
+         \Scode(\scode') * \snap(\sstate', \scode')}
+\end{mathpar}

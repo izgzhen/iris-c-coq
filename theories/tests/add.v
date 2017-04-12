@@ -7,7 +7,7 @@ From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 
 Section example.
-  Context `{clangG Σ, specG K Σ} {N: namespace}.
+  Context `{clangG Σ, refineG Σ} {N: namespace}.
 
   Parameter px py: addr.
   Definition x: ident := 1.

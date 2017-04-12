@@ -446,6 +446,7 @@
 \newcommand{\allctx}{\ensuremath{\textmon{Ctx}}}
 \newcommand{\Cont}{\ensuremath{\textmon{Cont}}}
 \newcommand{\SpecCode}{\ensuremath{\textmon{SpecCode}}}
+\newcommand{\SpecState}{\ensuremath{\textmon{SpecState}}}
 \newcommand{\Stack}{\ensuremath{\textmon{Stack}}}
 \newcommand{\Heap}{\ensuremath{\textmon{Heap}}}
 \newcommand{\Text}{\ensuremath{\textmon{Text}}}
@@ -486,6 +487,17 @@
 % Exclusive
 \newcommand{\exm}{\ensuremath{\textmon{Ex}}}
 \newcommand{\exinj}{\textlog{ex}}
+
+% Refine
+\newcommand{\refineM}{\ensuremath{\textmon{Refine}}}
+\newcommand{\refineinj}[2]{\textlog{refine}({#1}, {#2})}
+
+% View
+\newcommand{\view}{\ensuremath{\textmon{View}}}
+\newcommand{\vmaster}{\textlog{master}}
+\newcommand{\vsnap}{\textlog{snapshot}}
+\newcommand{\master}{\mathrm{master}}
+\newcommand{\snap}{\mathrm{snapshot}}
 
 % Auth
 \newcommand{\authm}{\textmon{Auth}}
@@ -546,6 +558,8 @@
 \newtheorem{lemma}[theorem]{Lemma}
 
 \newcommand{\irisc}{$\mathrm{Iris}^{\mathcal{C}}$}
+
+\newcommand{\valid}[1]{\surd({#1})}
 
 \endinput
 

@@ -10,8 +10,8 @@ From iris_os.lib Require Import pair.
 Set Default Proof Using "Type".
 Import uPred.
 
-Class specG K Σ := SpecG {
-    refine_inG :> inG Σ (@refine_ucmra K);
+Class refineG Σ := RefineG {
+    refine_inG :> inG Σ refine_ucmra;
     refine_specG :> @pairG spec_code Σ;
     refine_spstG :> @pairG spec_state Σ;
     refine_gname : gname;
@@ -19,10 +19,10 @@ Class specG K Σ := SpecG {
     spec_gname : gname;
 }.
 
-Section specG.
-  Context `{specG K Σ}.
+Section refineG.
+  Context `{refineG Σ}.
 
-  Definition refine v cs : refine_ucmra := to_validity (Refine K v cs).
+  Definition refine v cs : refine_ucmra := to_validity (Refine v cs).
 
   Definition master_own_exact cs := own refine_gname (refine master cs).
 
@@ -59,7 +59,7 @@ Section specG.
     iMod (refine_snap' with "Hm") as "[Hm Hs]".
     iSplitL "Hm"; by iExists _.
   Qed.
-
+x
   Lemma master_grow':
     ∀ c0 c cs,
       spec_step' c0 c →
@@ -112,4 +112,4 @@ Section specG.
     iFrame. iExists _, _. by iFrame.
   Qed.
   
-End specG.
+End refineG.

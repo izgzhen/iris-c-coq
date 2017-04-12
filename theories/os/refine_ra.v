@@ -3,8 +3,6 @@ From iris.algebra Require Import cmra dra cmra_tactics.
 From iris_os.os Require Import spec.
 
 Section algebra.
-  Context `{K : nat}.
-
   Inductive view : Set := master | snapshot.
 
   Definition max_view (v1 v2: view) :=
@@ -20,17 +18,15 @@ Section algebra.
   Instance comm_max_view: Comm (=) max_view.
   Proof. intros [|] [|]; auto. Qed.
 
+  Instance op_view: Op view := max_view.
+  
   Definition cfg: Type := spec_state * spec_code.
 
-  Record refine_car (K': nat) : Type :=
+  Record refine_car : Type :=
     Refine {
         refine_view: view;
         cfgs: list cfg;
       }.
-
-  Arguments refine_view {_} _.
-  Arguments cfgs {_} _.
-  Arguments Refine {_} _ _.
 
   Definition spec_step' (c c': cfg) : Prop :=
     spec_step (c.2) (c.1) (c'.2) (c'.1).
@@ -43,20 +39,19 @@ Section algebra.
       valid_cfgs (c :: cs) →
       valid_cfgs (c' :: c :: cs).
 
-  Global Instance refine_equiv : Equiv (refine_car K) := (=).
+  Global Instance refine_equiv : Equiv refine_car := (=).
 
-  Global Instance refine_equivalence: Equivalence ((≡) : relation (refine_car K)).
+  Global Instance refine_equivalence: Equivalence ((≡) : relation refine_car).
   Proof. by split; eauto with *. Qed.
 
-  Global Instance refine_leibniz: LeibnizEquiv (refine_car K).
+  Global Instance refine_leibniz: LeibnizEquiv refine_car.
   Proof. by intro. Qed.
 
-  Instance refine_valid : Valid (refine_car K) := λ r, valid_cfgs (cfgs r).
+  Instance refine_valid : Valid refine_car := λ r, valid_cfgs (cfgs r).
 
-  Instance refine_core : Core (refine_car K) :=
-    λ r, Refine snapshot (cfgs r).
+  Instance refine_core : Core refine_car := λ r, Refine snapshot (cfgs r).
 
-  Inductive refine_disjoint : Disjoint (refine_car K) :=
+  Inductive refine_disjoint : Disjoint refine_car :=
   | snap_snap_disjoint cs1 cs2 :
       (prefix cs1 cs2 ∨ prefix cs2 cs1) →
       Refine snapshot cs1 ⊥ Refine snapshot cs2
@@ -67,11 +62,11 @@ Section algebra.
 
   Existing Instance refine_disjoint.
 
-  Instance refine_op : Op (refine_car K) :=
+  Instance refine_op : Op refine_car :=
     λ r1 r2,
     if (Nat.leb (length (cfgs r1)) (length (cfgs r2)))
-      then Refine (max_view (refine_view r1) (refine_view r2)) (cfgs r2)
-      else Refine (max_view (refine_view r1) (refine_view r2)) (cfgs r1).
+      then Refine (refine_view r1 ⋅ refine_view r2) (cfgs r2)
+      else Refine (refine_view r1 ⋅ refine_view r2) (cfgs r1).
 
   Lemma refine_op' cs:
     Refine master cs ⋅ Refine snapshot cs = Refine master cs.
@@ -87,14 +82,12 @@ Section algebra.
     [ constructor | apply app_nil_l ].
   Qed.
 
-  Lemma refine_dra : DRAMixin (refine_car K).
-  Proof.
-    split; try apply _.
-  Admitted.
+  Lemma refine_dra : DRAMixin refine_car.
+  Proof. split; try apply _. Admitted.
 
-  Canonical Structure refineDR : draT := DRAT (refine_car K) refine_dra.
+  Canonical Structure refineDR : draT := DRAT refine_car refine_dra.
 
-  Instance refine_car_empty : Empty (refine_car K) := Refine snapshot [].
+  Instance refine_car_empty : Empty refine_car := Refine snapshot [].
 
   Instance refine_discrete: CMRADiscrete (validityR (refineDR)).
   Proof. apply _. Qed.

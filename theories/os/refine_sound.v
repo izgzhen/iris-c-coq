@@ -11,7 +11,7 @@ Set Default Proof Using "Type".
 Import uPred.
 
 Section sound.
-  Context `{specG K Σ, clangG Σ} {N: namespace}.
+  Context `{refineG Σ, clangG Σ} {N: namespace}.
 
   Inductive simulate: expr → spec_code → Prop :=
   | SimVal: ∀ v, simulate (Evalue v) (SCdone (Some v))
