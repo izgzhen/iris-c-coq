@@ -16,6 +16,7 @@ theories/clang/lib/list.v
 theories/os/spec.v
 theories/os/refine.v
 theories/os/refine_ra.v
+theories/os/refine_sound.v
 theories/os/reentrant.v
 theories/os/interrupt.v
 theories/os/page_table.v

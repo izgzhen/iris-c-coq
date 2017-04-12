@@ -22,32 +22,48 @@ Notation "l S↦ v" :=
 
 Section specG.
   Context `{specG K Σ}.
-  
+
   Definition refine v cs : refine_ucmra := to_validity (Refine K v cs).
 
-  Definition master_own (c: cfg) := 
-    (∃ cfg0, own refine_gname (refine master (cfg0 ++ [c]))).
-  
   Definition master_own_exact cs := own refine_gname (refine master cs).
 
-  Definition snapshot_own (c: cfg) := 
-    (∃ cfg0, own refine_gname (refine snapshot (cfg0 ++ [c]))).
-  
   Definition snapshot_own_exact cs := own refine_gname (refine snapshot cs).
 
   Lemma valid_refine_op cs1 cs2:
     ✓ (refine master cs1 ⋅ refine snapshot cs2) →
-    ∃ cs, cs1 = cs2 ++ cs.
+    ∃ cs, cs1 = cs ++ cs2.
   Proof. intros (?&?&Hdisj). inversion Hdisj. eauto. Qed.
 
-  Lemma refine_snap:
+  Lemma refine_snap':
     ∀ cs,
-      master_own_exact cs ⊢ master_own_exact cs ∗ snapshot_own_exact cs.
-  Admitted.
+      master_own_exact cs ⊢ |==> own refine_gname (refine master cs ⋅ refine snapshot cs).
+  Proof.
+    iIntros. iApply own_update; last done.
+    intros x mz Hm.
+    destruct mz eqn:Heq.
+    - destruct Hm as [? [? ?]].
+      try repeat split=>//; simpl.
+      + apply refine_disj'.
+      + by rewrite refine_op'.
+    - simpl. split; [|split]=>//. apply refine_disj'.
+  Qed.
 
   Lemma spec_grow:
-    ∀ c cs, master_own_exact cs ⊢ master_own_exact (c::cs).
-  Admitted.
+    ∀ c0 c cs,
+      spec_step' c0 c →
+      master_own_exact (c0::cs) ⊢ |==> master_own_exact (c::c0::cs).
+  Proof.
+    iIntros (????) "H". iApply own_update; last done.
+    intros x mz Hm.
+    destruct mz eqn:Heq.
+    - destruct Hm as [? [? ?]].
+      try repeat split=>//; simpl.
+      + constructor=>//.
+      + inversion H3. subst.
+        replace (c :: cs2 ++ cs1) with ((c :: cs2) ++ cs1)=>//.
+        constructor.
+    - simpl. constructor=>//.
+  Qed.
 
   Definition γ_sstate := @gen_heap_name _ _ _ _ _ specG_spstG.
 
@@ -127,89 +143,3 @@ Section specG.
   Admitted.
 
 End specG.
-
-Section sound.
-  Context `{specG K Σ, clangG Σ} {N: namespace}.
-
-  Inductive simulate: expr → spec_code → Prop :=
-  | SimVal: ∀ v, simulate (Evalue v) (SCdone (Some v))
-  | SimStep:
-      ∀ σ σ' (Σ Σ': spec_state) e c e' c',
-        cstep e σ e' σ' →
-        spec_step_star c Σ c' Σ →
-        simulate e c.
-
-  Local Hint Constructors simulate.
-
-  From iris.program_logic Require Import language adequacy.
-
-  Notation world σ := (wsat ∗ ownE ⊤ ∗ state_interp σ)%I.
-  Notation wptp t := ([∗ list] ef ∈ t, WP ef {{ _, True }})%I.
-
-Lemma wp_step R e1 σ1 e2 σ2 efs Φ :
-  (R ⊢ |==> ▷ R) →
-  prim_step e1 σ1 e2 σ2 efs →
-  world σ1 ∗ R ∗ WP e1 {{ Φ }} ==∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp efs).
-Proof.
-  rewrite {1}wp_unfold /wp_pre. iIntros (HR Hstep) "[(Hw & HE & Hσ) [HR [H|[_ H]]]]".
-  { iDestruct "H" as (v) "[% _]". apply val_stuck in Hstep; simplify_eq. }
-  rewrite fupd_eq /fupd_def.
-  iMod ("H" $! σ1 with "Hσ [Hw HE]") as ">(Hw & HE & _ & H)"; first by iFrame.
-  iModIntro; iNext.
-  iMod ("H" $! e2 σ2 efs with "[%] [$Hw $HE]") as ">($ & $ & $ & ? & $)"=>//.
-  by iFrame.
-Qed.
-
-  Lemma wptp_step' R e1 t1 t2 σ1 σ2 Φ :
-    (R ⊢ |==> ▷ R) →
-    step (e1 :: t1,σ1) (t2, σ2) →
-    world σ1 ∗ R ∗ WP e1 {{ Φ }} ∗ wptp t1
-    ==∗ ∃ e2 t2', ⌜t2 = e2 :: t2'⌝ ∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp t2').
-  Proof.
-    iIntros (HR Hstep) "(HW & HR & He & Ht)".
-    destruct Hstep as [e1' σ1' e2' σ2' efs [|? t1'] t2' ?? Hstep]; simplify_eq/=.
-    - iExists e2', (t2' ++ efs); iSplitR; first eauto.
-      rewrite big_sepL_app. iFrame "Ht". iApply wp_step; try iFrame; eauto.
-    - iExists e, (t1' ++ e2' :: t2' ++ efs); iSplitR; first eauto.
-      rewrite !big_sepL_app !big_sepL_cons big_sepL_app.
-      iDestruct "Ht" as "($ & He' & $)"; iFrame "He".
-      iApply wp_step; try iFrame; eauto.
-  Qed.
-
-  Lemma wptp_steps' R n e1 t1 t2 σ1 σ2 Φ :
-    (R ⊢ |==> ▷ R) →
-    nsteps (@step clang_lang) n (e1 :: t1, σ1) (t2, σ2) →
-    world σ1 ∗ R ∗ WP e1 {{ Φ }} ∗ wptp t1 ⊢
-    Nat.iter (S n) (λ P, |==> ▷ P) (∃ e2 t2',
-    ⌜t2 = e2 :: t2'⌝ ∗ world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp t2').
-  Proof.
-    revert e1 t1 t2 σ1 σ2; simpl; induction n as [|n IH]=> e1 t1 t2 σ1 σ2 /=.
-    { intros HR. inversion_clear 1. iIntros "?". eauto 10. }
-    iIntros (HR Hsteps) "H". inversion_clear Hsteps as [|?? [t1' σ1']].
-    iMod (wptp_step' with "H") as (e1' t1'') "[% H]"; first eauto; simplify_eq. apply H1.
-    iModIntro; iNext; iMod "H" as ">?". iApply IH=>//.
-    subst. done. Qed.
-
-  Lemma foo' s c:
-    (inv N spec_inv ∗ sstate s ∗ scode c) ⊢ |==> ▷ (inv N spec_inv ∗ sstate s ∗ scode c).
-  Proof.
-    iIntros "?". iModIntro.
-    by iNext. Qed.
-
-  Lemma soudness n e1 t1 σ1 t2 σ2 Σ1 c1 Σ2 v2:
-    nsteps step n (e1 :: t1, σ1) (of_val v2 :: t2, σ2) →
-    world σ1 ∗ (inv N spec_inv ∗ sstate Σ1 ∗ scode c1) ∗
-    WP e1 {{ v, scode (SCdone (Some v)) ∗ sstate Σ2 }} ∗ wptp t1 ⊢
-    Nat.iter (S (S n)) (λ P, |==> ▷ P) ⌜simulate (Evalue v2) c1⌝.
-  Proof.
-    intros. rewrite wptp_steps' //; last by apply foo'.
-    rewrite (Nat_iter_S_r (S n)). apply bupd_iter_mono.
-    iDestruct 1 as (e2 t2') "(% & (Hw & HE & _) & (?&?&?) & [H _])"; simplify_eq.
-    iDestruct (wp_value_inv with "H") as "H". rewrite fupd_eq /fupd_def.
-    iMod ("H" with "[Hw HE]") as ">(_ & _ & (?&?))"; first iFrame.
-    iModIntro. iNext.
-    iDestruct (scode_agree with "[~3 ~1]") as "%"; first iFrame.
-    iPureIntro. by subst.
-  Qed.
-
-End sound.
