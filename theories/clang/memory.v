@@ -41,8 +41,10 @@ Inductive val : Set :=
 | Vpair (v1 v2: val).
 
 
-Instance val_eq_dec : EqDecision val.
+Global Instance val_eq_dec : EqDecision val.
 Proof. solve_decision. Defined.
+
+Global Instance val_equiv: Equiv val := (=).
 
 Instance sizeof_val: Sizeof val :=
   fix go v :=
