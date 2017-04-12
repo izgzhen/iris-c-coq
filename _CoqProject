@@ -21,4 +21,5 @@ theories/os/reentrant.v
 theories/os/interrupt.v
 theories/os/page_table.v
 theories/os/vmm.v
+theories/lib/pair.v
 theories/tests/add.v

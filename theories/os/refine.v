@@ -6,18 +6,17 @@ From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
 From iris_os.os Require Export spec refine_ra.
+From iris_os.lib Require Import pair.
 Set Default Proof Using "Type".
 Import uPred.
 
-Instance equiv_cfg: Equiv cfg := (=).
-
-Definition specM := (prodR fracR (agreeR (discreteC cfg))).
-
 Class specG K Σ := SpecG {
-    specG_cfgG :> inG Σ specM;
-    cfgG_gname : gname;
     refine_inG :> inG Σ (@refine_ucmra K);
-    refine_gname : gname
+    refine_specG :> @pairG spec_code Σ;
+    refine_spstG :> @pairG spec_state Σ;
+    refine_gname : gname;
+    spst_gname : gname;
+    spec_gname : gname;
 }.
 
 Section specG.
@@ -88,52 +87,29 @@ Section specG.
     iExists _. iApply master_grow'=>//.
   Qed.
 
-  Definition to_cfgM (c: cfg) : specM :=
-    ((1/2)%Qp, (to_agree (c: leibnizC cfg))).
+  Definition own_sstate := @own_pair spec_state Σ refine_spstG spst_gname.
+  Definition update_sstate :=  @own_pair_update spec_state Σ refine_spstG spst_gname.
+  Definition own_scode := @own_pair spec_code Σ refine_specG spec_gname.
+  Definition update_scode :=  @own_pair_update spec_code Σ refine_specG spec_gname.
   
-  Definition own_cfg (c: cfg) := own cfgG_gname (to_cfgM c).
-
-  Definition spec_inv := (∃ c, own_cfg c ∗ master_own c)%I.
+  Definition spec_inv := (∃ ss sc, own_sstate ss ∗ own_scode sc ∗ master_own (ss, sc))%I.
 
   Global Instance spec_inv_timeless: TimelessP spec_inv. Proof. apply _. Qed.
-  
-  Lemma own_cfg_agree ks ks':
-   own_cfg ks ∗ own_cfg ks'  ⊢ ⌜ ks = ks' ⌝.
-  Proof.
-    iIntros "[Hs' Hs]".
-    rewrite /own_cfg.
-    iDestruct (own_valid_2 with "Hs Hs'") as "%".
-    iPureIntro. destruct H0 as [? ?]. simpl in H1.
-    by apply to_agree_comp_valid in H1.
-  Qed.
 
-  Lemma own_cfg_update c1 c2 c3:
-    own_cfg c1 ∗ own_cfg c2 ⊢ |==> own_cfg c3 ∗ own_cfg c3 ∗ ⌜ c1 = c2 ⌝.
+  Lemma spec_update {ss ss'} sc sc':
+    spec_step sc ss sc' ss' →
+    spec_inv ∗ own_sstate ss ∗ own_scode sc ∗ snapshot_own (ss, sc)
+    ⊢ |==> spec_inv ∗ own_sstate ss' ∗ own_scode sc' ∗ snapshot_own (ss', sc').
   Proof.
-    iIntros "[Hs Hs']".
-    iDestruct (own_cfg_agree with "[-]") as "%"; first iFrame.
-    inversion H0. subst.
-    rewrite /own_cfg.
-    iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
-    rewrite pair_op frac_op' Qp_div_2.
-    apply cmra_update_exclusive.
-    split; simpl.
-    - by rewrite frac_op'.
-    - by apply to_agree_comp_valid.
-  Qed.
-
-  Lemma spec_update c c':
-    spec_step' c c' →
-    spec_inv ∗ own_cfg c ∗ snapshot_own c
-    ⊢ |==> spec_inv ∗ own_cfg c' ∗ snapshot_own c'.
-  Proof.
-    iIntros (?) "(Hinv & Hc & _)".
-    iDestruct "Hinv" as (c'') "(HC & Hm)".
-    iMod (own_cfg_update _ _ c' with "[HC Hc]") as "(HC' & Hc' & %)"; first iFrame.
-    iFrame. subst.
-    iMod (master_grow _ c' with "Hm") as "Hm'"=>//.
+    iIntros (?) "(Hinv & Hss & Hsc & Hs)".
+    iDestruct "Hinv" as (ss'' sc'') "(HSS & HSC & Hm)".
+    unfold own_scode, own_sstate.
+    iMod (update_scode _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame.
+    iMod (update_sstate _ _ ss' with "[HSS Hss]") as "(HSS' & Hss' & %)"; first iFrame.
+    subst. iFrame.
+    iMod (master_grow _ (ss', sc') with "Hm") as "Hm'"=>//.
     iMod (refine_snap with "Hm'") as "[Hm' Hs']".
-    iFrame. iExists _. by iFrame.
+    iFrame. iExists _, _. by iFrame.
   Qed.
   
 End specG.
