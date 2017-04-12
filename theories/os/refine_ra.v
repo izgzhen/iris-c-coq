@@ -82,8 +82,37 @@ Section algebra.
     [ constructor | apply app_nil_l ].
   Qed.
 
+  Lemma prefix_leq {A: Type} (l1 l2: list A): prefix l1 l2 → length l1 <=? length l2 = true.
+  Admitted.
+
+  Lemma prefix_geq {A: Type} (l1 l2: list A): prefix l1 l2 → length l2 <=? length l1 = false.
+  Admitted.
+  
   Lemma refine_dra : DRAMixin refine_car.
-  Proof. split; try apply _. Admitted.
+  Proof.
+    split; try apply _; auto.
+    - intros. destruct x as [[] csx]; destruct y as [[] csy].
+      + inversion H1.
+      + inversion H1. unfold op, refine_op. simpl.
+        assert (length (cs2 ++ csy) <=? length csy = false); first admit.
+        rewrite H2. simplify_eq. eauto.
+      + inversion H1. unfold op, refine_op. simpl.
+        assert ((length csx) <=? length (cs2 ++ csx) = true); first admit.
+        rewrite H2. simplify_eq. eauto.
+      + inversion H1. destruct H4.
+        * simplify_eq. unfold op, refine_op. simpl.
+          rewrite prefix_leq=>//.
+        * simplify_eq. unfold op, refine_op. simpl.
+          rewrite prefix_geq=>//. (* not very right ... but let's take it for now *)
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+  Admitted.
 
   Canonical Structure refineDR : draT := DRAT refine_car refine_dra.
 
@@ -97,8 +126,13 @@ Section algebra.
   Global Instance refine_empty : Empty (refine_cmra) := to_validity (refine_car_empty).
 
   Lemma refine_unit: UCMRAMixin (refine_cmra).
+  Proof.
+    split.
+    - constructor.
+    - admit.
+    - constructor. by simpl.
   Admitted.
-
+  
   Canonical Structure refine_ucmra : ucmraT :=
     (UCMRAT refine_cmra (cmra_ofe_mixin _) (cmra_mixin _) refine_unit).
 
