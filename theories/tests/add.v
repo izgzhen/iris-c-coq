@@ -13,7 +13,7 @@ Section example.
   Definition x: ident := 1.
   Definition y: ident := 3.
   Definition Y: ident := 2.
-  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ Y S↦ Vint32 vy)%I.
+  Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ own_sstate {[ Y := Vint32 vy ]})%I.
 
   Definition invs (prio: nat) : iProp Σ :=
     match prio with
@@ -40,8 +40,9 @@ Section example.
   Lemma f_spec γ γp f vx Φ k ks:
     text_interp f (Function Tint32 [(x, Tint32); (y, Tint32)] f_body)  ∗
     int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ stack_interp ks ∗
-    scode (SCrel (f_rel vx)) ∗ px ↦ vx @ Tint32 ∗
-    (∀ v, scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ stack_interp ks -∗ WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
+    own_scode (SCrel (f_rel vx)) ∗ px ↦ vx @ Tint32 ∗
+    (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ stack_interp ks -∗
+          WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
     ⊢ WP fill_ectxs (Ecall f [Evalue (Vptr px); Evalue (Vptr py)]) k {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & Hx & HΦ)".
@@ -53,13 +54,13 @@ Section example.
     (* Open invariant *)
     iInv N as ">Hspec" "Hclose".
     iMod (spec_update {[ Y := Vint32 vy ]} {[ Y := Vint32 (Int.add vx vy) ]} with "[Hspec HY Hsc]")
-      as (?) "(Hspec & Hss' & Hsc' & ?)"; [ | iFrame; by iApply mapsto_singleton | ].
+      as "(Hspec & Hss' & Hsc' & ?)"; [ | iFrame; by iApply mapsto_singleton | ].
     { apply spec_step_rel'. unfold f_rel. eexists _. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
     wp_run. iApply wp_seq=>//. iApply sti_spec.
     iFrame. iFrame "#".  iSplitL "Hss' Hy".
-    { iExists _. iFrame. rewrite Int.add_commut. by iApply mapsto_singleton. }
+    { iExists _. iFrame. by rewrite Int.add_commut. }
     iIntros "Hp". wp_run. iFrame.
     iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
   Qed.

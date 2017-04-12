@@ -96,12 +96,12 @@ Section specG.
 
   Global Instance spec_inv_timeless: TimelessP spec_inv. Proof. apply _. Qed.
 
-  Lemma spec_update {ss ss'} sc sc':
+  Lemma spec_update {sc sc'} ss ss':
     spec_step sc ss sc' ss' →
-    spec_inv ∗ own_sstate ss ∗ own_scode sc ∗ snapshot_own (ss, sc)
+    spec_inv ∗ own_sstate ss ∗ own_scode sc
     ⊢ |==> spec_inv ∗ own_sstate ss' ∗ own_scode sc' ∗ snapshot_own (ss', sc').
   Proof.
-    iIntros (?) "(Hinv & Hss & Hsc & Hs)".
+    iIntros (?) "(Hinv & Hss & Hsc)".
     iDestruct "Hinv" as (ss'' sc'') "(HSS & HSC & Hm)".
     unfold own_scode, own_sstate.
     iMod (update_scode _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame.

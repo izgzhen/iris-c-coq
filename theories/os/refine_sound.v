@@ -6,9 +6,9 @@ From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
 From iris_os.os Require Export spec refine_ra refine.
+From iris_os.lib Require Import pair.
 Set Default Proof Using "Type".
 Import uPred.
-
 
 Section sound.
   Context `{specG K Σ, clangG Σ} {N: namespace}.
@@ -72,23 +72,25 @@ Qed.
     iModIntro; iNext; iMod "H" as ">?". iApply IH=>//.
     subst. done. Qed.
 
-  Lemma foo' c:
-    (inv N spec_inv ∗ own_cfg c) ⊢ |==> ▷ (inv N spec_inv ∗ own_cfg c).
+  Lemma foo' ss sc:
+    (inv N spec_inv ∗ own_sstate ss ∗ own_scode sc)
+    ⊢ |==> ▷ (inv N spec_inv ∗ own_sstate ss ∗ own_scode sc).
   Proof. iIntros "?". iModIntro. by iNext. Qed.
 
   Lemma soudness n e1 t1 σ1 t2 σ2 c1 Σ1 Σ2 v2:
     nsteps step n (e1 :: t1, σ1) (of_val v2 :: t2, σ2) →
-    world σ1 ∗ (inv N spec_inv ∗ own_cfg (Σ1, c1)) ∗
-    WP e1 {{ v, own_cfg (Σ2, SCdone (Some v)) }} ∗ wptp t1 ⊢
+    world σ1 ∗ (inv N spec_inv ∗ own_sstate Σ1 ∗ own_scode c1) ∗
+    WP e1 {{ v, own_sstate Σ2 ∗ own_scode (SCdone (Some v)) }} ∗ wptp t1 ⊢
     Nat.iter (S (S n)) (λ P, |==> ▷ P) ⌜simulate (Evalue v2) c1⌝.
   Proof.
     intros. rewrite wptp_steps' //; last by apply foo'.
     rewrite (Nat_iter_S_r (S n)). apply bupd_iter_mono.
-    iDestruct 1 as (e2 t2') "(% & (Hw & HE & _) & (?&?) & [H _])"; simplify_eq.
+    iDestruct 1 as (e2 t2') "(% & (Hw & HE & _) & (?&?&?) & [H _])"; simplify_eq.
     iDestruct (wp_value_inv with "H") as "H". rewrite fupd_eq /fupd_def.
-    iMod ("H" with "[Hw HE]") as ">(_ & _ & ?)"; first iFrame.
+    iMod ("H" with "[Hw HE]") as ">(_ & _ & (?&?))"; first iFrame.
     iModIntro. iNext.
-    iDestruct (own_cfg_agree with "[~2 ~1]") as "%"; first iFrame.
+    iDestruct (@own_pair_agree spec_state with "[~2 ~1]") as "%"; first iFrame.
+    iDestruct (@own_pair_agree spec_code with "[~3 ~4]") as "%"; first iFrame.
     iPureIntro. by simplify_eq.
   Qed.
 
