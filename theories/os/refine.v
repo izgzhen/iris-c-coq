@@ -59,7 +59,7 @@ Section refineG.
     iMod (refine_snap' with "Hm") as "[Hm Hs]".
     iSplitL "Hm"; by iExists _.
   Qed.
-x
+
   Lemma master_grow':
     ∀ c0 c cs,
       spec_step' c0 c →
