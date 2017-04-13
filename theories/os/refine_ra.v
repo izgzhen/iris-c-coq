@@ -19,7 +19,7 @@ Section algebra.
   Proof. intros [|] [|]; auto. Qed.
 
   Instance op_view: Op view := max_view.
-  
+
   Definition cfg: Type := spec_state * spec_code.
 
   Record refine_car : Type :=
@@ -62,49 +62,54 @@ Section algebra.
 
   Existing Instance refine_disjoint.
 
-  Instance refine_op : Op refine_car :=
-    λ r1 r2,
-    if (Nat.leb (length (cfgs r1)) (length (cfgs r2)))
-      then Refine (refine_view r1 ⋅ refine_view r2) (cfgs r2)
-      else Refine (refine_view r1 ⋅ refine_view r2) (cfgs r1).
+  Instance op_cfgs: Op (list cfg) :=
+    λ cs1 cs2, if (Nat.leb (length cs1) (length cs2)) then cs2 else cs1.
 
-  Lemma refine_op' cs:
+  Instance assoc_op_cfgs: Assoc (@eq (list cfg)) (⋅).
+  Admitted.
+
+  Instance comm_op_cfgs: Comm (@eq (list cfg)) (⋅).
+  Admitted.
+
+  Instance op_refine : Op refine_car :=
+    λ r1 r2, Refine (refine_view r1 ⋅ refine_view r2) (cfgs r1 ⋅ cfgs r2).
+
+  Lemma refine_op v1 v2 l1 l2: Refine v1 l1 ⋅ Refine v2 l2 = Refine (v1 ⋅ v2) (l1 ⋅ l2).
+  Proof. unfold op, op_refine. by simpl. Qed.
+
+  Lemma cfgs_id_merge (cs: list cfg): cs ⋅ cs = cs.
+  Proof. unfold op, op_cfgs. by rewrite Nat.leb_refl. Qed.
+
+  Lemma refine_id_merge cs:
     Refine master cs ⋅ Refine snapshot cs = Refine master cs.
-  Proof.
-    unfold op, refine_op.
-    simpl. by rewrite Nat.leb_refl.
-  Qed.
+  Proof. unfold op, op_refine. simpl. by rewrite cfgs_id_merge. Qed.
 
-  Lemma refine_disj' cs:
+  Lemma refine_id_disj cs:
     Refine master cs ⊥ Refine snapshot cs.
   Proof.
     replace cs with ([] ++ cs) at 1;
     [ constructor | apply app_nil_l ].
   Qed.
 
-  Lemma prefix_leq {A: Type} (l1 l2: list A): prefix l1 l2 → length l1 <=? length l2 = true.
+  Lemma op_cfgs_prefix (l1 l2: list cfg): prefix l1 l2 → l1 ⋅ l2 = l2.
   Admitted.
 
-  Lemma prefix_geq {A: Type} (l1 l2: list A): prefix l1 l2 → length l2 <=? length l1 = false.
+  Lemma op_cfgs_app (l1 l2: list cfg): (l1 ++ l2) ⋅ l2 = l1 ++ l2.
   Admitted.
-  
+
   Lemma refine_dra : DRAMixin refine_car.
   Proof.
     split; try apply _; auto.
-    - intros. destruct x as [[] csx]; destruct y as [[] csy].
-      + inversion H1.
-      + inversion H1. unfold op, refine_op. simpl.
-        assert (length (cs2 ++ csy) <=? length csy = false); first admit.
-        rewrite H2. simplify_eq. eauto.
-      + inversion H1. unfold op, refine_op. simpl.
-        assert ((length csx) <=? length (cs2 ++ csx) = true); first admit.
-        rewrite H2. simplify_eq. eauto.
-      + inversion H1. destruct H4.
-        * simplify_eq. unfold op, refine_op. simpl.
-          rewrite prefix_leq=>//.
-        * simplify_eq. unfold op, refine_op. simpl.
-          rewrite prefix_geq=>//. (* not very right ... but let's take it for now *)
-    - admit.
+    - intros.
+      destruct x as [[] csx]; destruct y as [[] csy]; inversion H1;
+      rewrite refine_op; simplify_eq.
+      + by rewrite op_cfgs_app.
+      + by rewrite comm_op_cfgs op_cfgs_app.
+      + destruct H4.
+        * by rewrite op_cfgs_prefix.
+        * by rewrite comm_op_cfgs op_cfgs_prefix.
+    - intros ???.
+
     - admit.
     - admit.
     - admit.
@@ -132,7 +137,7 @@ Section algebra.
     - admit.
     - constructor. by simpl.
   Admitted.
-  
+
   Canonical Structure refine_ucmra : ucmraT :=
     (UCMRAT refine_cmra (cmra_ofe_mixin _) (cmra_mixin _) refine_unit).
 

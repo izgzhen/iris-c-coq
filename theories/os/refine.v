@@ -91,7 +91,7 @@ Section refineG.
   Definition update_sstate :=  @own_pair_update spec_state Σ refine_spstG spst_gname.
   Definition own_scode := @own_pair spec_code Σ refine_specG spec_gname.
   Definition update_scode :=  @own_pair_update spec_code Σ refine_specG spec_gname.
-  
+
   Definition spec_inv := (∃ ss sc, own_sstate ss ∗ own_scode sc ∗ master_own (ss, sc))%I.
 
   Global Instance spec_inv_timeless: TimelessP spec_inv. Proof. apply _. Qed.
@@ -111,5 +111,5 @@ Section refineG.
     iMod (refine_snap with "Hm'") as "[Hm' Hs']".
     iFrame. iExists _, _. by iFrame.
   Qed.
-  
+
 End refineG.

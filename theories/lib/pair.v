@@ -21,7 +21,7 @@ End defs.
 
 Section rules.
   Context `{@pairG t Σ} {γ: gname}.
-  
+
   Definition own_pair (c: t) := own γ (to_pairM c).
 
   Lemma own_pair_agree ks ks':
