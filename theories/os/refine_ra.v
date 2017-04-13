@@ -190,8 +190,26 @@ Section algebra.
         * rewrite comm_op_cfgs op_cfgs_suffix=>//.
       + by rewrite op_cfgs_app comm_op_cfgs op_cfgs_app.
       + by rewrite op_cfgs_app comm_op_cfgs op_cfgs_app.
-    - admit.
-  Admitted.
+    - intros.
+      destruct x as [[] lx]; unfold core, refine_core; simpl.
+      + rewrite -{2}(left_id_L _ _ lx). constructor.
+      + constructor. by left.
+    - intros.
+      destruct x as [[] lx]; unfold core, refine_core;
+      rewrite refine_op; simpl; by rewrite cfgs_id_merge.
+    - intros.
+      destruct x as [[] lx]; destruct y as [[] ly];
+      rewrite refine_op; simpl; exists (Refine snapshot ly);
+      intros; first inversion H1;
+      rewrite /core /refine_core refine_op; simpl.
+      + inversion H1. subst. rewrite op_cfgs_app.
+        split; [| split]=>//.
+        constructor. right. by eexists _.
+      + split; [|split]=>//.
+        constructor. inversion H1. subst.
+        left. by eexists _.
+      + split; [|split]=>//.
+  Qed.
 
   Canonical Structure refineDR : draT := DRAT refine_car refine_dra.
 
