@@ -1,5 +1,11 @@
-Iris OS
+Iris C
 =======
+
+## Introduction
+
+C verification framework based on the Iris program logic.
+
+[Documentation](doc/iris-c.pdf)
 
 ## Dependencies
 
