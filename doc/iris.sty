@@ -448,6 +448,7 @@
 \newcommand{\SpecCode}{\ensuremath{\textmon{SpecCode}}}
 \newcommand{\SpecState}{\ensuremath{\textmon{SpecState}}}
 \newcommand{\Stack}{\ensuremath{\textmon{Stack}}}
+\newcommand{\stack}{\ensuremath{\textmon{Stack}}}
 \newcommand{\Heap}{\ensuremath{\textmon{Heap}}}
 \newcommand{\Text}{\ensuremath{\textmon{Text}}}
 \newcommand{\cureval}{E_{\text{cur}}}
@@ -466,8 +467,6 @@
 
 \newcommand{\reslhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{LHS}}}
 \newcommand{\resrhs}[1]{\llparenthesis {#1} \rrparenthesis_{\text{RHS}}}
-
-\newcommand{\assigncomp}[2]{\mathrm{assign\any compatible}({#1} \la {#2})}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STANDARD DERIVED CONSTRUCTIONS
@@ -498,6 +497,7 @@
 \newcommand{\vsnap}{\textlog{snapshot}}
 \newcommand{\master}{\mathrm{master}}
 \newcommand{\snap}{\mathrm{snapshot}}
+
 
 % Auth
 \newcommand{\authm}{\textmon{Auth}}
@@ -561,5 +561,8 @@
 
 \newcommand{\valid}[1]{\surd({#1})}
 
-\endinput
+\newcommand{\assigncomp}[2]{\mathrm{assign\any compatible}({#1} \la {#2})}
 
+\newcommand*{\xxx}[1]{{\color{red}\textbf{XXX: #1}}}
+
+\endinput
