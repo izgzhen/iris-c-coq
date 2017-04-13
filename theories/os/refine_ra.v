@@ -224,11 +224,27 @@ Section algebra.
 
   Lemma refine_unit: UCMRAMixin (refine_cmra).
   Proof.
+    split; try by constructor.
+    intros [[? l] Hv HP].
     split.
-    - constructor.
-    - admit.
-    - constructor. by simpl.
-  Admitted.
+    - split.
+      + intros H. rewrite /empty /refine_empty in H.
+        destruct H as [? [? ?]].
+        simpl in H1. inversion H1=>//.
+      + intros H. rewrite /empty /refine_empty.
+        split.
+        { constructor. }
+        { split=>//. simpl. unfold refine_car_empty.
+          destruct refine_view0.
+          - rewrite -(right_id_L _ _ l). constructor.
+          - constructor. left. apply suffix_nil. }
+    - intros.
+      rewrite /empty /refine_empty.
+      simpl. unfold refine_car_empty.
+      rewrite refine_op.
+      destruct refine_view0; simpl;
+        by rewrite op_cfgs_suffix; last by apply suffix_nil.
+  Qed.
 
   Canonical Structure refine_ucmra : ucmraT :=
     (UCMRAT refine_cmra (cmra_ofe_mixin _) (cmra_mixin _) refine_unit).
