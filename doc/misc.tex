@@ -141,7 +141,8 @@ Induction scheme II for $\Expr$:
     k(e) = k'(e_h)}
   {\Exists k''. k' = k \append k'' \and e = k''(e_h)}
   \]
-\begin{proof}
+\end{lemma}
+  \begin{proof}
   \begin{enumerate}
     Since $e$ is well-formed and not a value, so it can be unfilled such that $e = k''(e_h')$,
     then by \texttt{cont\_inj}, $e_h = e_h'$ and $k' = k ++ k''$, which proves our claim
@@ -183,3 +184,15 @@ $\textlog{wp}^{+}$ is contractive.
     by \texttt{f\_contractive}.
   \end{enumerate}
 \end{proof}
+
+\subsection{Admitted Facts}
+
+There are still one or more loopholes that exists behind the documented formalization.
+But note that all of them are harmless to leave unproven for now.
+
+\begin{itemize}
+\item In \texttt{lang.v}, lemma \texttt{same\_type\_encode\_inj}'s fourth case on \texttt{int32} is admitted.
+  Essential, this is about encoding \texttt{int32} value with four bytes. It is trivially true, and even if
+  it is false, the soundness of logic won't suffer.  
+  We don't prove it now because there are not enough lemmas exposed from \texttt{Integers.v}.
+\end{itemize}
