@@ -146,8 +146,39 @@ Section algebra.
           rewrite H6 in H7.
           by eapply suffix_app.
         * rewrite comm_op_cfgs op_cfgs_suffix in H9=>//.
-    - admit.
-    - admit.
+    - intros [[] lx] [[] ly] [[] lz]; rewrite !refine_op; simpl; intros=>//;
+      match goal with
+        | [H : Refine master _ ⊥ Refine master _ |- _ ] => inversion H
+        | _ => idtac
+      end; inversion H2; inversion H3; simplify_eq.
+      + rewrite op_cfgs_app in H7.
+        move: (suffix_app _ _ _ _ H7)=>[?|?].
+        * rewrite comm_op_cfgs op_cfgs_suffix=>//.
+        * rewrite op_cfgs_suffix=>//. rewrite -H7. constructor.
+      + rewrite comm_op_cfgs op_cfgs_app in H7.
+        rewrite -H7 op_cfgs_app H7. constructor.
+      + destruct H6.
+        * rewrite (op_cfgs_suffix lx ly)=>//.
+          rewrite comm_op_cfgs op_cfgs_app. inversion H4. subst.
+          rewrite assoc. constructor.
+        * rewrite (comm_op_cfgs lx ly) (op_cfgs_suffix ly lx)=>//.
+          inversion H4. subst. rewrite assoc comm_op_cfgs op_cfgs_app.
+          rewrite -assoc. constructor.
+      + constructor. destruct H6.
+        * rewrite op_cfgs_suffix in H9=>//.
+          inversion H9; left.
+          { rewrite op_cfgs_suffix=>//.
+            eapply suffix_trans=>//. }
+          rewrite comm_op_cfgs op_cfgs_suffix=>//.
+        * rewrite comm_op_cfgs op_cfgs_suffix in H9=>//.
+          inversion H9.
+          { left. move: (suffix_trans _ _ _ H4 H5)=>?.
+            rewrite op_cfgs_suffix=>//. }
+          { right. inversion H4. inversion H5.
+            rewrite H6 in H7. apply suffix_app in H7.
+            inversion H7.
+            - rewrite op_cfgs_suffix=>//.
+            - rewrite comm_op_cfgs op_cfgs_suffix=>//. }
     - admit.
     - admit.
     - admit.
