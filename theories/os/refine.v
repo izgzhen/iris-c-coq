@@ -46,9 +46,9 @@ Section refineG.
     destruct mz eqn:Heq.
     - destruct Hm as [? [? ?]].
       try repeat split=>//; simpl.
-      + apply refine_disj'.
-      + by rewrite refine_op'.
-    - simpl. split; [|split]=>//. apply refine_disj'.
+      + apply refine_id_disj.
+      + by rewrite refine_id_merge.
+    - simpl. split; [|split]=>//. apply refine_id_disj.
   Qed.
 
   Lemma refine_snap:

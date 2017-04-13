@@ -92,13 +92,25 @@ Section algebra.
   Qed.
 
   Lemma op_cfgs_suffix (l1 l2: list cfg): suffix l1 l2 → l1 ⋅ l2 = l2.
-  Admitted.
+  Proof.
+    intros H. apply suffix_length in H.
+    unfold op, op_cfgs.
+    apply Nat.leb_le in H. by rewrite H.
+  Qed.
 
   Lemma op_cfgs_app (l1 l2: list cfg): (l1 ++ l2) ⋅ l2 = l1 ++ l2.
-  Admitted.
+  Proof.
+    unfold op, op_cfgs.
+    rewrite app_length.
+    destruct l1.
+    - simpl. by rewrite Nat.leb_refl.
+    - assert (length (c :: l1) + length l2 > length l2).
+      { simpl. omega. }
+      apply Nat.leb_gt in H. by rewrite H.
+  Qed.
 
   Lemma suffix_app (l1 l2 lx ly: list cfg):
-    l1 ++ lx = l2 ++ ly →                
+    l1 ++ lx = l2 ++ ly →
     lx `suffix_of` ly ∨ ly `suffix_of` lx.
   Admitted.
 
