@@ -179,9 +179,17 @@ Section algebra.
             inversion H7.
             - rewrite op_cfgs_suffix=>//.
             - rewrite comm_op_cfgs op_cfgs_suffix=>//. }
-    - admit.
-    - admit.
-    - admit.
+    - intros [? ?] [? ?] ?.
+      inversion H; subst; constructor.
+      inversion H1; auto.
+    - intros.
+      inversion H1; rewrite !refine_op.
+      + inversion H2.
+        * rewrite op_cfgs_suffix=>//.
+          rewrite comm_op_cfgs op_cfgs_suffix=>//.
+        * rewrite comm_op_cfgs op_cfgs_suffix=>//.
+      + by rewrite op_cfgs_app comm_op_cfgs op_cfgs_app.
+      + by rewrite op_cfgs_app comm_op_cfgs op_cfgs_app.
     - admit.
   Admitted.
 
