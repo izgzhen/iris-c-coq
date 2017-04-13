@@ -25,34 +25,34 @@ The language is a simplified version of C. It mainly consists of \Prim{} (assemb
 \\
 \end{align*}
 
-We also have following non-syntactical definitions:
+We also have following definitions:
 
 \begin{itemize}
   \item block address $b \in \nat$
   \item offset $o \in \integer^{+}$
   \item Memory address $l: \Addr \eqdef \vaddr{b}{o}$
-  \item Program $\Sigma: \Text \eqdef [x \gmapsto \Funct]$ is a list of functions indexed by names
-  \item Function $F: \Funct \eqdef (\tau_{ret} \times (x_1 : \tau_1, ...) \times e)$ consists of return type,
+  \item Program $\Sigma: \Text \eqdef [f \gmapsto \Funct]$ is a list of functions indexed by names
+  \item Function $F: \Funct \eqdef (\tau_{ret} \times [x_1 : \tau_1, ...] \times e)$ consists of return type,
     parameter declarations and function body.
 \end{itemize}
 
 (NOTE) The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is only used in source,
 and the later one is used in the actual semantics and inference rules.
 By adding a pre-processing step which instantiates all source-only expression to substituted/typed ones,
-we can remove lexical and typing environment from core program logic. The details are in \ref{par:tyev}
+we can remove lexical and typing environment from the core program logic. The details are in \ref{par:tyev}
 
 (NOTE) Compared with C, there are several notable differences:
 \begin{enumerate}
   \item We currently don't support declarations of local variables, \texttt{for} loop and \texttt{switch},
     \texttt{break} and \texttt{continue}
-  \item C differentiates statements and expressions (so do many other program logic). For simplicity and
+  \item C differentiates statements and expressions (so do many other program logics). For simplicity and
     expressivity, we merged them together into a coherent expression $\Expr$ instead
 \end{enumerate}
 
 \paragraph{Evaluation Context.}
 
-To make the evaluation order explicit and reflected into the logic through the bind rule,
-we define evaluation context:
+To make the evaluation order explicit and reflected to the logic through the bind rule,
+we define the \emph{evaluation context}:
 
 \begin{align*}
     \ctx : \ectx \eqdef{}&
@@ -68,9 +68,9 @@ we define evaluation context:
 
 First define
 \begin{itemize}
-\item byte-size value \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
+\item Byte-size value \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
 \item Heap $h: \Heap \eqdef [ l \gmapsto \bval ]$
-\item Continuation $\ctx: \Cont \eqdef [\ectx]$
+\item Continuation $k: \Cont \eqdef [\ectx]$
 \item Stack $s: \Stack \eqdef [\Cont]$
 \item Whole state \[\sigma: \State \eqdef (\text{heap}: \Heap, \text{text}: \Text, \text{stack}: \Stack)\]
 \end{itemize}
@@ -160,7 +160,7 @@ expression when processing the left-hand side expression, which in turn requires
 
 Now we write down the algorithmic rules  for rewriting left-hand side expression ($\reslhs{e}$)
 and right-hand side expression ($\resrhs{e}$). Essentially, $\reslhs{e}$ will rewrite the left-hand side $e$ into its location
-in memory, while $\resrhs{e}$ will rewrite variables into the dereference of its locations.
+in memory, while $\resrhs{e}$ will add dereference to all variables in $e$.
 
 Note that environment $\Gamma : \Env \eqdef [x \gmapsto (\tau, l)]$ is assumed, and if any operation fails, like missing something in $\Gamma$,
 then the rule will indicate it in the actual implementation.

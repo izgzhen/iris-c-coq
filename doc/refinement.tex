@@ -5,11 +5,10 @@
 Considering a STS composed of spec code $\scode$ (as below),
 spec state $\state : [X \gmapsto \val]$,
 and semantic rules $\sstep{\scode}{\sstate}{\scode'}{\sstate'}$
-(as well as $\sstepstar{\scode}{\sstate}{\scode'}{\sstate'}$ trivially derived).
-
+(as well as derived $\sstepstar{\scode}{\sstate}{\scode'}{\sstate'}$).
 \begin{align*}
     \scode : \SpecCode \bnfdef{}&
-        \texttt{done}(v?) \mid \texttt{rel}(r: \sstate \ra v? \ra \sstate \ra \Prop) \mid ...
+        \texttt{done}(v?) \mid \texttt{rel}(r: \sstate \ra v? \ra \sstate \ra \Prop)
 \end{align*}
 
 \subsection{Refinement RA}

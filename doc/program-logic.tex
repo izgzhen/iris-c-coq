@@ -1,7 +1,7 @@
 \section{Program Logic}
 \label{sec:program-logic}
 
-This section describes how to build a program logic for the C language (\cf \Sref{sec:language}) on top of the base logic of Iris.
+This section describes how to build a program logic for the C language (\cf \Sref{sec:language}) on top of Iris..
 
 \subsection{Extended Assertions}
 
@@ -17,13 +17,10 @@ f \tmapsto F \eqdef{}& \ownGhost{\Text}{\authfrag \mapsingleton{f}{\aginj F}}
 
 \subsection{Weakest Precondition}
 
-Finally, we can define the core piece of the program logic, the assertion that reasons about program behavior:
-Weakest precondition, from which Hoare triples can be derived.
-
 \paragraph{Defining weakest precondition.}
 
 The state interpreting predicate $S : \State \to \iProp$ for our \irisc{} language is defined below, as required for
-instantiating the parametric WP of Iris (whose definition is also copied below for reference).
+instantiating the parametric WP provided by Iris already (but we copy its definition over for reference).
 
 \[S(\sigma) \eqdef 
   \ownGhost{\Heap}{\authfull \fmap (\lambda v. (1, \aginj v), \sigma.\text{heap})} *

@@ -145,7 +145,7 @@ Induction scheme II for $\Expr$:
   \begin{proof}
   \begin{enumerate}
     Since $e$ is well-formed and not a value, so it can be unfilled such that $e = k''(e_h')$,
-    then by \texttt{cont\_inj}, $e_h = e_h'$ and $k' = k ++ k''$, which proves our claim
+    then by \texttt{cont\_inj}, $e_h = e_h'$ and $k' = k \append k''$, which proves our claim
   \end{enumerate}
 \end{proof}
 
@@ -187,12 +187,11 @@ $\textlog{wp}^{+}$ is contractive.
 
 \subsection{Admitted Facts}
 
-There are still one or more loopholes that exists behind the documented formalization.
-But note that all of them are harmless to leave unproven for now.
+There are still one or more loopholes that exist behind the documented formalization.
+But note that all of them are apparently true \emph{and} harmless to leave unproven for now.
 
 \begin{itemize}
-\item In \texttt{lang.v}, lemma \texttt{same\_type\_encode\_inj}'s fourth case on \texttt{int32} is admitted.
-  Essential, this is about encoding \texttt{int32} value with four bytes. It is trivially true, and even if
-  it is false, the soundness of logic won't suffer.  
-  We don't prove it now because there are not enough lemmas exposed from \texttt{Integers.v}.
+\item In \texttt{lang.v}, lemma \texttt{same\_type\_encode\_inj}'s fourth case about \texttt{int32} is admitted.
+  Essential, this says something about encoding \texttt{int32} value with four bytes.
+  We don't prove it now because there are not enough lemmas provided by machine integer library \texttt{Integers.v}.
 \end{itemize}
