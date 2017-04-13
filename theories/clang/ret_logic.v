@@ -24,7 +24,7 @@ Section wp_ret.
   Admitted. (* XXX: We will first prove on paper instead *)
 
   Definition wpr_def:
-  coPset → expr → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wpr_pre.
+    coPset → expr → (val → iProp Σ) → (val → iProp Σ) → iProp Σ := fixpoint wpr_pre.
   Definition wpr_aux : { x | x = @wpr_def }. by eexists. Qed.
   Definition wpr := proj1_sig wpr_aux.
   Definition wpr_eq : @wpr = @wpr_def := proj2_sig wpr_aux.
@@ -150,7 +150,68 @@ Section wp_ret.
     iNext. iApply wpr_step_mono. iFrame.
     iAlways. iIntros (?). iApply wpr_value.
   Qed.
+  
+  Lemma wpr_call' E ks es ls params f_body f_body' f retty Φ:
+    es = map (fun l => Evalue (Vptr l)) ls →
+    instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
+    text_interp f (Function retty params f_body) ∗ stack_interp ks ∗
+    ▷ wpr E f_body' (fun _ => False%I) (λ v, stack_interp ks -∗ Φ v)
+    ⊢ wp E (Ecall f es) Φ.
+  Proof.
+    iIntros (??) "(?&?&?)".
+    iApply (@wp_call _ _ _ [])=>//.
+    iFrame. iNext. iIntros "H". clear H1.
+    iLöb as "IH" forall (Φ f_body').
+    rewrite wp_unfold /wp_pre.
+    rewrite wpr_unfold /wpr_pre.
+    iDestruct "~2" as "[H' | H']".
+    - by iDestruct "H'" as (?) "[_ %]".
+    - iDestruct "H'" as (??) "[% [[% ?] | [? | ?]]]".
+      + iRight. destruct H3.
+        iSplit=>//.
+        iIntros (?) "Hσ1".
+        move: (cont_uninj' _ _ _ H5) => [Ha Hb]. subst.
+        clear H5.
+        rewrite wp_unfold /wp_pre.
+        iDestruct "~1" as "[?|?]".
+        * iDestruct "~1" as (?) "[% _]". apply enf_not_val in Ha.
+          simpl in H5. rewrite Ha in H5. done.
+        * iDestruct "~1" as "[% ?]".
+          iSpecialize ("~" $! a with "Hσ1").
+          iMod "~" as "[% ?]".
+          iModIntro. iSplit.
+          { iPureIntro. inversion H5 as (e'&σ'&?&?).
+            eexists _, σ', []. constructor=>//.
+            destruct a. destruct σ'.
+            simpl in H6. destruct H6. move:(enf_not_val _ Ha)=>Hn.
+            move: (not_jmp_preserves [] _ _ _ _ Hn H4 c) => /= [? [? ?]]. subst.
+            apply CSestep. apply ESbind=>//. }
+          iNext. iIntros (e2 σ2 efs) "%".
+          simpl in H6. destruct H6. move:(enf_not_val _ Ha)=>Hn.
+          move: (not_jmp_preserves _ _ _ _ _ Hn H4 H6) => /= [Heqs [Heqt H']].
+          apply fill_estep_inv in H'=>//.
+          destruct H' as [? [? ?]]. subst.
+          iSpecialize ("~1" $! x σ2 []).
+          iAssert (⌜step H1 a x σ2 []⌝)%I as "?".
+          { iPureIntro. split=>//.
+            destruct a. destruct σ2.
+            simpl in Heqs, Heqt. subst.
+            constructor. simpl in H8. done. }
+          iMod ("~1" with "~") as "[? [? ?]]". iModIntro.
+          iFrame. iApply wp_bind=>//.
+          { eapply estep_preserves_not_jmp=>//. }
+            iApply (wp_strong_mono E E)=>//.
+          iFrame. iIntros (?) "H'".
+          iModIntro. iApply ("IH" with "[-H]")=>//.
+      + 
+            
+            
+            
 
+          
+        
+        
+      
   Lemma wpr_op E op v1 v2 v' Φ Φret:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.

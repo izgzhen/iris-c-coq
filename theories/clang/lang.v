@@ -800,13 +800,24 @@ Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qe
 Lemma is_jmp_call k' f es: is_jmp (fill_ectxs (Ecall f es) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
-Lemma is_jmp_jstep_false {e e' σ ks ks'}:
+Lemma is_jmp_jstep_false {e e' σ k ks ks'}:
+  to_val e = None →
   is_jmp e = false →
-  jstep σ e ks e' ks' → false.
+  jstep σ (fill_ectxs e k) ks e' ks' → false.
 Proof.
-  inversion 2; subst.
-  - by rewrite is_jmp_ret in H.
-  - by rewrite is_jmp_call in H.
+  inversion 3; subst;
+  symmetry in H2; apply unfill_segment in H2=>//;
+  destruct H2 as [? [? ?]]; subst.
+  - by rewrite is_jmp_ret in H0.
+  - by rewrite is_jmp_call in H0.
+Qed.
+
+Lemma cstep_not_val e σ e' σ':
+  cstep e σ e' σ' → to_val e = None.
+Proof.
+  inversion 1; subst.
+  - by eapply estep_not_val.
+  - inversion H0; by apply fill_ectxs_not_val.
 Qed.
 
 Lemma CSbind':
@@ -817,7 +828,8 @@ Lemma CSbind':
 Proof.
   intros. inversion H0; subst.
   - apply CSestep. apply ESbind=>//.
-  - exfalso. by eapply is_jmp_jstep_false.
+  - exfalso. move: (cstep_not_val _ _ _ _ H0) => Hn.
+    apply (@is_jmp_jstep_false _ _ _ [] _ _ Hn H H1).
 Qed.
 
 Lemma CSbind:
@@ -829,11 +841,14 @@ Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
 Instance state_inhabited: Inhabited state := populate (State ∅ ∅ []).
 
-Lemma not_jmp_preserves_stack e e' σ σ':
-  is_jmp e = false → cstep e σ e' σ' → s_stack σ = s_stack σ'.
+Lemma not_jmp_preserves k e e' σ σ':
+  to_val e = None →
+  is_jmp e = false →
+  cstep (fill_ectxs e k) σ e' σ' →
+  s_stack σ = s_stack σ' ∧ s_text σ = s_text σ' ∧ estep (fill_ectxs e k) (s_heap σ) e' (s_heap σ').
 Proof.
-  intros. inversion H0; subst=>//.
-  exfalso. by eapply is_jmp_jstep_false.
+  intros. inversion H1; subst=>//.
+  exfalso. eapply (@is_jmp_jstep_false _ _ _ k)=>//.
 Qed.
 
 Lemma fill_step_inv e1' σ1 e2 σ2 K:
@@ -904,7 +919,8 @@ Proof.
     + simpl in H. simpl.
       destruct (is_jmp cond); destruct (is_jmp s0)=>//.
     + by eapply estep_preserves_not_jmp.
-  - exfalso. by eapply is_jmp_jstep_false.
+  - exfalso. move:(cstep_not_val _ _ _ _ H0)=>Hn.
+    by eapply (@is_jmp_jstep_false _ _ _ []).
 Qed.
 
 Lemma same_type_encode_inj σ:
@@ -959,9 +975,7 @@ Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ' ∧ efs = [].
 Lemma step_not_val e σ e' σ' efs:
   step e σ e' σ' efs → to_val e = None.
 Proof.
-  destruct 1. inversion H; subst.
-  - by eapply estep_not_val.
-  - inversion H1; by apply fill_ectxs_not_val.
+  destruct 1. by eapply cstep_not_val.
 Qed.
 
 Definition clang_lang :=
