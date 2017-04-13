@@ -5,7 +5,7 @@
 
 \paragraph{Syntax.}\label{p:type}
 
-The language is a simplified version of C. It mainly consists of \Prim{} (assembly primitives),
+The language is a simplified version of C. It mainly consists of
 \Expr{} (expressions), \Type{} (types) and \Val{} (values).
 
 \begin{align*}
@@ -15,12 +15,9 @@ The language is a simplified version of C. It mainly consists of \Prim{} (assemb
     v : \Val \bnfdef{}&
         \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l \mid (v, v)
 \\
-    p : \Prim \bnfdef{}&
-        \pcli \mid \psti
-\\
     e : \Expr \bnfdef{}&
        v \mid x \mid e \oplus e \mid \deref{e} \mid \dereft{\tau}{e} \mid \& e \mid \efst{e} \mid \esnd{e} \\&
-       \sskip \mid p \mid e \la e \mid \sif{e}{e}{e} \mid \swhile{e}{e}{e} \mid \\&
+       \sskip \mid e \la e \mid \sif{e}{e}{e} \mid \swhile{e}{e}{e} \mid \\&
        \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid e ; e \mid \alloc{\tau}{e}
 \\
 \end{align*}
@@ -39,7 +36,7 @@ We also have following definitions:
 (NOTE) The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is only used in source,
 and the later one is used in the actual semantics and inference rules.
 By adding a pre-processing step which instantiates all source-only expression to substituted/typed ones,
-we can remove lexical and typing environment from the core program logic. The details are in \ref{par:tyev}
+we can remove lexical and typing environment from the core program logic. The details are in \ref{par:tyev}.
 
 (NOTE) Compared with C, there are several notable differences:
 \begin{enumerate}
