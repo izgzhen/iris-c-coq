@@ -1,4 +1,3 @@
-Require Import logic.
 From iris.algebra Require Import agree frac.
 From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.

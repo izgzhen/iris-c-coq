@@ -535,11 +535,13 @@ Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 Axiom cont_uninj: ∀ kes e, enf e → unfill e kes.
 Axiom cont_uninj': ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
 
+Arguments cont_uninj' {_ _ _} _.
+
 Lemma unfill_app e eh K K':
   unfill_expr e [] = Some (K, eh) →
   unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
 Proof.
-  intros H. move: (cont_uninj' _ _ _ H) => [? ?].
+  intros H. move: (cont_uninj' H) => [? ?].
   subst. rewrite fill_app. by apply cont_uninj.
 Qed.
 
@@ -595,6 +597,28 @@ Axiom unfill_segment: ∀ e ks eh ks',
 
 Arguments unfill_segment {_ _ _ _} _ _ _.
 
+Ltac inversion_cstep Hnf tac :=
+  match goal with
+      | [ H : estep (fill_ectxs _ _) _ _ _ |- _ ] => (
+          inversion H=>//;
+          try (match goal with
+               | [ H2 : fill_expr (fill_ectxs ?E _) _ =
+                        fill_ectxs ?E2 ?KS |- _ ] =>
+                 rewrite fill_cons in H2; subst;
+                 match goal with
+                 | [ H3 : estep E _ _ _ |- _ ] =>
+                   let Hnv := fresh "Hnv" in
+                   move: (estep_not_val H3) => Hnv;
+                   destruct (unfill_segment Hnv Hnf H2) as [K' [? ?]]; subst
+                 end
+               | _ => subst; match goal with
+                             | [ H : ?E1 = fill_ectxs ?E2 ?KS |- _ ] =>
+                                 by (gen_eq H E1 E2 KS; eauto; tac)
+                             end
+               end)
+        )
+    end.
+
 Lemma focus_estep_inv' eh1 σ1 σ2:
   enf eh1 →
   let P K :=
@@ -604,21 +628,13 @@ Lemma focus_estep_inv' eh1 σ1 σ2:
       )
   in ∀ K, P K.
 Proof.
-  intros H P. apply (cont_ind P).
+  intros Hnf P. apply (cont_ind P).
   - unfold P. eauto.
-  - unfold P. intros.
-    inversion H1=>//;
-    try (match goal with
-      | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
-      | [ H : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq H E1 E2 KS; eauto
-    end).
-    { subst. gen_eq H3 (Eseq (Evalue v) e2) eh1 ks. eauto. }
-    rewrite fill_cons in H2. move: (estep_not_val H4) => Hnv.
-    destruct (unfill_segment Hnv H H2) as [K' [? ?]].
-    subst. apply (H0 K') in H4.
-    + destruct H4 as [eh2 [? ?]].
-      subst. exists eh2.
-      split=>//. by rewrite fill_app.
+  - unfold P. intros ks Hind e2 Hes.
+    inversion_cstep Hnf idtac.
+    apply (Hind K') in H1.
+    + destruct H1 as [eh2 [? ?]].
+      subst. exists eh2.  split=>//. by rewrite fill_app.
     + rewrite app_length. simpl. omega.
 Qed.
 
@@ -661,22 +677,15 @@ Lemma fill_estep_false' e σ σ':
       (∀ e', estep (fill_ectxs e K) σ e' σ' → False)
   in ∀ K, P K.
 Proof.
-  intros H P. assert (enf e) as He; first by apply jnf_enf.
+  intros Hjn P. assert (enf e) as Henf; first by apply jnf_enf.
   apply (cont_ind P).
   - unfold P. simpl. intros.
-    inversion H; subst.
+    inversion Hjn; subst.
     + by eapply estep_call_false.
     + by eapply estep_ret_false.
-  - unfold P. intros.
-    inversion H1=>//;
-    try (match goal with
-      | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
-      | [ HT : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq HT E1 E2 KS; eauto; inversion H
-    end).
-    { subst. gen_eq H3 (Eseq (Evalue v) e') e ks. eauto. inversion H. }
-    rewrite fill_cons in H2. move: (estep_not_val H4)=>Hnv.
-    destruct (unfill_segment Hnv He H2) as [K' [? ?]].
-    subst. apply (H0 K') in H4=>//.
+  - unfold P. intros ks Hind e' Hes.
+    inversion_cstep Henf ltac:(inversion Hjn).
+    apply (Hind K') in H1=>//.
     rewrite app_length. simpl. omega.
 Qed.
 
@@ -694,7 +703,9 @@ Axiom not_val_ind:
 Axiom not_val_ind':
   ∀ P: expr → Prop,
     (∀ e, enf e → P e) →
-    (∀ e ks, enf e → (∀ ks', length ks' < length ks → P (fill_ectxs e ks'))%nat → P (fill_ectxs e ks)) →
+    (∀ e ks, enf e →
+             (∀ ks', length ks' < length ks →
+                     P (fill_ectxs e ks'))%nat → P (fill_ectxs e ks)) →
     (∀ e, to_val e = None → P e).
 
 Lemma fill_estep_inv':
@@ -718,7 +729,7 @@ Proof.
     exists (fill_ectxs e'' ks).
     split.
     { apply ESbind=>//. by eapply is_jmp_rec. }
-    by rewrite fill_app.
+    { by rewrite fill_app. }
 Qed.
 
 Lemma fill_estep_inv {e ks a a1 a2}:
@@ -737,15 +748,14 @@ Lemma cont_incl':
   in ∀ e', to_val e' = None → P e'.
 Proof.
   intros P. apply (not_val_ind P).
-  - unfold P. intros.
-    apply cont_inj in H1=>//.
-    destruct H1. subst.
+  - unfold P. intros e Henf e' kes kes' Henf' Heq.
+    apply cont_inj in Heq=>//.
+    destruct Heq. subst.
     by exists [].
-  - unfold P. intros.
-    rewrite fill_app in H2.
-    apply H0 in H2=>//.
-    destruct H2.
-    subst. rewrite fill_app. eauto.
+  - unfold P. intros e ks Hnv Hind e' kes kes' Henf' Heq.
+    rewrite fill_app in Heq.
+    apply Hind in Heq=>//.
+    destruct Heq. subst. rewrite fill_app. eauto.
 Qed.
 
 Lemma cont_incl {e' kes kes' e}:
@@ -759,12 +769,15 @@ Inductive jstep: text → expr → stack → expr → stack → Prop :=
 | JSrete:
     ∀ t v k k' ks,
       unfill (Erete (Evalue v)) k' →
-      jstep t (fill_ectxs (Erete (Evalue v)) k') (k::ks) (fill_ectxs (Evalue v) k) ks
+      jstep t
+            (fill_ectxs (Erete (Evalue v)) k') (k::ks)
+            (fill_ectxs (Evalue v) k) ks
 | JScall:
     ∀ t es ls retty params f_body f_body' f k ks,
       es = map (fun l => Evalue (Vptr l)) ls →
       t !! f = Some (Function retty params f_body) →
-      instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
+      instantiate_f_body (add_params_to_env (Env [] []) params ls)
+                         f_body = Some f_body' →
       jstep t (fill_ectxs (Ecall f es) k) ks f_body' (k::ks).
 
 Bind Scope val_scope with val.
@@ -786,19 +799,24 @@ Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qe
 Lemma is_jmp_call k' f es: is_jmp (fill_ectxs (Ecall f es) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
-Lemma is_jmp_jstep_false {e e' σ k ks ks'}:
+Lemma is_jmp_jstep_false {e e' σ} k {ks ks'}:
   to_val e = None →
   is_jmp e = false →
   jstep σ (fill_ectxs e k) ks e' ks' → false.
 Proof.
-  inversion 3; subst;
-  symmetry in H2; apply unfill_segment in H2=>//;
-  destruct H2 as [? [? ?]]; subst.
-  - by rewrite is_jmp_ret in H0.
-  - by rewrite is_jmp_call in H0.
+  intros Hnv Hnj.
+  inversion 1; subst;
+    match goal with
+    | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
+      symmetry in H;
+      apply unfill_segment in H=>//;
+      destruct H as [? [? ?]]; subst
+    end.
+  - by rewrite is_jmp_ret in Hnj.
+  - by rewrite is_jmp_call in Hnj.
 Qed.
 
-Lemma cstep_not_val e σ e' σ':
+Lemma cstep_not_val {e σ e' σ'}:
   cstep e σ e' σ' → to_val e = None.
 Proof.
   inversion 1; subst.
@@ -806,16 +824,15 @@ Proof.
   - inversion H0; by apply fill_ectxs_not_val.
 Qed.
 
-Lemma CSbind':
-    ∀ e e' σ σ' k kes,
-      is_jmp e = false →
-      cstep e σ e' σ' →
-      cstep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'.
+Lemma CSbind' e e' σ σ' k kes:
+  is_jmp e = false →
+  cstep e σ e' σ' →
+  cstep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'.
 Proof.
-  intros. inversion H0; subst.
+  intros Hnj Hcs. inversion Hcs; subst.
   - apply CSestep. apply ESbind=>//.
-  - exfalso. move: (cstep_not_val _ _ _ _ H0) => Hn.
-    apply (@is_jmp_jstep_false _ _ _ [] _ _ Hn H H1).
+  - exfalso. move: (cstep_not_val Hcs) => Hn.
+    apply (is_jmp_jstep_false [] Hn Hnj H).
 Qed.
 
 Lemma CSbind:
@@ -831,10 +848,11 @@ Lemma not_jmp_preserves k e e' σ σ':
   to_val e = None →
   is_jmp e = false →
   cstep (fill_ectxs e k) σ e' σ' →
-  s_stack σ = s_stack σ' ∧ s_text σ = s_text σ' ∧ estep (fill_ectxs e k) (s_heap σ) e' (s_heap σ').
+  s_stack σ = s_stack σ' ∧ s_text σ = s_text σ' ∧
+  estep (fill_ectxs e k) (s_heap σ) e' (s_heap σ').
 Proof.
-  intros. inversion H1; subst=>//.
-  exfalso. eapply (@is_jmp_jstep_false _ _ _ k)=>//.
+  intros Hnv Hnj Hcs. inversion Hcs; subst=>//.
+  exfalso. eapply (is_jmp_jstep_false k)=>//.
 Qed.
 
 Lemma fill_step_inv e1' σ1 e2 σ2 K:
@@ -843,17 +861,25 @@ Lemma fill_step_inv e1' σ1 e2 σ2 K:
   cstep (fill_ectxs e1' K) σ1 e2 σ2 →
   ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 e2' σ2 ∧ s_stack σ1 = s_stack σ2.
 Proof.
-  inversion 3; subst.
-  - eapply fill_estep_inv in H2=>//.
-    destruct H2 as (?&?&?).
-    exists x. split; [| split ]; auto.
-  - inversion H2; subst.
-    + eapply cont_incl in H3=>//.
-      destruct H3 as (?&?); subst.
-      by rewrite is_jmp_ret in H0.
-    + eapply cont_incl in H3=>//.
-      destruct H3 as (?&?); subst.
-      by rewrite is_jmp_call in H0.
+  intros Hnv Hnj.
+  inversion 1; subst.
+  - match goal with
+    | [ H : estep _ _ _ _ |- _ ] =>
+      eapply fill_estep_inv in H=>//;
+      destruct H as (e2'&?&?)
+    end; exists e2'; split; [| split ]; auto.
+  - match goal with
+    | [ H : jstep _ _ _ _ _ |- _ ] =>
+      inversion H;
+        match goal with
+        | [ Heq : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
+          eapply cont_incl in Heq=>//;
+          destruct Heq as (?&?); subst
+        end
+    end.
+    + by rewrite is_jmp_ret in Hnj.
+    + by rewrite is_jmp_call in Hnj.
+    + constructor.
 Qed.
 
 Lemma estep_preserves_not_jmp' σ1 σ2:
@@ -862,31 +888,26 @@ Lemma estep_preserves_not_jmp' σ1 σ2:
   in ∀ e1, to_val e1 = None → P e1.
 Proof.
   intros P. apply (not_val_ind' P).
-  - unfold P. intros.
-    inversion H1=>//; subst; simpl in H0=>//.
-    + inversion H0. simpl. destruct (is_jmp cond); destruct (is_jmp s)=>//.
-    + simpl in H. exfalso.
-      eapply (escape_false H3)=>//.
-  - unfold P. intros.
-    inversion H2=>//;
-    try (match goal with
-      | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
-      | [ HT : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq HT E1 E2 KS; eauto; inversion H
-    end).
-    { subst. gen_eq H2 (Eseq (Evalue v) e2) e ks. eauto. }
-    { subst. simpl. simpl in H1. destruct (is_jmp cond); destruct (is_jmp s)=>//. }
-    subst. rewrite fill_cons in H3. move:(estep_not_val H5) => Hnv.
-    destruct (unfill_segment Hnv H H3) as [K' [? ?]].
-    subst. assert (is_jmp e' = false).
-    { apply (H0 K')=>//.  rewrite app_length. simpl. omega. }
-    rewrite -fill_app in H1.
-    eapply is_jmp_out in H1=>//.
+  - unfold P. intros e Henf e2 Hjn Hes.
+    inversion Hes=>//; subst; simpl in Hes=>//.
+    + inversion Hjn. simpl. solve_is_jmp_false.
+    + simpl in Hjn. exfalso.
+      eapply escape_false in H0=>//.
+  - unfold P. intros e ks Henf Hind e2 Hjn Hes.
+    inversion_cstep Henf ltac:(inversion Hjn).
+    { subst. simpl. rewrite -H0 in Hjn. inversion Hjn. solve_is_jmp_false. }
+    assert (is_jmp e' = false).
+    { apply (Hind K')=>//. rewrite app_length. simpl. omega. }
+    rewrite -fill_app in Hjn.
+    eapply is_jmp_out in Hjn=>//.
 Qed.
 
 Lemma estep_preserves_not_jmp'' e σ1 e2' σ2:
-  to_val e = None → is_jmp e = false → estep e σ1 e2' σ2 → is_jmp e2' = false.
+  to_val e = None → is_jmp e = false →
+  estep e σ1 e2' σ2 → is_jmp e2' = false.
 Proof.
-  intros H. move: (estep_preserves_not_jmp' σ1 σ2 e H e2') => /= H'. done. Qed.
+  intros H. move: (estep_preserves_not_jmp' σ1 σ2 e H e2') => /= H'. done.
+Qed.
 
 Lemma estep_preserves_not_jmp e σ1 e2' σ2:
   is_jmp e = false → estep e σ1 e2' σ2 → is_jmp e2' = false.
@@ -905,8 +926,8 @@ Proof.
     + simpl in H. simpl.
       destruct (is_jmp cond); destruct (is_jmp s0)=>//.
     + by eapply estep_preserves_not_jmp.
-  - exfalso. move:(cstep_not_val _ _ _ _ H0)=>Hn.
-    by eapply (@is_jmp_jstep_false _ _ _ []).
+  - exfalso. move:(cstep_not_val H0)=>Hn.
+    by eapply (is_jmp_jstep_false []).
 Qed.
 
 Lemma same_type_encode_inj σ:
@@ -916,40 +937,27 @@ Lemma same_type_encode_inj σ:
     readbytes p (encode_val v') σ →
     v = v'.
 Proof.
-  induction t.
-  - intros. inversion H. inversion H0. done.
-  - intros. inversion H. inversion H0. done.
-  - intros. inversion H. inversion H0.
-    subst. destruct p. simpl in H1, H2.
-    rewrite Byte.repr_unsigned in H2.
-    rewrite Byte.repr_unsigned in H1.
-    destruct H2. destruct H1. rewrite H2 in H1.
-    by inversion H1.
-  - intros.
-    inversion H. inversion H0.
-    subst. destruct p. simpl in H1, H2.
-    destruct H2 as (?&?&?&?&?).
-    destruct H1 as (?&?&?&?&?).
-    rewrite H2 in H1. rewrite H3 in H7.
-    rewrite H4 in H8. rewrite H5 in H9.
+  induction t;
+    intros v v' p Htv Htv';
+    inversion Htv; inversion Htv'=>//; subst;
+    intros Hv1 Hv2; subst; destruct p; simpl in Hv1, Hv2.
+  - rewrite Byte.repr_unsigned in Hv2, Hv1.
+    destruct Hv1. destruct Hv2. rewrite H in H1.
+    inversion H1. by rewrite Byte.repr_unsigned.
+  - destruct Hv2 as (?&?&?&?&?).
+    destruct Hv1 as (?&?&?&?&?).
     admit. (* Hairy arithmetic -- should be right *)
-  - intros. inversion H; inversion H0; subst; destruct p; simpl in H1, H2=>//.
-    + destruct H1. destruct H2.
-      by rewrite H2 in H1.
-    + destruct H1. destruct H2.
-      by rewrite H2 in H1.
-    + destruct H1. destruct H2.
-      rewrite H2 in H1. by inversion H1.
-  - intros.
-    inversion H. inversion H0. subst.
-    f_equal.
-    + eapply IHt1=>//.
-      simpl in H1. by eapply readbytes_segment.
-      simpl in H2. by eapply readbytes_segment.
+  - destruct Hv1. destruct Hv2.
+    by rewrite H in H1.
+  - destruct Hv1. destruct Hv2.
+      by rewrite H in H1.
+  - destruct Hv1. destruct Hv2.
+    rewrite H in H1. by inversion H1.
+  - f_equal.
+    + eapply IHt1=>//; by eapply readbytes_segment.
     + eapply IHt2=>//.
-      * simpl in H1. by eapply readbytes_segment_2.
-      * simpl in H2.
-        replace (length (encode_val v1)) with
+      * by eapply readbytes_segment_2.
+      * replace (length (encode_val v1)) with
         (length (encode_val v0)).
         by eapply readbytes_segment_2.
         { rewrite -(typeof_preserves_size v0 t1)=>//.
@@ -966,3 +974,35 @@ Qed.
 
 Definition clang_lang :=
   Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
+
+Lemma empty_ctx e: e = fill_ectxs e []. done. Qed.
+
+Ltac rewrite_empty_ctx :=
+  match goal with
+  | [ H : fill_ectxs _ _ = ?E |- _ ] =>
+    erewrite empty_ctx in H
+  | [ H : fill_expr _ _ = ?E |- _ ] =>
+    erewrite empty_ctx in H
+  end.
+
+Ltac fill_enf_neq :=
+  match goal with
+  | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
+    apply cont_inj in H=>//; by destruct H as [? ?]
+  | [ H : fill_ectxs _ _ = _ |- _ ] =>
+    rewrite_empty_ctx; apply cont_inj in H=>//; by destruct H as [? ?]
+  | _ => done
+  end.
+
+Ltac inversion_estep :=
+  match goal with [ H : estep _ _ _ _ |- _ ] => inversion H end.
+
+
+Ltac inversion_cstep_as Hes Hjs :=
+  inversion Hcs as [???????Hes|???????Hjs]; subst.
+
+Ltac inversion_jstep_as Hjs Heq :=
+  inversion Hjs as [?|?]; subst;
+  match goal with
+  | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] => rename H into Heq
+  end.

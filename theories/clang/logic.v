@@ -4,6 +4,7 @@ From iris.algebra Require Export gmap agree auth frac excl.
 From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
 From iris.program_logic Require Export weakestpre.
 From iris_os.clang Require Export lang.
+From iris_os.lib Require Import pair.
 From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
@@ -12,14 +13,13 @@ Instance equiv_type_function: Equiv function := (=).
 Instance equiv_type_stack: Equiv stack := (=).
 
 Definition textG := authR (gmapUR ident (agreeR (discreteC function))).
-Definition stackG := prodR fracR (agreeR (discreteC stack)).
 
 Class clangG Σ := ClangG {
   clangG_invG :> invG Σ;
   clangG_heapG :> gen_heapG addr byteval Σ;
   clangG_textG :> inG Σ textG;
   clangG_textG_name : gname;
-  clangG_stackG :> inG Σ stackG;
+  clangG_stackG :> @pairG stack Σ;
   clangG_stackG_name : gname
 }.
 
@@ -29,17 +29,14 @@ Section wp.
   Definition text_interp (f: ident) (x: function) :=
     own clangG_textG_name (◯ {[ f := to_agree (x : discreteC function) ]}).
 
-  Definition stack_interp (s: stack) :=
-    own clangG_stackG_name ((1/2)%Qp, (to_agree (s: discreteC stack))).
+  Definition own_stack :=
+    @own_pair stack Σ clangG_stackG clangG_stackG_name.
 
-  Definition to_gen_text (t: text) := fmap (λ v, to_agree (v : leibnizC function)) t.
+  Definition to_gen_text (t: text) :=
+    fmap (λ v, to_agree (v : leibnizC function)) t.
 
   Definition own_text (m: text) : iProp Σ :=
     own clangG_textG_name (● to_gen_text m).
-
-  Definition to_gen_stack (s: stack) := ((1/2)%Qp, (to_agree (s: discreteC stack))).
-
-  Definition own_stack (s: stack) : iProp Σ := own clangG_stackG_name (to_gen_stack s).
 
   Definition clang_state_interp (s: state) : iProp Σ:=
     (gen_heap_ctx (s_heap s) ∗ own_text (s_text s) ∗ own_stack (s_stack s))%I.
@@ -76,13 +73,16 @@ Section rules.
 
   Lemma wp_bind' kes E e Φ :
     ⌜ is_jmp e = false ⌝ ∗
-    WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
+    WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }}
+    ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof.
     iIntros "H". iLöb as "IH" forall (E e Φ). rewrite wp_unfold /wp_pre.
     iDestruct "H" as "[% [Hv|[% H]]]".
-    { iDestruct "Hv" as (v) "[Hev Hv]"; iDestruct "Hev" as % <-%of_to_val.
+    { iDestruct "Hv" as (v) "[Hev Hv]";
+        iDestruct "Hev" as % <-%of_to_val.
         by iApply fupd_wp. }
-    rewrite wp_unfold /wp_pre. iRight; iSplit; eauto using fill_ectxs_not_val.
+    rewrite wp_unfold /wp_pre.
+    iRight; iSplit; eauto using fill_ectxs_not_val.
     iIntros (σ1) "Hσ". iMod ("H" $! _ with "Hσ") as "[% H]".
     iModIntro; iSplit.
     { iPureIntro. unfold reducible in *.
@@ -90,16 +90,16 @@ Section rules.
       split; last done. apply CSbind=>//. }
     iNext. iIntros (e2 σ2 ? (Hstep & ?)).
     destruct (fill_step_inv e σ1 e2 σ2 kes) as (e2'&->&?&?); auto; subst.
-    iMod ("H" $! _ _ _ with "[%]") as "($ & H & ?)"; eauto.
+    iMod ("H" $! _ _ _ with "[%]") as "($ & H & Hefs)"; eauto.
     { split; done. }
-    iFrame "~".
-    iApply "IH". iSplit=>//.
+    iFrame "Hefs". iApply "IH". iSplit=>//.
     iPureIntro. eapply cstep_preserves_not_jmp=>//.
   Qed.
 
   Lemma wp_bind kes E e Φ :
     is_jmp e = false →
-    WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }} ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
+    WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }}
+    ⊢ WP (fill_ectxs e kes) @ E {{ Φ }}.
   Proof. iIntros (?) "?". iApply wp_bind'. iSplit; done. Qed.
 
   Definition reducible := @reducible clang_lang.
@@ -120,83 +120,72 @@ Section rules.
                 WP cur2 @ E {{ Φ }} ∗ [∗ list] ef ∈ efs, WP ef {{ _, True }})
       ⊢ WP e1 @ E {{ Φ }}.
   Proof.
-    iIntros (Hsafe ?) "H".
+    iIntros (Hsafe Hs) "H".
     iApply wp_lift_step.
     { eapply (@reducible_not_val clang_lang), (Hsafe inhabitant). }
     iIntros (σ1) "Hσ". iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
-    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ? ?).
+    iModIntro. iSplit; [done|]; iNext; iIntros (e2 σ2 ? Hsp).
     iMod "Hclose"; iModIntro.
-    destruct (H0 _ _ _ _ H1) as [? ?]. subst. iFrame.
+    destruct (Hs _ _ _ _ Hsp) as [? ?]. subst. iFrame.
     by iApply "H".
   Qed.
 
-  Lemma stack_agree ks ks':
-    stack_interp ks ∗ own_stack ks' ⊢ ⌜ ks = ks' ⌝.
-  Proof.
-    iIntros "[Hs' Hs]".
-    rewrite /stack_interp /own_stack.
-    iDestruct (own_valid_2 with "Hs Hs'") as "%".
-    iPureIntro. destruct H0 as [? ?].
-    simpl in H1. by apply to_agree_comp_valid in H1.
-  Qed.
-
   Lemma stack_pop k k' ks ks':
-    stack_interp (k::ks) ∗ own_stack (k'::ks') ==∗ stack_interp (ks) ∗ own_stack (ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
+    own_stack (k::ks) ∗ own_stack (k'::ks') ==∗
+    own_stack (ks) ∗ own_stack (ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
   Proof.
     iIntros "[Hs Hs']".
-    iDestruct (stack_agree with "[-]") as "%"; first iFrame.
-    inversion H0. subst.
-    rewrite /stack_interp /own_stack.
-    iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
-    rewrite pair_op frac_op' Qp_div_2.
-    apply cmra_update_exclusive.
-    split; simpl.
-    - by rewrite frac_op'.
-    - by apply to_agree_comp_valid.
+    iMod (own_pair_update with "[-]") as "[? [? %]]"; first iFrame.
+    inversion H0. by iFrame.
   Qed.
 
   Lemma stack_push k ks ks':
-    stack_interp (ks) ∗ own_stack (ks') ==∗ stack_interp (k::ks) ∗ own_stack (k::ks') ∗ ⌜ ks = ks' ⌝.
+    own_stack (ks) ∗ own_stack (ks') ==∗
+    own_stack (k::ks) ∗ own_stack (k::ks') ∗ ⌜ ks = ks' ⌝.
   Proof.
     iIntros "[Hs Hs']".
-    iDestruct (stack_agree with "[-]") as "%"; first iFrame.
-    inversion H0. subst.
-    rewrite /stack_interp /own_stack.
-    iMod (own_update_2 with "Hs Hs'") as "[Hs Hs']"; last by iFrame.
-    - rewrite pair_op frac_op' Qp_div_2.
-      apply cmra_update_exclusive.
-      split; simpl
-      + by rewrite frac_op'.
-      + done.
-      + by apply to_agree_comp_valid.
+    iMod (own_pair_update with "[-]") as "[? [? %]]"; first iFrame.
+    inversion H0. by iFrame.
   Qed.
-
+  
   Lemma wp_ret k k' ks v E Φ:
-    stack_interp (k'::ks) ∗
-    (stack_interp ks -∗ WP fill_ectxs (Evalue v) k' @ E {{ Φ }})
+    own_stack (k'::ks) ∗
+    (own_stack ks -∗ WP fill_ectxs (Evalue v) k' @ E {{ Φ }})
     ⊢ WP fill_ectxs (Erete (Evalue v)) k @ E {{ Φ }}.
   Proof.
-    iIntros "[Hs HΦ]". iApply wp_lift_step; eauto; first by apply fill_ectxs_not_val.
-    iIntros (?) "[Hσ [HΓ Hstk]]".
+    iIntros "[Hs HΦ]".
+    iApply wp_lift_step; eauto; first by apply fill_ectxs_not_val.
+    iIntros (σ) "[Hσ [HΓ Hstk]]".
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit.
-    { iDestruct (stack_agree with "[Hstk Hs]") as "%"; first iFrame.
-      subst. iPureIntro. destruct a. eexists _, (State s_heap s_text _), [].
+    { iDestruct (own_pair_agree with "[Hstk Hs]") as "%"; first iFrame.
+      subst. iPureIntro. destruct σ. eexists _, (State s_heap s_text _), [].
       split; last done. apply CSjstep. simpl in H0. subst. constructor.
       by apply cont_uninj. }
-    iNext. iIntros (??? (? & ?)).
-    inversion H0; subst.
-    { by apply fill_estep_false in H2. }
-    inversion H2; subst.
-    - assert (Erete (Evalue v0) = Erete (Evalue v) ∧ k'0 = k) as (?&?).
-      { apply cont_inj=>//. }
-      inversion H3. subst. iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
-      destruct H5; subst.
+    iNext. iIntros (e2 σ2 efs (Hcs & ?)).
+    inversion Hcs; subst.
+    { by apply fill_estep_false in H1. }
+    inversion H1; subst.
+    - match goal with
+      | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
+        apply cont_inj in H=>//;
+        destruct H; inversion H; subst
+      end.
+      iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
+      destruct H2; subst.
       iFrame. iMod "Hclose" as "_".
       iModIntro. iSplitL; first by iApply "HΦ".
       by rewrite big_sepL_nil.
-    - apply cont_inj in H1=>//.
-      destruct H1 as [? ?]; done.
+    - fill_enf_neq.
+  Qed.
+
+  Lemma eseq_pure v s h e2 h':
+    estep (Eseq (Evalue v) s) h e2 h' → h = h'.
+  Proof.
+    intros Hes. f_equal. simplify_eq. inversion Hes=>//.
+    simplify_eq. exfalso.
+    rewrite_empty_ctx.
+    eapply (escape_false H2 H0). by simpl.
   Qed.
 
   Lemma wp_skip E Φ v s:
@@ -204,18 +193,16 @@ Section rules.
   Proof.
     iIntros "Φ". iApply wp_lift_pure_step; eauto.
     - destruct σ1. eexists _, _, []. split; auto.
-    - destruct 1.
-      inversion H0=>//.
-      + simplify_eq. inversion H2=>//. simplify_eq.
-        exfalso. replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1; last done.
-        replace (fill_expr (fill_ectxs e kes) k)
-        with (fill_ectxs e (k::kes)) in H1; last done.
-        eapply (escape_false H4 H1). by simpl.
-      + simplify_eq. inversion H2; subst.
-        * unfold unfill in H4. rewrite H1 in H4.
-          simpl in H4. done.
-        * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
-          apply cont_inj in H1=>//. by destruct H1.
+    - intros σ1 σ2 e2 efs (Hs&?).
+      inversion Hs=>//.
+      + f_equal. simplify_eq. inversion H1=>//.
+        simplify_eq. exfalso.
+        rewrite_empty_ctx.
+        eapply (escape_false H3 H0). by simpl.
+      + simplify_eq. inversion H1; subst.
+        * unfold unfill in H3. rewrite H0 in H3.
+          simpl in H3. done.
+        * fill_enf_neq.
     - iNext. iIntros (???? (?& ?)).
       inversion H0; subst.
       + inversion H2; subst.
@@ -223,9 +210,7 @@ Section rules.
         { exfalso. by eapply (escape_false H4 H1). }
       + simplify_eq. inversion H2; subst.
         * by rewrite /unfill H1 /= in H4.
-        * replace (Eseq (Evalue v) s) with (fill_ectxs (Eseq (Evalue v) s) []) in H1 =>//.
-          apply cont_inj in H1=>//.
-          by destruct H1.
+        * fill_enf_neq.
   Qed.
 
   Lemma wp_seq E e1 e2 Φ:
@@ -281,9 +266,11 @@ Section rules.
           inversion HE; subst;
             [ idtac | exfalso;
                 match goal with
-                  | [ HF: fill_expr (fill_ectxs ?E _) _ = _, HE2: estep ?E _ _ _ |- _ ] =>
-                      by eapply (escape_false HE2 HF)
-                end ]
+                | [ HF: fill_expr (fill_ectxs ?E _) _ = _,
+                    HE2: estep ?E _ _ _ |- _ ] =>
+                    by eapply (escape_false HE2 HF)
+                end
+            ]
       end
     | match goal with
         | [ HJ : jstep _ _ _ _ _ |- _ ] =>
@@ -308,7 +295,9 @@ Section rules.
     { iPureIntro. destruct σ1. eexists _, _, []. split; auto. }
     iNext; iIntros (v2 σ2 Hstep).
     iDestruct "Hl" as "[% Hl]".
-    iDestruct (gen_heap_update_bytes _ (encode_val v) _ (encode_val v') with "Hσ Hl") as "H".
+    iDestruct (gen_heap_update_bytes _ (encode_val v)
+                                     _ (encode_val v')
+               with "Hσ Hl") as "H".
     { rewrite -(typeof_preserves_size v t)=>//.
       rewrite -(typeof_preserves_size v' t')=>//.
       by apply assign_preserves_size. }
@@ -328,7 +317,8 @@ Section rules.
     intro v1. simpl. induction (encode_val v1); intros; iSplit.
     - iIntros "?". simpl. iSplit; first done. by rewrite Nat.add_0_r.
     - simpl. iIntros "[_ ?]". by rewrite Nat.add_0_r.
-    - simpl. iIntros "[$ ?]". replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
+    - simpl. iIntros "[$ ?]".
+      replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
       by iApply IHl.
     - simpl. iIntros "[[$ ?] ?]".
       replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
@@ -373,12 +363,19 @@ Section rules.
   Proof.
     generalize bs p.
     induction bs0; destruct p0; first apply _.
-    simpl. assert (TimelessP (mapstobytes (b, (n + 1)%nat) q bs0)) as ?; first done.
+    simpl.
+    assert (TimelessP (mapstobytes (b, (n + 1)%nat) q bs0)) as ?; first done.
     apply _.
   Qed.
 
   Instance timeless_mapstoval p q v t : TimelessP (p ↦{q} v @ t)%I.
   Proof. rewrite /mapstoval. apply _. Qed.
+
+  Ltac solve_red :=
+    match goal with
+    | [ |- reducible _ ?σ ] =>
+      destruct σ; eexists _, _, _; by repeat constructor
+    end.
 
   Lemma wp_load {E} Φ p v t q:
     ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
@@ -391,7 +388,7 @@ Section rules.
     iDestruct "Hl" as "[>% >Hl]".
     iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
     iModIntro. iSplit; first eauto.
-    { iPureIntro. destruct σ1. eexists _, _, []. simpl in H1. split; auto. by repeat constructor. }
+    { iPureIntro. solve_red. }
     iNext; iIntros (s2 σ2 Hstep). iModIntro.
     atomic_step Hstep.
     simpl. iFrame.
@@ -399,47 +396,33 @@ Section rules.
     iApply ("HΦ" with "[-]") ; first by iSplit=>//.
   Qed.
 
+  Ltac wp_solve_pure :=
+    iApply wp_lift_pure_step; first eauto;
+    [ intros; solve_red |
+      destruct 1 as [Hcs ?]; atomic_step Hcs=>// |
+      iNext;
+      let Hcs := fresh "Hcs" in
+      iIntros (????(Hcs&?));
+      atomic_step Hcs; iSplitL; last by rewrite big_sepL_nil ].
+  
   Lemma wp_op E op v1 v2 v' Φ:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP Ebinop op (Evalue v1) (Evalue v2) @ E {{ Φ }}.
   Proof.
-    iIntros (?) "HΦ".
-    iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _, _. by repeat constructor. }
-    { destruct 1. atomic_step H1=>//. }
-    iNext. iIntros (????(?&?)).
-    atomic_step H1.
-    rewrite H0 in H9. inversion H9. subst.
-    iSplitL; first by iApply wp_value=>//.
-    by rewrite big_sepL_nil.
+    iIntros (?) "HΦ". wp_solve_pure.
+    simplify_eq. subst. iApply wp_value=>//.
   Qed.
 
   Lemma wp_while_true cond s Φ:
     ▷ WP Eseq s (Ewhile cond cond s) {{ Φ }}
     ⊢ WP Ewhile cond (Evalue vtrue) s {{ Φ }}.
-  Proof.
-    iIntros "Hnext".
-    iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _, []. by repeat constructor. }
-    { destruct 1. atomic_step H0=>//. }
-    iNext. iIntros (???? (?&?)).
-    atomic_step H0.
-    iSplitL=>//.
-    by rewrite big_sepL_nil.
-  Qed.
+  Proof. iIntros "Hnext". by wp_solve_pure. Qed.
 
   Lemma wp_while_false cond s Φ:
     ▷ Φ Vvoid
     ⊢ WP Ewhile cond (Evalue vfalse) s {{ Φ }}.
   Proof.
-    iIntros "HΦ".
-    iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _, []. by repeat constructor. }
-    { destruct 1. atomic_step H0=>//. }
-    iNext. iIntros (???? (?&?)).
-    atomic_step H0.
-    iSplitL; first by iApply wp_value.
-    by rewrite big_sepL_nil.
+    iIntros "HΦ". wp_solve_pure. iApply wp_value=>//.
   Qed.
 
   Lemma wp_while_inv I Q cond s:
@@ -463,28 +446,12 @@ Section rules.
   Lemma wp_fst v1 v2 Φ:
     ▷ Φ v1
     ⊢ WP Efst (Evalue (Vpair v1 v2)) {{ Φ }}.
-  Proof.
-    iIntros "HΦ".
-    iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _, _. by repeat constructor. }
-    { destruct 1. atomic_step H0=>//. }
-    iNext. iIntros (???? (?&?)).
-    atomic_step H0. iSplitL; first by iApply wp_value.
-    by rewrite big_sepL_nil.
-  Qed.
+  Proof. iIntros "HΦ". wp_solve_pure. iApply wp_value=>//. Qed.
 
   Lemma wp_snd v1 v2 Φ:
     ▷ Φ v2
     ⊢ WP Esnd (Evalue (Vpair v1 v2)) {{ Φ }}.
-  Proof.
-    iIntros "HΦ".
-    iApply wp_lift_pure_step; first eauto.
-    { destruct σ1. eexists _, _, _. by repeat constructor. }
-    { destruct 1. atomic_step H0=>//. }
-    iNext. iIntros (????(?&?)).
-    atomic_step H0. iSplitL; first by iApply wp_value.
-    by rewrite big_sepL_nil.
-  Qed.
+  Proof. iIntros "HΦ". wp_solve_pure. iApply wp_value=>//. Qed.
 
   (* Freshness and memory allocation *)
 
@@ -548,7 +515,8 @@ Section rules.
     iApply wp_lift_atomic_step=>//.
     iIntros ((σ1&Γ) ks1) "[Hσ1 HΓ]".
     iModIntro. iSplit.
-    { iPureIntro. eexists _, _, []. split; last done. apply CSestep. by apply alloc_fresh. }
+    { iPureIntro. eexists _, _, [].
+      split; last done. apply CSestep. by apply alloc_fresh. }
     iNext. iIntros (e2 σ2 ?).
     atomic_step H1.
     iMod (gen_heap_update_block with "Hσ1") as "[? ?]"=>//.
@@ -566,7 +534,8 @@ Section rules.
      end)%I.
 
   Lemma text_singleton_included (σ: text) l v :
-    {[l := to_agree v]} ≼ (fmap (λ v, to_agree (v : leibnizC function)) σ) → σ !! l = Some v.
+    {[l := to_agree v]} ≼ (fmap (λ v, to_agree (v : leibnizC function)) σ) →
+    σ !! l = Some v.
   Proof.
     rewrite singleton_included=> -[av []].
     rewrite lookup_fmap fmap_Some_equiv. intros [v' [Hl ->]].
@@ -578,43 +547,44 @@ Section rules.
     ⊢ ⌜ Γ !! f = Some x⌝.
   Proof.
     iIntros "[Hf HΓ]".
-    rewrite /own_text /text_interp. iDestruct (own_valid_2 with "HΓ Hf")
+    rewrite /own_text /text_interp.
+    by iDestruct (own_valid_2 with "HΓ Hf")
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
-    done.
   Qed.
-
+  
   Lemma wp_call {E k ks es} ls params f_body f_body' f retty Φ:
     es = map (fun l => Evalue (Vptr l)) ls →
-    instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
+    instantiate_f_body (add_params_to_env (Env [] []) params ls)
+                       f_body = Some f_body' →
     text_interp f (Function retty params f_body) ∗
-    stack_interp ks ∗
-    ▷ (stack_interp (k::ks) -∗ WP f_body' @ E {{ Φ }})
+    own_stack ks ∗
+    ▷ (own_stack (k::ks) -∗ WP f_body' @ E {{ Φ }})
     ⊢ WP fill_ectxs (Ecall f es) k @ E {{ Φ }}.
   Proof.
-    iIntros (??) "[Hf [Hstk HΦ]]".
+    iIntros (Hls Hf) "[Hf [Hstk HΦ]]".
     iApply wp_lift_step=>//.
     { apply fill_ectxs_not_val. done. }
-    iIntros ((σ1&Γ) ks1) "[Hσ1 [HΓ Hs]]". iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    iIntros ((σ1&Γ) ks1) "[Hσ1 [HΓ Hs]]".
+    iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
-    simpl in H2.
+    simpl in H0.
     iModIntro. iSplit.
-    { iPureIntro. eexists _, _, []. split; last done. apply CSjstep. eapply JScall=>//. }
-    iNext. iIntros (e2 σ2 ? (?&?)).
-    iMod "Hclose". inversion H3; subst.
-    { apply fill_estep_false in H11=>//. }
-    inversion H11; subst.
-    + apply cont_inj in H0=>//.
-      by destruct H0.
-    + apply cont_inj in H0=>//.
-      destruct H0. inversion H0. subst.
-      iFrame. iDestruct (stack_agree with "[Hs Hstk]") as "%"; first iFrame.
-      subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
+    { iPureIntro. eexists _, _, []. split; last done.
+      apply CSjstep. eapply JScall=>//. }
+    iNext. iIntros (e2 σ2 efs (Hcs&?)).
+    iMod "Hclose". inversion_cstep_as Hes Hjs.
+    { apply fill_estep_false in Hes=>//. }
+    inversion_jstep_as Hjs Heq.
+    + fill_enf_neq.
+    + apply cont_inj in Heq=>//.
+      destruct Heq as [Heq ?]. inversion Heq. subst.
+      iFrame. iDestruct (own_pair_agree with "[Hs Hstk]") as "%"; first iFrame.
+      subst.
+      iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
       iFrame.
       assert (ls0 = ls) as ?.
-      { eapply map_inj=>//. simpl. intros. by inversion H6. }
-      subst. clear H0 H9 H4.
-      rewrite H5 in H2. inversion H2. subst. clear H2.
-      rewrite H1 in H7. inversion H7.
+      { eapply map_inj=>//. simpl. by inversion 1. }
+      subst. clear Heq. simplify_eq.
       iSplitL; first by iApply "HΦ".
       by rewrite big_sepL_nil.
   Qed.
