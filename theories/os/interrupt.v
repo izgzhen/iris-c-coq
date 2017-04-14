@@ -31,6 +31,8 @@ Section definitions.
   Structure interrupt := Interrupt {
     (* -- predicates -- *)
     name : Type;
+    f_sti: ident;
+    f_cli: ident;
     hpri (γp: name) (i: nat) : iProp Σ;
     closed (γ: name): iProp Σ;
     int_ctx (N: namespace) (γ γp: name): iProp Σ;
@@ -39,13 +41,18 @@ Section definitions.
     int_ctx_persistent N γ γp : PersistentP (int_ctx N γ γp);
     closed_timeless γ : TimelessP (closed γ);
     closed_exclusive γ : closed γ -∗ closed γ -∗ False;
+    (* HACK *)
+    sti : expr := Ecall f_sti [];
+    cli : expr := Ecall f_cli [];
+    sti_nj: is_jmp sti = false;
+    cli_nj: is_jmp cli = false;
     (* -- operation specs -- *)
     sti_spec N prio γ γp Φ :
       int_ctx N γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ Vvoid)
-      ⊢ WP (Eprim Psti) {{ Φ }};
+      ⊢ WP sti {{ Φ }};
     cli_spec N prio γ γp Φ :
       int_ctx N γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ Vvoid)
-      ⊢ WP (Eprim Pcli) {{ Φ }}
+      ⊢ WP cli {{ Φ }}
   }.
 End definitions.
 

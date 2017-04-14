@@ -24,10 +24,10 @@ Section example.
   Context `{i: interrupt invs}.
 
   Definition f_body : expr :=
-    cli ;;
+    cli i ;;
     y <- y + x ;;
     x <- y ;;
-    sti ;;
+    sti i ;;
     rete x.
 
   Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
@@ -47,7 +47,7 @@ Section example.
   Proof.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & Hx & HΦ)".
     iApply (wp_call [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
-    iFrame. iNext. iIntros "Hstk". iApply wp_seq=>//.
+    iFrame. iNext. iIntros "Hstk". iApply wp_seq=>//. { apply cli_nj. }
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
@@ -58,7 +58,7 @@ Section example.
     { apply spec_step_rel'. unfold f_rel. eexists _. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-    wp_run. iApply wp_seq=>//. iApply sti_spec.
+    wp_run. iApply wp_seq=>//. { apply sti_nj. } iApply sti_spec.
     iFrame. iFrame "#".  iSplitL "Hss' Hy".
     { iExists _. iFrame. by rewrite Int.add_commut. }
     iIntros "Hp". wp_run. iFrame.
