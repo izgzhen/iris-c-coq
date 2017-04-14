@@ -8,6 +8,8 @@ From iris_os.clang Require Export memory types.
 
 Open Scope Z_scope.
 
+(* Syntax *)
+
 Inductive bop :=
 | oplus
 | ominus
@@ -19,16 +21,12 @@ Definition decls := list (ident * type).
 
 Definition tid := nat.
 
-(* TODO: Parameterize it *)
-Inductive prim :=
-| Pcli | Psti | Pswitch (i: tid).
-
 Inductive expr :=
 | Evalue (v: val)
 | Evar (x: ident)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
 | Ederef (e: expr)
-| Ederef_typed (t: type) (e: expr) (* not in source *)
+| Ederef_typed (t: type) (e: expr)
 | Eaddrof (e: expr)
 | Efst (e: expr)
 | Esnd (e: expr)
@@ -38,8 +36,7 @@ Inductive expr :=
 | Eif (cond: expr) (s1 s2: expr)
 | Ewhile (cond: expr) (curcond: expr) (s: expr)
 | Erete (e: expr)
-| Eseq (s1 s2: expr)
-| Eprim (p: prim).
+| Eseq (s1 s2: expr).
 
 Record function :=
   Function {
@@ -263,7 +260,6 @@ Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
         | Some s1', Some s2' => Some (Eseq s1' s2')
         | _, _ => None
       end
-    | Eprim p => Some e
   end.
 
 Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
@@ -302,7 +298,6 @@ Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
         | _, _ => None
       end
     | Erete e => Some (Erete e)
-    | Eprim _ => Some e
   end.
 
 Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
@@ -338,46 +333,39 @@ Inductive jnf: expr → Prop :=
 
 Global Hint Constructors jnf.
 
+Ltac solve_is_jmp_false :=
+  repeat (match goal with
+    | [ H: is_jmp _ = false |- _ ] => rewrite H
+  end);
+  match goal with
+    | [ H: is_jmp ?E1 || is_jmp ?E2 = false |- _ ] =>
+      destruct (is_jmp E1); destruct (is_jmp E2)=>//
+    | [ H: is_jmp ?E1 || is_jmp ?E2 || is_jmp ?E3 = false |- _ ] =>
+      destruct (is_jmp E1); destruct (is_jmp E2); destruct (is_jmp E3)=>//
+    | [ H: is_jmp ?E1 || is_jmp ?E2 || is_jmp ?E3 || is_jmp ?E4 = false |- _ ] =>
+      destruct (is_jmp E1); destruct (is_jmp E2); destruct (is_jmp E3); destruct (is_jmp E4)=>//
+  end.
+
 Lemma is_jmp_rec' e K:
   is_jmp (fill_expr e K) = false → is_jmp e = false.
-Proof.
-  induction K=>//; simpl; intros.
-  - destruct (is_jmp re); destruct (is_jmp e)=>//.
-  - destruct (is_jmp rhs); destruct (is_jmp e)=>//.
-  - destruct (is_jmp s1); destruct (is_jmp s2); destruct (is_jmp e)=>//.
-  - destruct (is_jmp s); destruct (is_jmp e); destruct (is_jmp cond)=>//.
-  - destruct (is_jmp s); destruct (is_jmp e)=>//.
-Qed.
+Proof. induction K=>//; simpl; intros; solve_is_jmp_false. Qed.
 
 Lemma is_jmp_rec e ks:
   is_jmp (fill_ectxs e ks) = false → is_jmp e = false.
-Proof.
-  induction ks=>//.
-  simpl; intros.
-  apply is_jmp_rec' in H.
-  auto.
-Qed.
+Proof. induction ks=>//. simpl; intros. apply is_jmp_rec' in H. auto. Qed.
 
 Lemma is_jmp_out' e e' K:
   is_jmp e' = false →
   is_jmp (fill_expr e K) = false →
   is_jmp (fill_expr e' K) = false.
-Proof.
-  induction K=>//; simpl; intros.
-  - destruct (is_jmp e'); destruct (is_jmp re); destruct (is_jmp e)=>//.
-  - destruct (is_jmp e'); destruct (is_jmp rhs); destruct (is_jmp e)=>//.
-  - destruct (is_jmp e'); destruct (is_jmp s1); destruct (is_jmp s2); destruct (is_jmp e)=>//.
-  - destruct (is_jmp e'); destruct (is_jmp cond); destruct (is_jmp e)=>//.
-  - destruct (is_jmp e'); destruct (is_jmp s); destruct (is_jmp e)=>//.
-Qed. (** FIXME: automate this *)
+Proof. induction K=>//; simpl; intros; solve_is_jmp_false. Qed.
 
 Lemma is_jmp_out e e' K:
   is_jmp e' = false →
   is_jmp (fill_ectxs e K) = false →
   is_jmp (fill_ectxs e' K) = false.
 Proof.
-  induction K=>//.
-  simpl. intros. eapply is_jmp_out'=>//.
+  induction K=>//. simpl. intros. eapply is_jmp_out'=>//.
   apply IHK=>//. eapply is_jmp_rec'=>//.
 Qed.
 
@@ -559,10 +547,10 @@ Lemma cont_inj {e e' kes kes'}:
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
 Proof.
-  intros. apply (cont_uninj kes) in H.
-  apply (cont_uninj kes') in H0.
-  unfold unfill in H0, H.
-  rewrite H1 in H. by simplify_eq.
+  intros H H' Heq. apply (cont_uninj kes) in H.
+  apply (cont_uninj kes') in H'.
+  unfold unfill in H', H.
+  rewrite Heq in H. by simplify_eq.
 Qed.
 
 Lemma fill_not_enf e k:
@@ -591,7 +579,6 @@ Ltac gen_eq H E1 E2 KS :=
   assert (E1 = E2 ∧ [] = KS) as [? ?];
   [ apply cont_inj=>// | subst; clear H ].
 
-
 Lemma fill_cons e K K': fill_expr (fill_ectxs e K) K' = fill_ectxs e (K' :: K).
 Proof. induction K'=>//. Qed.
 
@@ -599,7 +586,7 @@ Axiom cont_ind:
   ∀ P: cont → Prop,
     (P []) →
     (∀ ks, (∀ ks', length ks' < length ks → P ks')%nat → P ks) →
-    (∀ ks, P ks). (* TODO: it should be provable *)
+    (∀ ks, P ks).
 
 Axiom unfill_segment: ∀ e ks eh ks',
   to_val e = None → enf eh →
@@ -625,7 +612,7 @@ Proof.
       | [ H : fill_expr _ _ = fill_ectxs ?E2 ?KS |- _ ] => fail 1
       | [ H : ?E1 = fill_ectxs ?E2 ?KS |- _ ] => subst; gen_eq H E1 E2 KS; eauto
     end).
-    subst. gen_eq H3 (Eseq (Evalue v) e2) eh1 ks. eauto.
+    { subst. gen_eq H3 (Eseq (Evalue v) e2) eh1 ks. eauto. }
     rewrite fill_cons in H2. move: (estep_not_val H4) => Hnv.
     destruct (unfill_segment Hnv H H2) as [K' [? ?]].
     subst. apply (H0 K') in H4.
@@ -645,15 +632,16 @@ Proof. intros H. move: (focus_estep_inv' eh1 σ1 σ2 H) => /= H'. done. Qed.
 Axiom focus_estep: ∀ e1 σ1 e2 σ2,
   estep e1 σ1 e2 σ2 → ∃ K eh1, e1 = fill_ectxs eh1 K ∧ enf eh1.
 
+Arguments focus_estep {_ _ _ _} _.
+
 Lemma focus_estep_inv {e1 σ1 e2 σ2}:
   estep e1 σ1 e2 σ2 →
   ∃ e1' e2' K, enf e1' ∧ e1 = fill_ectxs e1' K ∧ estep e1' σ1 e2' σ2 ∧ e2 = fill_ectxs e2' K.
 Proof.
-  intros H. move: (focus_estep _ _ _ _ H) => [K [eh1 [? H']]].
+  intros H. move: (focus_estep H) => [K [eh1 [? H']]].
   subst. exists eh1.
   destruct (@focus_estep_inv'' eh1 σ1 σ2 H' K e2) as [e' [? ?]]=>//.
-  eexists e', K.
-  split=>//; split=>//.
+  eexists _, _. split=>//; split=>//.
 Qed.
 
 Lemma estep_call_false f ls σ1 e' σ2:
@@ -718,18 +706,18 @@ Lemma fill_estep_inv':
   in ∀ e, to_val e = None → P e.
 Proof.
   intros P. apply (not_val_ind P).
-  - unfold P. intros.
-    eapply focus_estep_inv in H1.
-    destruct H1 as (?&?&?&?&?&?&?).
-    eapply cont_inj in H2=>//.
-    destruct H2. subst. eauto.
-  - unfold P. intros.
-    rewrite fill_app in H2.
-    apply H0 in H2; last by eapply is_jmp_rec.
-    destruct H2 as (?&?&?).
-    exists (fill_ectxs x ks).
-    split. apply ESbind=>//.
-    by eapply is_jmp_rec.
+  - unfold P. intros e Henf e' σ σ' ks Hnj Hes.
+    eapply focus_estep_inv in Hes.
+    destruct Hes as (e1'&e2'&K&Henf'&Heq&Hes'&Heq'). subst.
+    eapply cont_inj in Heq=>//.
+    destruct Heq. subst. eauto.
+  - unfold P. intros e ks Hnv Hind e' σ σ' ks' Hnj Hes.
+    rewrite fill_app in Hes.
+    apply Hind in Hes; last by eapply is_jmp_rec.
+    destruct Hes as (e''&Hes''&Heq').
+    exists (fill_ectxs e'' ks).
+    split.
+    { apply ESbind=>//. by eapply is_jmp_rec. }
     by rewrite fill_app.
 Qed.
 
@@ -783,8 +771,6 @@ Bind Scope val_scope with val.
 Delimit Scope val_scope with V.
 Bind Scope expr_scope with expr.
 Delimit Scope expr_scope with E.
-Bind Scope prim_scope with prim.
-Delimit Scope prim_scope with prim.
 
 Inductive cstep: expr → state → expr → state → Prop :=
 | CSestep:
