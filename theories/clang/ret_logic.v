@@ -150,18 +150,34 @@ Section wp_ret.
     iNext. iApply wpr_step_mono. iFrame.
     iAlways. iIntros (?). iApply wpr_value.
   Qed.
-  
-  Lemma wpr_call' E ks es ls params f_body f_body' f retty Φ:
+
+  Lemma stack_agree_s s σ:
+    stack_interp s ∗ state_interp σ ⊢ ⌜ s_stack σ = s⌝.
+  Proof.
+    iIntros "(?&(?&?&?))".
+    iDestruct (stack_agree with "[~ ~3]") as "%"; first iFrame.
+    done.
+  Qed.
+
+  Lemma lookup_text_s f x σ:
+    text_interp f x ∗ state_interp σ ⊢ ⌜s_text σ !! f = Some x⌝.
+  Proof.
+    iIntros "(?&(?&?&?))".
+    iDestruct (lookup_text with "[~ ~2]") as "%"; first iFrame.
+    done.
+  Qed.
+
+  Lemma wp_call_r E ks es ls params f_body f_body' f retty k Φ:
     es = map (fun l => Evalue (Vptr l)) ls →
     instantiate_f_body (add_params_to_env (Env [] []) params ls) f_body = Some f_body' →
     text_interp f (Function retty params f_body) ∗ stack_interp ks ∗
-    ▷ wpr E f_body' (fun _ => False%I) (λ v, stack_interp ks -∗ Φ v)
-    ⊢ wp E (Ecall f es) Φ.
+    ▷ wpr E f_body' (fun _ => False%I) (λ v, stack_interp ks -∗ WP (fill_ectxs (Evalue v) k) @ E {{ Φ }})
+    ⊢ wp E (fill_ectxs (Ecall f es) k) Φ.
   Proof.
     iIntros (??) "(?&?&?)".
-    iApply (@wp_call _ _ _ [])=>//.
+    iApply (@wp_call _ _ _ k)=>//.
     iFrame. iNext. iIntros "H". clear H1.
-    iLöb as "IH" forall (Φ f_body').
+    iLöb as "IH" forall (Φ k ks f_body').
     rewrite wp_unfold /wp_pre.
     rewrite wpr_unfold /wpr_pre.
     iDestruct "~2" as "[H' | H']".
@@ -203,15 +219,76 @@ Section wp_ret.
             iApply (wp_strong_mono E E)=>//.
           iFrame. iIntros (?) "H'".
           iModIntro. iApply ("IH" with "[-H]")=>//.
-      + 
-            
-            
-            
+      +  destruct H3.
+         iDestruct "~" as (?) "[% ?]". subst.
+         apply cont_uninj' in H4. destruct H4. subst.
+         iRight.
+         iSplit=>//.
+         iIntros (σ1) "Hσ1".
+         iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+         iModIntro.
+         iDestruct (stack_agree_s with "[H Hσ1]") as "%"; first iFrame.
+         iSplit.
+         { iPureIntro. destruct σ1. simpl in H1.
+           eexists _, (State s_heap s_text ks), []. split; [|split]=>//.
+           apply CSjstep. subst. apply JSrete.
+           by apply cont_uninj. }
+         iNext; iIntros (e2 σ2 efs ?).
+         simpl in H4. destruct H4.
+         inversion H4; subst.
+         { by apply fill_estep_false in H7. }
+         inversion H7; subst.
+         * apply cont_inj in H6=>//. destruct H6. inversion H6. subst.
+           iDestruct "Hσ1" as "(?&?&?)".
+           iMod (stack_pop with "[H ~2]") as "(Hstk & Hs & %)"; first iFrame.
+           destruct H8; subst.
+           iFrame. iMod "Hclose" as "_".
+           iModIntro. iSplitL.
+           { simpl. by iApply "~1". }
+           by rewrite big_sepL_nil.
+         * apply cont_inj in H6=>//.
+           destruct H6 as [? ?]; done.
+      + destruct H3.
+        iDestruct "~" as (??????) "[% [? ?]]".
+        destruct H11.
+        apply cont_uninj' in H4. destruct H4. subst.
+        iRight. iSplit=>//.
+        iIntros (σ1) "Hσ1".
+        iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
+        iModIntro.
+        iDestruct (stack_agree_s with "[H Hσ1]") as "%"; first iFrame.
+        iDestruct (lookup_text_s with "[~1 Hσ1]") as "%"; first iFrame.
+        iSplit.
+        { iPureIntro. destruct σ1. simpl in H0. subst.
+          eexists _, (State s_heap s_text (H2::k::ks)), []. split; [|split]=>//.
+          constructor. eapply JScall=>//. }
+        iNext; iIntros (e2 σ2 efs ?).
+        simpl in H11. destruct H11.
+         inversion H11; subst.
+         { by apply fill_estep_false in H14. }
+         inversion H14; subst.
+         * apply cont_inj in H13=>//. destruct H13. inversion H13.
+         * apply cont_inj in H13=>//. destruct H13. inversion H13. subst.
+           apply map_inj in H20. subst.
+           simpl in H0. subst.
+           iDestruct "Hσ1" as "(?&?&?)".
+           iMod (stack_push with "[~3 H]") as "(Hs & Hstk & %)"; first iFrame.
+           iFrame.
+           iMod "Hclose" as "_".
+           iModIntro. iSplitL.
+           simpl in H1. rewrite H1 in H16.
+           inversion H16. subst. clear H16. clear H1.
+           rewrite H18 in H12. inversion H12. subst. clear H13.
+           iApply ("IH" $! _ H2 (k::ks) with "[-Hs]")=>//.
+           iApply wpr_step_mono. iFrame.
+           iClear "~1". iAlways.
+           iIntros (?) "? ?".
+           (* iSpecialize ("IH" $! Φ k (fill_ectxs (Evalue ) H2) with "~"). *)
+           iApply ("IH" with "[-~1]")=>//.
+           by rewrite big_sepL_nil.
+           { intros. by inversion H15. }
+  Qed.
 
-          
-        
-        
-      
   Lemma wpr_op E op v1 v2 v' Φ Φret:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
