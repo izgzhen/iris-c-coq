@@ -186,6 +186,11 @@ And this definition supports the following inference rules:
  \proves
  \wprer{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
 
+\infer[wp-call-r]
+{f \tmapsto \Funct(\any, ps, e) * \ownstack(ks) *
+ \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \ownstack(ks) * \wpre{k(v)}[\mask]{\pred}} }
+{\wpre{k(\scall{f}{ls})}[\mask]{\pred}}
+
 \end{mathpar}
 
 Note how WP-CALL, WP-RET, and WP-BIND are simplified in their new, corresponding versions,
