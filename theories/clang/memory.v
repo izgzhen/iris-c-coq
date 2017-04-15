@@ -40,7 +40,6 @@ Inductive val : Set :=
 | Vptr (p: addr)
 | Vpair (v1 v2: val).
 
-
 Global Instance val_eq_dec : EqDecision val.
 Proof. solve_decision. Defined.
 

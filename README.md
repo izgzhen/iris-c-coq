@@ -1,8 +1,6 @@
 Iris C
 =======
 
-## Introduction
-
 C verification framework based on the Iris program logic.
 
 [Documentation](doc/iris-c.pdf)
@@ -34,3 +32,18 @@ Quick build:
 ```
 make -f Makefile.coq quick
 ```
+
+## Acknowledgement
+
+Thanks to Derek Dreyer, Ralf Jung and other people in FP group
+for teaching me about Iris logic and hosting me during my internship at MPI-SWS.
+
+Thanks to Xinyu Feng and Ming Fu in USTC for discussing this work with me
+and show me the code.
+
+Also, in this source, the following files are not written by me,
+but included for convenience:
+
+- `lib/CoqLib.v`
+- `lib/CpdtTactics.v`
+- `lib/Integers.v`
