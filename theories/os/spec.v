@@ -3,7 +3,7 @@
 Require Import iris.algebra.gmap.
 Require Import iris_os.clang.lang.
 
-Definition spec_state := gmap ident val. (* XXX: should be parameterized *)
+Definition spec_state := gmap ident val.
 
 Definition spec_rel := spec_state → option val → spec_state → Prop.
 
@@ -21,7 +21,9 @@ Inductive spec_step_star: spec_code → spec_state → spec_code → spec_state 
 | SSid: ∀ c s, spec_step_star c s c s
 | SStrans:
     ∀ c c' c'' s s' s'',
-      spec_step_star c s c' s' → spec_step c' s' c'' s'' → spec_step_star c s c'' s''.
+      spec_step_star c s c' s' →
+      spec_step c' s' c'' s'' →
+      spec_step_star c s c'' s''.
 
 Lemma spec_step_rel' (r: spec_rel) s retv s':
   r s retv s' → spec_step (SCrel r) s (SCdone retv) s'.

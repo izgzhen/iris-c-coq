@@ -33,7 +33,8 @@ Lemma wp_step R e1 σ1 e2 σ2 efs Φ :
   prim_step e1 σ1 e2 σ2 efs →
   world σ1 ∗ R ∗ WP e1 {{ Φ }} ==∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp efs).
 Proof.
-  rewrite {1}wp_unfold /wp_pre. iIntros (HR Hstep) "[(Hw & HE & Hσ) [HR [H|[_ H]]]]".
+  rewrite {1}wp_unfold /wp_pre.
+  iIntros (HR Hstep) "[(Hw & HE & Hσ) [HR [H|[_ H]]]]".
   { iDestruct "H" as (v) "[% _]". apply val_stuck in Hstep; simplify_eq. }
   rewrite fupd_eq /fupd_def.
   iMod ("H" $! σ1 with "Hσ [Hw HE]") as ">(Hw & HE & _ & H)"; first by iFrame.
@@ -68,9 +69,11 @@ Qed.
     revert e1 t1 t2 σ1 σ2; simpl; induction n as [|n IH]=> e1 t1 t2 σ1 σ2 /=.
     { intros HR. inversion_clear 1. iIntros "?". eauto 10. }
     iIntros (HR Hsteps) "H". inversion_clear Hsteps as [|?? [t1' σ1']].
-    iMod (wptp_step' with "H") as (e1' t1'') "[% H]"; first eauto; simplify_eq. apply H1.
+    iMod (wptp_step' with "H") as (e1' t1'') "[% H]";
+      first eauto; simplify_eq. apply H1.
     iModIntro; iNext; iMod "H" as ">?". iApply IH=>//.
-    subst. done. Qed.
+    subst. done.
+  Qed.
 
   Lemma foo' ss sc:
     (inv N spec_inv ∗ own_sstate ss ∗ own_scode sc)

@@ -65,24 +65,51 @@ Section algebra.
   Instance op_cfgs: Op (list cfg) :=
     λ cs1 cs2, if (Nat.leb (length cs1) (length cs2)) then cs2 else cs1.
 
+  Lemma leb_trans (x y z: nat):
+    (x <=? y) = true →
+    (y <=? z) = true →
+    (x <=? z) = true.
+  Proof.
+    intros Hxy Hyz.
+    apply Nat.leb_le in Hxy. apply Nat.leb_le in Hyz.
+    move : (le_trans _ _ _ Hxy Hyz) => Hxz.
+    by apply Nat.leb_le.
+  Qed.
+
+  Lemma gtb_trans (x y z: nat):
+    (x <=? y) = false →
+    (y <=? z) = false →
+    (x <=? z) = false.
+  Proof.
+    intros Hxy Hyz.
+    apply Nat.leb_gt in Hxy.
+    apply Nat.leb_gt in Hyz. move: (lt_trans _ _ _ Hyz Hxy)=>Hzx.
+    by apply Nat.leb_gt.
+  Qed.
+
+  Lemma leb_cancel_false (c: cfg) (l1 l2: list cfg):
+    length (c :: l1) + length l2 <=? length l2 = false.
+  Proof. rewrite Nat.leb_gt. simpl. omega. Qed.
+
+  Lemma leb_cancel_true (c: cfg) (l1 l2: list cfg):
+    length l2 <=? length (c :: l1 ++ l2) = true.
+  Proof. rewrite Nat.leb_le. simpl. rewrite app_length. omega. Qed.
+  
   Instance assoc_op_cfgs: Assoc (@eq (list cfg)) (⋅).
   Proof.
     intros ???; unfold op, op_cfgs.
     destruct (length x <=? length y) eqn:Hxy;
       destruct (length y <=? length z) eqn:Hyz=>//.
-    - apply Nat.leb_le in Hxy. apply Nat.leb_le in Hyz.
-      move : (le_trans _ _ _ Hxy Hyz) => Hxz.
-      apply Nat.leb_le in Hxz. by rewrite Hxz.
+    - by erewrite leb_trans.
     - by rewrite Hxy.
-    - rewrite Hxy. apply Nat.leb_gt in Hxy.
-      apply Nat.leb_gt in Hyz. move: (lt_trans _ _ _ Hyz Hxy)=>Hzx.
-      apply Nat.leb_gt in Hzx. by rewrite Hzx.
+    - rewrite Hxy. erewrite gtb_trans=>//.
   Qed.
 
   Instance op_refine : Op refine_car :=
     λ r1 r2, Refine (refine_view r1 ⋅ refine_view r2) (cfgs r1 ⋅ cfgs r2).
 
-  Lemma refine_op v1 v2 l1 l2: Refine v1 l1 ⋅ Refine v2 l2 = Refine (max_view v1 v2) (l1 ⋅ l2).
+  Lemma refine_op v1 v2 l1 l2:
+    Refine v1 l1 ⋅ Refine v2 l2 = Refine (max_view v1 v2) (l1 ⋅ l2).
   Proof. unfold op, op_refine. by simpl. Qed.
 
   Lemma cfgs_id_merge (cs: list cfg): cs ⋅ cs = cs.
@@ -112,25 +139,18 @@ Section algebra.
     rewrite app_length.
     destruct l1.
     - simpl. by rewrite Nat.leb_refl.
-    - assert (length (c :: l1) + length l2 > length l2).
-      { simpl. omega. }
-      apply Nat.leb_gt in H. by rewrite H.
+    - by rewrite leb_cancel_false.
   Qed.
 
   Lemma op_cfgs_suffix' (l1 l2: list cfg): suffix l1 l2 → l2 ⋅ l1 = l2.
-  Proof.
-    intros H. inversion H. subst. apply op_cfgs_app.
-  Qed.
+  Proof. intros H. inversion H. subst. apply op_cfgs_app. Qed.
 
   Lemma comm_op_cfgs l1 l2: l1 ⋅ (l2 ++ l1) = (l2 ++ l1) ⋅ l1.
   Proof.
     rewrite op_cfgs_app.
     destruct l2.
     - simpl. apply cfgs_id_merge.
-    - simpl. unfold op, op_cfgs.
-      assert (length l1 <=? length (c :: l2 ++ l1) = true).
-      { apply Nat.leb_le. simpl. rewrite app_length. omega. }
-      rewrite H. done.
+    - simpl. unfold op, op_cfgs. by rewrite leb_cancel_true.
   Qed.
 
   Lemma suffix_app (lx ly: list cfg):
@@ -152,62 +172,72 @@ Section algebra.
     simplify_eq. rewrite assoc. by eexists _.
   Qed.
 
+  Ltac rewrite_op_cfgs :=
+    repeat (match goal with
+            | [ |- context [(?E1 ++ ?E2) ⋅ ?E2 ] ] =>
+              rewrite op_cfgs_app
+            | [ |- context [?E2 ⋅ (?E1 ++ ?E2) ] ] =>
+              rewrite comm_op_cfgs op_cfgs_app
+            | [ H: context [(?E1 ++ ?E2) ⋅ ?E2 ] |- _ ] =>
+              rewrite op_cfgs_app in H
+            | [ H: context [?E2 ⋅ (?E1 ++ ?E2) ] |- _ ] =>
+              rewrite comm_op_cfgs op_cfgs_app in H
+            | [ H: ?E1 `suffix_of` ?E2 |- context [?E1 ⋅ ?E2] ] =>
+              rewrite op_cfgs_suffix
+            | [ H: ?E1 `suffix_of` ?E2 |- context [?E2 ⋅ ?E1] ] =>
+              rewrite op_cfgs_suffix'
+            | [ H: ?E1 `suffix_of` ?E2, H2: context [?E1 ⋅ ?E2] |- _ ] =>
+              rewrite op_cfgs_suffix in H2
+            | [ H: ?E1 `suffix_of` ?E2, H2: context [?E2 ⋅ ?E1] |- _ ] =>
+              rewrite op_cfgs_suffix' in H2
+            | [ H : _ `suffix_of` _ ∨ _ `suffix_of` _ |- _ ] => destruct H
+            end).
 
+  Lemma suffix_common (lx ly lz: list cfg):
+    lx `suffix_of` ly →
+    lz `suffix_of` ly →
+    lx `suffix_of` lz ∨ lz `suffix_of` lx.
+  Proof.
+    inversion 1. inversion 1.
+    simplify_eq. by eapply suffix_app.
+  Qed.
+  
   Lemma refine_dra : DRAMixin refine_car.
   Proof.
     split; try apply _; auto.
-    - intros.
-      destruct x as [[] csx]; destruct y as [[] csy]; inversion H1;
-      rewrite refine_op; simplify_eq.
-      + by rewrite op_cfgs_app.
-      + by rewrite comm_op_cfgs op_cfgs_app.
-      + destruct H4.
-        * by rewrite op_cfgs_suffix.
-        * by rewrite op_cfgs_suffix'.
+    - intros x y ? ? Hdisj.
+      destruct x as [[] csx]; destruct y as [[] csy]; inversion Hdisj;
+      rewrite refine_op; simplify_eq; by rewrite_op_cfgs.
     - intros x y z. destruct x, y, z.
       by rewrite !refine_op !assoc.
-    - intros [[] lx] [[] ly] [[] lz]; rewrite !refine_op; simpl; intros=>//;
+    - intros [[] lx] [[] ly] [[] lz];
+      rewrite !refine_op; simpl; intros=>//;
       match goal with
         | [H : Refine master _ ⊥ Refine master _ |- _ ] => inversion H
         | _ => idtac
       end; inversion H2; inversion H3; simplify_eq.
-      + rewrite op_cfgs_app in H7.
-        rewrite -H7. constructor.
-      + rewrite comm_op_cfgs op_cfgs_app in H7.
-        constructor. eapply suffix_app. by symmetry.
-      + destruct H6.
-        * rewrite op_cfgs_suffix in H3=>//.
-          rewrite op_cfgs_suffix=>//. inversion H4.
-          subst. rewrite assoc. constructor.
-        * rewrite op_cfgs_suffix' in H3=>//.
-          rewrite op_cfgs_suffix'=>//.
+      + rewrite_op_cfgs. rewrite -H7. constructor.
+      + rewrite_op_cfgs. constructor. eapply suffix_app. by symmetry.
+      + destruct H6; rewrite_op_cfgs=>//.
+        inversion H4.
+        subst. rewrite assoc. constructor.
       + constructor.
-        destruct H6.
-        * rewrite op_cfgs_suffix in H9=>//.
-          inversion H9.
-          { left. eapply suffix_trans=>//. }
-          inversion H4. inversion H5.
-          rewrite H6 in H7.
-          by eapply suffix_app.
-        * rewrite op_cfgs_suffix' in H9=>//.
+        destruct H6; rewrite_op_cfgs=>//; auto.
+        * left; eapply suffix_trans=>//.
+        * by eapply suffix_common.
     - intros [[] lx] [[] ly] [[] lz]; rewrite !refine_op; simpl; intros=>//;
       match goal with
         | [H : Refine master _ ⊥ Refine master _ |- _ ] => inversion H
         | _ => idtac
       end; inversion H2; inversion H3; simplify_eq.
-      + rewrite op_cfgs_app in H7.
-        move: (suffix_app _ _ _ _ H7)=>[?|?].
-        * rewrite op_cfgs_suffix'=>//.
-        * rewrite op_cfgs_suffix=>//. rewrite -H7. constructor.
-      + rewrite comm_op_cfgs op_cfgs_app in H7.
-        rewrite -H7 op_cfgs_app H7. constructor.
+      + rewrite_op_cfgs. move: (suffix_app _ _ _ _ H7)=>[?|?]; rewrite_op_cfgs=>//.
+      + rewrite_op_cfgs. rewrite -H7. rewrite_op_cfgs. rewrite H7. constructor.
       + destruct H6.
-        * rewrite (op_cfgs_suffix lx ly)=>//.
-          rewrite comm_op_cfgs op_cfgs_app. inversion H4. subst.
-          rewrite assoc. constructor.
+        * rewrite_op_cfgs=>//; last by eexists.
+          inversion H4. subst. rewrite assoc. constructor.
         * rewrite (op_cfgs_suffix' ly lx)=>//.
-          inversion H4. subst. rewrite assoc comm_op_cfgs op_cfgs_app.
-          rewrite -assoc. constructor.
+          inversion H4. subst. rewrite assoc.
+          rewrite_op_cfgs. rewrite -assoc. constructor.
       + constructor. destruct H6.
         * rewrite op_cfgs_suffix in H9=>//.
           inversion H9; left.
@@ -220,21 +250,16 @@ Section algebra.
             rewrite op_cfgs_suffix=>//. }
           { right. inversion H4. inversion H5.
             rewrite H6 in H7. apply suffix_app in H7.
-            inversion H7.
-            - rewrite op_cfgs_suffix=>//.
-            - rewrite op_cfgs_suffix'=>//. }
+            inversion H7; rewrite_op_cfgs=>//. }
     - intros [? ?] [? ?] ?.
       inversion H; subst; constructor.
       inversion H1; auto.
     - intros.
-      inversion H1; rewrite !refine_op.
+      inversion H1; rewrite !refine_op; try by rewrite_op_cfgs.
       + inversion H2.
-        * rewrite op_cfgs_suffix=>//.
-          rewrite op_cfgs_suffix'=>//.
+        * rewrite_op_cfgs=>//.
         * rewrite op_cfgs_suffix'=>//.
           rewrite op_cfgs_suffix=>//.
-      + by rewrite op_cfgs_app comm_op_cfgs op_cfgs_app.
-      + by rewrite op_cfgs_app comm_op_cfgs op_cfgs_app.
     - intros.
       destruct x as [[] lx]; unfold core, refine_core; simpl.
       + rewrite -{2}(left_id_L _ _ lx). constructor.
@@ -247,7 +272,7 @@ Section algebra.
       rewrite refine_op; simpl; exists (Refine snapshot ly);
       intros; first inversion H1;
       rewrite /core /refine_core refine_op; simpl.
-      + inversion H1. subst. rewrite op_cfgs_app.
+      + inversion H1. subst. rewrite_op_cfgs.
         split; [| split]=>//.
         constructor. right. by eexists _.
       + split; [|split]=>//.

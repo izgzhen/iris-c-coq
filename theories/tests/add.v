@@ -39,9 +39,9 @@ Section example.
 
   Lemma f_spec γ γp f vx Φ k ks:
     text_interp f (Function Tint32 [(x, Tint32); (y, Tint32)] f_body)  ∗
-    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ stack_interp ks ∗
+    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ own_stack ks ∗
     own_scode (SCrel (f_rel vx)) ∗ px ↦ vx @ Tint32 ∗
-    (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ stack_interp ks -∗
+    (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ own_stack ks -∗
           WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
     ⊢ WP fill_ectxs (Ecall f [Evalue (Vptr px); Evalue (Vptr py)]) k {{ _, Φ }}.
   Proof.

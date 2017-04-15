@@ -104,8 +104,10 @@ Section refineG.
     iIntros (?) "(Hinv & Hss & Hsc)".
     iDestruct "Hinv" as (ss'' sc'') "(HSS & HSC & Hm)".
     unfold own_scode, own_sstate.
-    iMod (update_scode _ _ sc' with "[HSC Hsc]") as "(HSC' & Hsc' & %)"; first iFrame.
-    iMod (update_sstate _ _ ss' with "[HSS Hss]") as "(HSS' & Hss' & %)"; first iFrame.
+    iMod (update_scode _ _ sc' with "[HSC Hsc]")
+      as "(HSC' & Hsc' & %)"; first iFrame.
+    iMod (update_sstate _ _ ss' with "[HSS Hss]")
+      as "(HSS' & Hss' & %)"; first iFrame.
     subst. iFrame.
     iMod (master_grow _ (ss', sc') with "Hm") as "Hm'"=>//.
     iMod (refine_snap with "Hm'") as "[Hm' Hs']".

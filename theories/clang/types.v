@@ -33,10 +33,14 @@ Inductive typeof: val → type → Prop :=
 
 Global Hint Constructors typeof.
 
-Lemma null_typeof v: typeof v Tnull → v = Vnull. Proof. induction v; inversion 1=>//. Qed.
-Lemma void_typeof v: typeof v Tvoid → v = Vvoid. Proof. induction v; inversion 1=>//. Qed.
-Lemma int8_typeof v: typeof v Tint8 → (∃ i, v = Vint8 i). Proof. induction v; inversion 1=>//. eauto. Qed.
-Lemma int32_typeof v: typeof v Tint32 → (∃ i, v = Vint32 i). Proof. induction v; inversion 1=>//. eauto. Qed.
+Lemma null_typeof v: typeof v Tnull → v = Vnull.
+Proof. induction v; inversion 1=>//. Qed.
+Lemma void_typeof v: typeof v Tvoid → v = Vvoid.
+Proof. induction v; inversion 1=>//. Qed.
+Lemma int8_typeof v: typeof v Tint8 → (∃ i, v = Vint8 i).
+Proof. induction v; inversion 1=>//. eauto. Qed.
+Lemma int32_typeof v: typeof v Tint32 → (∃ i, v = Vint32 i).
+Proof. induction v; inversion 1=>//. eauto. Qed.
 
 Lemma typeof_any_ptr l t1 t2:
   typeof l (Tptr t1) → typeof l (Tptr t2).
