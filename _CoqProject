@@ -23,3 +23,4 @@ theories/os/page_table.v
 theories/os/vmm.v
 theories/lib/pair.v
 theories/tests/add.v
+theories/tests/lock.v

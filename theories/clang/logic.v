@@ -259,33 +259,6 @@ Section rules.
       by iFrame.
   Qed.
 
-  Ltac absurd_jstep' :=
-    match goal with
-      | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
-        replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
-              by destruct HF
-    end.
-
-  Ltac absurd_jstep Hjs :=
-    inversion Hjs; subst;
-    [ match goal with
-      | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-          by rewrite /unfill HF /= in HU
-      end
-    | absurd_jstep' ].
-  
-  Ltac atomic_step H :=
-    inversion H; subst;
-    [ match goal with
-        | [ HE: estep _ _ _ _ |- _ ] =>
-          inversion HE; subst;
-            [ idtac | exfalso; by escape_false ]
-      end
-    | match goal with
-        | [ HJ : jstep _ _ _ _ _ |- _ ] => absurd_jstep HJ
-      end
-    ].
-
   Lemma wp_assign {E l v v'} t t' Φ:
     typeof v' t' → assign_type_compatible t t' →
     ▷ l ↦ v @ t ∗ ▷ (l ↦ v' @ t -∗ Φ Vvoid)

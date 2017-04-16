@@ -39,6 +39,12 @@ Ltac reshape_expr e tac :=
     go (EKrete :: K) e
   | Ewhile ?c ?e ?s =>
     go (EKwhile c s :: K) e
+  | ECAS_typed ?t (Evalue (Vptr ?l)) (Evalue ?v1) ?e2 =>
+    go (EKCASr t l v1 :: K) e2
+  | ECAS_typed ?t (Evalue (Vptr ?l)) ?e1 ?e2 =>
+    go (EKCASm t l e2 :: K) e1
+  | ECAS_typed ?t ?e0 ?e1 ?e2 =>
+    go (EKCASl t e1 e2 :: K) e0
   end in go (@nil exprctx) e.
 
 Ltac wp_bind_core Kes :=

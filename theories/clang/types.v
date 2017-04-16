@@ -8,6 +8,8 @@ Inductive type : Set :=
 | Tptr (t: type)
 | Tprod (t1 t2: type).
 
+Definition tybool := Tint8.
+
 Instance equiv_type: Equiv type := (=).
 
 Fixpoint type_infer_v (v: val) : type :=
