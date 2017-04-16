@@ -232,21 +232,22 @@ Section wp_ret.
            eexists _, (State s_heap s_text ks), []. split; [|split]=>//.
            apply CSjstep. subst. apply JSrete.
            by apply cont_uninj. }
-         iNext; iIntros (e2 σ2 efs ?).
-         simpl in H4. destruct H4.
-         inversion H4; subst.
-         { by apply fill_estep_false in H7. }
-         inversion H7; subst.
-         * apply cont_inj in H6=>//. destruct H6. inversion H6. subst.
+         iNext; iIntros (e2 σ2 efs Hs).
+         simpl in *. destruct Hs.
+         inversion_cstep_as Hes Hjs; subst.
+         { by apply fill_estep_false in Hes. }
+         inversion_jstep_as Heq; subst.
+         * apply cont_inj in Heq=>//. destruct Heq as [Heq ?].
+           inversion Heq. subst.
            iDestruct "Hσ1" as "(?&?&?)".
            iMod (stack_pop with "[H ~2]") as "(Hstk & Hs & %)"; first iFrame.
-           destruct H8; subst.
+           destruct H7; subst.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
            { simpl. by iApply "~1". }
            by rewrite big_sepL_nil.
-         * apply cont_inj in H6=>//.
-           destruct H6 as [? ?]; done.
+         * apply cont_inj in Heq=>//.
+           by destruct Heq as [? ?].
       + destruct H3.
         iDestruct "~" as (??????) "[% [? ?]]".
         destruct H11.
@@ -258,18 +259,18 @@ Section wp_ret.
         iDestruct (stack_agree_s with "[H Hσ1]") as "%"; first iFrame.
         iDestruct (lookup_text_s with "[~1 Hσ1]") as "%"; first iFrame.
         iSplit.
-        { iPureIntro. destruct σ1. simpl in H0. subst.
+        { iPureIntro. destruct σ1. simpl in *. subst.
           eexists _, (State s_heap s_text (H2::k::ks)), []. split; [|split]=>//.
           constructor. eapply JScall=>//. }
         iNext; iIntros (e2 σ2 efs (Hcs&?)).
         inversion_cstep_as Hes Hjs.
          { by apply fill_estep_false in Hes. }
-         inversion_jstep_as Hjs Heq; subst.
+         inversion_jstep_as Heq; subst.
          * fill_enf_neq.
          * apply cont_inj in Heq=>//. destruct Heq as [Heq ?].
            inversion Heq. simplify_eq.
            apply map_inj in Heq. subst.
-           simpl in H0, H1. subst. simplify_eq.
+           simpl in *. subst. simplify_eq.
            iDestruct "Hσ1" as "(?&?&?)".
            iMod (stack_push with "[~3 H]") as "(Hs & Hstk & %)"; first iFrame.
            iFrame.

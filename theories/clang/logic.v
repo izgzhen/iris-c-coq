@@ -160,21 +160,17 @@ Section rules.
     iModIntro. iSplit.
     { iDestruct (own_pair_agree with "[Hstk Hs]") as "%"; first iFrame.
       subst. iPureIntro. destruct σ. eexists _, (State s_heap s_text _), [].
-      split; last done. apply CSjstep. simpl in H0. subst. constructor.
+      split; last done. apply CSjstep. simpl in *. subst. constructor.
       by apply cont_uninj. }
     iNext. iIntros (e2 σ2 efs (Hcs & ?)).
-    inversion Hcs; subst.
-    { by apply fill_estep_false in H1. }
-    inversion H1; subst.
-    - match goal with
-      | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
-        apply cont_inj in H=>//;
-        destruct H; inversion H; subst
-      end.
-      iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
-      destruct H2; subst.
-      iFrame. iMod "Hclose" as "_".
-      iModIntro. iSplitL; first by iApply "HΦ".
+    inversion_cstep_as Hes Hjs; subst.
+    { by apply fill_estep_false in Hes. }
+    inversion_jstep_as Heq; subst.
+    apply cont_inj in Heq=>//;
+    destruct Heq as [Heq ?]; inversion Heq; subst.
+    iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
+    destruct H1; subst. iFrame. iMod "Hclose" as "_".
+    iModIntro. iSplitL; first by iApply "HΦ".
       by rewrite big_sepL_nil.
     - fill_enf_neq.
   Qed.
@@ -182,10 +178,10 @@ Section rules.
   Lemma eseq_pure v s h e2 h':
     estep (Eseq (Evalue v) s) h e2 h' → h = h'.
   Proof.
-    intros Hes. f_equal. simplify_eq. inversion Hes=>//.
+    intros Hes. f_equal. simplify_eq. inversion Hes =>//.
     simplify_eq. exfalso.
-    rewrite_empty_ctx.
-    eapply (escape_false H2 H0). by simpl.
+    rewrite_empty_ctx. simpl in *.
+    escape_false.
   Qed.
 
   Lemma wp_skip E Φ v s:
@@ -194,22 +190,21 @@ Section rules.
     iIntros "Φ". iApply wp_lift_pure_step; eauto.
     - destruct σ1. eexists _, _, []. split; auto.
     - intros σ1 σ2 e2 efs (Hs&?).
-      inversion Hs=>//.
-      + f_equal. simplify_eq. inversion H1=>//.
+      inversion_cstep_as Hes Hjs=>//.
+      + f_equal. simplify_eq. inversion Hes=>//.
         simplify_eq. exfalso.
-        rewrite_empty_ctx.
-        eapply (escape_false H3 H0). by simpl.
-      + simplify_eq. inversion H1; subst.
-        * unfold unfill in H3. rewrite H0 in H3.
-          simpl in H3. done.
+        rewrite_empty_ctx. simpl in *. escape_false.
+      + simplify_eq. inversion Hjs; subst.
+        * unfold unfill in H2. rewrite H0 in H2.
+          by simpl in *.
         * fill_enf_neq.
     - iNext. iIntros (???? (?& ?)).
-      inversion H0; subst.
-      + inversion H2; subst.
+      inversion_cstep_as Hes Hjs; subst.
+      + inversion Hes; subst.
         { iFrame. by rewrite big_sepL_nil. }
-        { exfalso. by eapply (escape_false H4 H1). }
-      + simplify_eq. inversion H2; subst.
-        * by rewrite /unfill H1 /= in H4.
+        { escape_false. }
+      + simplify_eq. inversion Hjs; subst.
+        * by rewrite /unfill H1 /= in H3.
         * fill_enf_neq.
   Qed.
 
@@ -264,13 +259,7 @@ Section rules.
     [ match goal with
         | [ HE: estep _ _ _ _ |- _ ] =>
           inversion HE; subst;
-            [ idtac | exfalso;
-                match goal with
-                | [ HF: fill_expr (fill_ectxs ?E _) _ = _,
-                    HE2: estep ?E _ _ _ |- _ ] =>
-                    by eapply (escape_false HE2 HF)
-                end
-            ]
+            [ idtac | exfalso; by escape_false ]
       end
     | match goal with
         | [ HJ : jstep _ _ _ _ _ |- _ ] =>
@@ -574,7 +563,7 @@ Section rules.
     iNext. iIntros (e2 σ2 efs (Hcs&?)).
     iMod "Hclose". inversion_cstep_as Hes Hjs.
     { apply fill_estep_false in Hes=>//. }
-    inversion_jstep_as Hjs Heq.
+    inversion_jstep_as Heq.
     + fill_enf_neq.
     + apply cont_inj in Heq=>//.
       destruct Heq as [Heq ?]. inversion Heq. subst.

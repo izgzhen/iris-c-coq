@@ -28,4 +28,15 @@ including:
 
 \paragraph{$\refineM$ RA.}
 
-\texttt{rewrite_op_cfgs}: Simplify product of the configuration list component.
+\texttt{rewrite\_op\_cfgs}: Simplify product of the configuration list component.
+
+\subsection{Misc Tactics}
+
+\paragraph{Inversion. } \texttt{inversion\_estep}, \texttt{inversion\_cstep\_as}, and \texttt{inversion\_jstep\_as}
+are all designed to automatically match stepping relation assumption and give proper names to the important results
+produced by \texttt{inversion}.
+
+\paragraph{Evaluation Context Equality. } \texttt{gen\_eq <H> <E1> <E2> <KS>} can generate equalities
+between expressions \texttt{E1} and \texttt{E2}, and between \texttt{KS} and empty context.
+It assumes that both \texttt{E1} and \texttt{E2} are normal form, and there is equality between
+the filled ones: \texttt{fill\_ectxs E1 KS = E2}.

@@ -164,7 +164,7 @@ Lemma readbytes_segment σ bs': ∀ bs l,
   readbytes l (bs ++ bs') σ → readbytes l bs σ.
 Proof.
   induction bs=>//.
-  intros. destruct l. simpl. simpl in H.
+  intros. destruct l. simpl in *.
   destruct H. split=>//.
   by apply IHbs.
 Qed.
@@ -176,7 +176,7 @@ Proof.
   - intros. destruct l. unfold shift_loc. simpl.
     replace ([] ++ bs') with bs' in H=>//.
     replace (n + 0)%nat with n=>//.
-  - intros. destruct l. simpl. simpl in H.
+  - intros. destruct l. simpl in *.
     destruct H.
     specialize (IHbs _ H0).
     simpl in IHbs.
@@ -334,17 +334,15 @@ Inductive jnf: expr → Prop :=
 Global Hint Constructors jnf.
 
 Ltac solve_is_jmp_false :=
-  repeat (match goal with
-    | [ H: is_jmp _ = false |- _ ] => rewrite H
-  end);
-  match goal with
-    | [ H: is_jmp ?E1 || is_jmp ?E2 = false |- _ ] =>
-      destruct (is_jmp E1); destruct (is_jmp E2)=>//
-    | [ H: is_jmp ?E1 || is_jmp ?E2 || is_jmp ?E3 = false |- _ ] =>
-      destruct (is_jmp E1); destruct (is_jmp E2); destruct (is_jmp E3)=>//
-    | [ H: is_jmp ?E1 || is_jmp ?E2 || is_jmp ?E3 || is_jmp ?E4 = false |- _ ] =>
-      destruct (is_jmp E1); destruct (is_jmp E2); destruct (is_jmp E3); destruct (is_jmp E4)=>//
-  end.
+  repeat (
+      match goal with
+      | [ H: is_jmp _ = false |- _ ] => rewrite H
+      end);
+  repeat (
+      match goal with
+      | [ H : context [ is_jmp ?E ] |- _ ] => destruct (is_jmp E)
+      end);
+  auto.
 
 Lemma is_jmp_rec' e K:
   is_jmp (fill_expr e K) = false → is_jmp e = false.
@@ -576,6 +574,11 @@ Proof.
   apply to_val_is_val, fill_ectxs_not_val. by eapply estep_not_val.
 Qed.
 
+Lemma escape_false' {e a e' a2 kes k0}:
+  estep e a e' a2 →
+  enf (fill_expr (fill_ectxs e kes) k0) → False.
+Proof. intros Hes Henf. eapply escape_false=>//. Qed.
+
 Ltac gen_eq H E1 E2 KS :=
   replace E1 with (fill_ectxs E1 []) in H; last done;
   assert (E1 = E2 ∧ [] = KS) as [? ?];
@@ -660,13 +663,24 @@ Proof.
   eexists _, _. split=>//; split=>//.
 Qed.
 
+Tactic Notation "escape_false" :=
+  exfalso;
+  match goal with
+  | [ Hes: estep ?e ?a ?e' ?a2,
+      Heq: fill_expr (fill_ectxs ?e ?kes) ?k0 = ?e'' |- _ ] =>
+      by eapply (escape_false Hes Heq)=>//
+  | [ Hes: estep ?e ?a ?e' ?a2,
+      Henf: enf (fill_expr (fill_ectxs ?e ?kes) ?k) |- _ ] =>
+      by eapply (escape_false' Hes Henf)=>//
+  end.
+
 Lemma estep_call_false f ls σ1 e' σ2:
   estep (Ecall f (map (λ l, Evalue (Vptr l)) ls)) σ1 e' σ2 → False.
-Proof. intros. inversion H. subst. eapply (escape_false H2)=>//. Qed.
+Proof. inversion 1. subst. escape_false. Qed.
 
 Lemma estep_ret_false v σ1 e' σ2:
   estep (Erete (Evalue v)) σ1 e' σ2 → False.
-Proof. intros. inversion H. subst. eapply (escape_false H2)=>//. Qed.
+Proof. inversion 1. subst. escape_false. Qed.
 
 Lemma jnf_enf e: jnf e → enf e.
 Proof. by induction 1. Qed.
@@ -791,6 +805,25 @@ Inductive cstep: expr → state → expr → state → Prop :=
 | CSjstep:
     ∀ e e' h t s s' , jstep t e s e' s' → cstep e (State h t s) e' (State h t s').
 
+Ltac inversion_estep :=
+  match goal with [ H : estep _ _ _ _ |- _ ] => inversion H end.
+
+Ltac inversion_cstep_as Hes Hjs :=
+  match goal with
+    | [ Hcs : cstep _ _ _ _ |- _ ] =>
+      inversion Hcs as [???????Hes|???????Hjs]; subst
+  end.
+
+Ltac inversion_jstep_as Heq :=
+  match goal with
+  | [ Hjs: jstep _ _ _ _ _ |- _ ] =>
+    inversion Hjs as [?|?]; subst;
+    match goal with
+    | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] => rename H into Heq
+    | _ => idtac
+    end
+  end.
+
 Global Hint Constructors estep jstep cstep.
 
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
@@ -821,7 +854,7 @@ Lemma cstep_not_val {e σ e' σ'}:
 Proof.
   inversion 1; subst.
   - by eapply estep_not_val.
-  - inversion H0; by apply fill_ectxs_not_val.
+  - inversion_jstep_as Heq; by apply fill_ectxs_not_val.
 Qed.
 
 Lemma CSbind' e e' σ σ' k kes:
@@ -868,18 +901,11 @@ Proof.
       eapply fill_estep_inv in H=>//;
       destruct H as (e2'&?&?)
     end; exists e2'; split; [| split ]; auto.
-  - match goal with
-    | [ H : jstep _ _ _ _ _ |- _ ] =>
-      inversion H;
-        match goal with
-        | [ Heq : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
-          eapply cont_incl in Heq=>//;
-          destruct Heq as (?&?); subst
-        end
-    end.
+  - inversion_jstep_as Heq;
+    eapply cont_incl in Heq=>//;
+    destruct Heq as (?&?); subst.
     + by rewrite is_jmp_ret in Hnj.
     + by rewrite is_jmp_call in Hnj.
-    + constructor.
 Qed.
 
 Lemma estep_preserves_not_jmp' σ1 σ2:
@@ -892,7 +918,7 @@ Proof.
     inversion Hes=>//; subst; simpl in Hes=>//.
     + inversion Hjn. simpl. solve_is_jmp_false.
     + simpl in Hjn. exfalso.
-      eapply escape_false in H0=>//.
+      simpl in Henf. escape_false.
   - unfold P. intros e ks Henf Hind e2 Hjn Hes.
     inversion_cstep Henf ltac:(inversion Hjn).
     { subst. simpl. rewrite -H0 in Hjn. inversion Hjn. solve_is_jmp_false. }
@@ -922,9 +948,8 @@ Lemma cstep_preserves_not_jmp e σ1 e2' σ2:
   is_jmp e = false → cstep e σ1 e2' σ2 → is_jmp e2' = false.
 Proof.
   inversion 2; subst.
-  - inversion H1; subst=>//.
-    + simpl in H. simpl.
-      destruct (is_jmp cond); destruct (is_jmp s0)=>//.
+  - inversion_estep; subst=>//.
+    + simpl in *. solve_is_jmp_false.
     + by eapply estep_preserves_not_jmp.
   - exfalso. move:(cstep_not_val H0)=>Hn.
     by eapply (is_jmp_jstep_false []).
@@ -992,17 +1017,4 @@ Ltac fill_enf_neq :=
   | [ H : fill_ectxs _ _ = _ |- _ ] =>
     rewrite_empty_ctx; apply cont_inj in H=>//; by destruct H as [? ?]
   | _ => done
-  end.
-
-Ltac inversion_estep :=
-  match goal with [ H : estep _ _ _ _ |- _ ] => inversion H end.
-
-
-Ltac inversion_cstep_as Hes Hjs :=
-  inversion Hcs as [???????Hes|???????Hjs]; subst.
-
-Ltac inversion_jstep_as Hjs Heq :=
-  inversion Hjs as [?|?]; subst;
-  match goal with
-  | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] => rename H into Heq
   end.

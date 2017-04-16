@@ -1,6 +1,7 @@
 From iris.prelude Require Export prelude.
 From iris.algebra Require Import cmra dra cmra_tactics.
 From iris_os.os Require Import spec.
+From iris_os.lib Require Import prelude.
 
 Section algebra.
   Inductive view : Set := master | snapshot.
@@ -64,36 +65,6 @@ Section algebra.
 
   Instance op_cfgs: Op (list cfg) :=
     λ cs1 cs2, if (Nat.leb (length cs1) (length cs2)) then cs2 else cs1.
-
-  Lemma leb_trans (x y z: nat):
-    (x <=? y) = true →
-    (y <=? z) = true →
-    (x <=? z) = true.
-  Proof.
-    intros Hxy Hyz.
-    apply Nat.leb_le in Hxy. apply Nat.leb_le in Hyz.
-    move : (le_trans _ _ _ Hxy Hyz) => Hxz.
-    by apply Nat.leb_le.
-  Qed.
-
-  Lemma gtb_trans (x y z: nat):
-    (x <=? y) = false →
-    (y <=? z) = false →
-    (x <=? z) = false.
-  Proof.
-    intros Hxy Hyz.
-    apply Nat.leb_gt in Hxy.
-    apply Nat.leb_gt in Hyz. move: (lt_trans _ _ _ Hyz Hxy)=>Hzx.
-    by apply Nat.leb_gt.
-  Qed.
-
-  Lemma leb_cancel_false (c: cfg) (l1 l2: list cfg):
-    length (c :: l1) + length l2 <=? length l2 = false.
-  Proof. rewrite Nat.leb_gt. simpl. omega. Qed.
-
-  Lemma leb_cancel_true (c: cfg) (l1 l2: list cfg):
-    length l2 <=? length (c :: l1 ++ l2) = true.
-  Proof. rewrite Nat.leb_le. simpl. rewrite app_length. omega. Qed.
   
   Instance assoc_op_cfgs: Assoc (@eq (list cfg)) (⋅).
   Proof.
@@ -290,7 +261,8 @@ Section algebra.
 
   Definition refine_cmra := (validity (refineDR)).
 
-  Global Instance refine_empty : Empty (refine_cmra) := to_validity (refine_car_empty).
+  Global Instance refine_empty : Empty (refine_cmra) :=
+    to_validity (refine_car_empty).
 
   Lemma refine_unit: UCMRAMixin (refine_cmra).
   Proof.

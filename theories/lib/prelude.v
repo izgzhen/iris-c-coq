@@ -60,3 +60,35 @@ Qed.
 
 Global Instance int32_countable: Countable int32 :=
   Build_Countable _ _ int32_encode int32_decode int32_decode_encode.
+
+Close Scope Z_scope.
+
+Lemma leb_trans (x y z: nat):
+  (x <=? y) = true →
+  (y <=? z) = true →
+  (x <=? z) = true.
+Proof.
+  intros Hxy Hyz.
+  apply Nat.leb_le in Hxy. apply Nat.leb_le in Hyz.
+  apply Nat.leb_le.
+  by eapply le_trans.
+Qed.
+
+Lemma gtb_trans (x y z: nat):
+  (x <=? y) = false →
+  (y <=? z) = false →
+  (x <=? z) = false.
+Proof.
+  intros Hxy Hyz.
+  apply Nat.leb_gt in Hxy.
+  apply Nat.leb_gt in Hyz. apply Nat.leb_gt.
+  by eapply lt_trans.
+Qed.
+
+Lemma leb_cancel_false {A: Type} (c: A) (l1 l2: list A):
+  length (c :: l1) + length l2 <=? length l2 = false.
+Proof. rewrite Nat.leb_gt. simpl. omega. Qed.
+
+Lemma leb_cancel_true {A: Type} (c: A) (l1 l2: list A):
+  length l2 <=? length (c :: l1 ++ l2) = true.
+Proof. rewrite Nat.leb_le. simpl. rewrite app_length. omega. Qed.
