@@ -462,6 +462,7 @@
 \newcommand{\estep}[4]{({#1}, {#2}) \ra_{local} ({#3}, {#4})}
 \newcommand{\jstep}[5]{({#2}, {#3}) \ra_{jump}^{#1} ({#4}, {#5})}
 \newcommand{\cstep}[4]{({#1}, {#2}) \ra_c ({#3}, {#4})}
+\newcommand{\cstepN}[5]{({#1}, {#2}) \ra^{#5}_c ({#3}, {#4})}
 \newcommand{\sstep}[4]{({#1}, {#2}) \ra_{spec} ({#3}, {#4})}
 \newcommand{\sstepstar}[4]{({#1}, {#2}) \ra^{*}_{spec} ({#3}, {#4})}
 
@@ -564,5 +565,7 @@
 \newcommand{\assigncomp}[2]{\mathrm{assign\any compatible}({#1} \la {#2})}
 
 \newcommand*{\xxx}[1]{{\color{red}\textbf{XXX: #1}}}
+
+\newcommand{\simulate}{\Downarrow}
 
 \endinput

@@ -89,3 +89,26 @@ using the following derived rules:
  \proves \upd \knowInv{\iname}{I_\refineM} * \Sstate(\sstate') *
          \Scode(\scode') * \snap(\sstate', \scode')}
 \end{mathpar}
+
+\subsection{Soundness}
+
+First we define the simulation relationship between the $\Expr$ and $\SpecCode$:
+
+\begin{mathpar}
+\infer{}{v \simulate \texttt{done}(v)}
+
+\infer
+    {\cstep{e}{\sigma}{e'}{\sigma'} \quad \sstepstar{\scode}{\sstate}{\scode'}{\sstate'}}
+    {e \simulate c}
+\end{mathpar}
+
+Our final soundness lemma, which is proved in Coq, is like below (the step indexing part is simplified away):
+
+\begin{align*}
+\infer{\cstepN{e}{\sigma}{v}{\sigma'}{*}}
+{
+    \text{world}(\sigma) * (\knowInv{\iname}{I_\refineM} * \Sstate(\sstate) * \Scode(\scode)) *
+    \wpre{e}{\Ret v. \Sstate(\sstate') * \Scode(\texttt{done}(v)) }  \proves
+    v \simulate c
+}
+\end{align*}
