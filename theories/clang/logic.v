@@ -50,7 +50,7 @@ Section wp.
 
   Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
     (⌜ typeof v t ⌝ ∗ mapstobytes l q (encode_val v))%I.
-
+  
 End wp.
 
 Instance heapG_irisG `{clangG Σ}: irisG clang_lang Σ := {
@@ -71,6 +71,18 @@ Notation "l ↦ - @ t" := (l ↦{1} - @ t)%I (at level 20) : uPred_scope.
 Section rules.
   Context `{clangG Σ}.
 
+  Global Instance timeless_mapstobytes q bs p: TimelessP (mapstobytes p q bs)%I.
+  Proof.
+    generalize bs p.
+    induction bs0; destruct p0; first apply _.
+    simpl.
+    assert (TimelessP (mapstobytes (b, (n + 1)%nat) q bs0)) as ?; first done.
+    apply _.
+  Qed.
+
+  Global Instance timeless_mapstoval p q v t : TimelessP (p ↦{q} v @ t)%I.
+  Proof. rewrite /mapstoval. apply _. Qed.
+  
   Lemma wp_bind' kes E e Φ :
     ⌜ is_jmp e = false ⌝ ∗
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }}
@@ -247,13 +259,21 @@ Section rules.
       by iFrame.
   Qed.
 
-  Ltac absurd_jstep :=
+  Ltac absurd_jstep' :=
     match goal with
       | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
         replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
               by destruct HF
     end.
 
+  Ltac absurd_jstep Hjs :=
+    inversion Hjs; subst;
+    [ match goal with
+      | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
+          by rewrite /unfill HF /= in HU
+      end
+    | absurd_jstep' ].
+  
   Ltac atomic_step H :=
     inversion H; subst;
     [ match goal with
@@ -262,13 +282,7 @@ Section rules.
             [ idtac | exfalso; by escape_false ]
       end
     | match goal with
-        | [ HJ : jstep _ _ _ _ _ |- _ ] =>
-          inversion HJ; subst;
-          [ match goal with
-              | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-                  by rewrite /unfill HF /= in HU
-            end
-          | absurd_jstep ]
+        | [ HJ : jstep _ _ _ _ _ |- _ ] => absurd_jstep HJ
       end
     ].
 
@@ -313,7 +327,7 @@ Section rules.
       replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
       iApply IHl. iFrame.
   Qed.
-
+  
   Lemma mapstoval_split b o q v1 v2 t1 t2:
     (b, o) ↦{q} Vpair v1 v2 @ Tprod t1 t2 ⊢
     (b, o) ↦{q} v1 @ t1 ∗ (b, o + sizeof t1)%nat ↦{q} v2 @ t2.
@@ -348,18 +362,6 @@ Section rules.
       iPureIntro. auto.
   Qed.
 
-  Instance timeless_mapstobytes q bs p: TimelessP (mapstobytes p q bs)%I.
-  Proof.
-    generalize bs p.
-    induction bs0; destruct p0; first apply _.
-    simpl.
-    assert (TimelessP (mapstobytes (b, (n + 1)%nat) q bs0)) as ?; first done.
-    apply _.
-  Qed.
-
-  Instance timeless_mapstoval p q v t : TimelessP (p ↦{q} v @ t)%I.
-  Proof. rewrite /mapstoval. apply _. Qed.
-
   Ltac solve_red :=
     match goal with
     | [ |- reducible _ ?σ ] =>
@@ -385,6 +387,62 @@ Section rules.
     iApply ("HΦ" with "[-]") ; first by iSplit=>//.
   Qed.
 
+  Lemma wp_cas_fail Φ E l t q v' v1 v2 :
+    v' ≠ v1 → typeof v1 t → typeof v2 t → (* too strong, should mimick wp_assign *)
+    ▷ l ↦{q} v' @ t ∗ ▷ (l ↦{q} v' @ t -∗ Φ vfalse)
+    ⊢ WP ECAS_typed t (Evalue (Vptr l)) (Evalue v1) (Evalue v2) @ E {{ Φ }}.
+  Proof.
+    iIntros (???) "[Hl HΦ]".
+    iApply wp_lift_atomic_step=>//.
+    iIntros (σ1) "[Hσ [HΓ Hs]]".
+    unfold mapstoval.
+    iDestruct "Hl" as "[>% >Hl]".
+    iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
+    iModIntro. iSplit; first eauto.
+    { iPureIntro. eexists _, σ1, []. split=>//.
+      destruct σ1. constructor. econstructor=>//. }
+    iNext; iIntros (s2 σ2 Hstep). iModIntro.
+    inversion_cstep_as Hes Hjs; subst.
+    - inversion Hes; subst.
+      + escape_false.
+      + iFrame. iApply ("HΦ" with "[-]").
+        iSplitR=>//.
+      + simpl in *.
+        rewrite (same_type_encode_inj h t v' v1 l) in H0=>//.
+    - absurd_jstep Hjs.
+  Qed.
+
+  Lemma wp_cas_suc Φ E l t v v2 :
+    typeof v t → typeof v2 t → (* too strong, should mimick wp_assign *)
+    ▷ l ↦ v @ t ∗ ▷ (l ↦ v2 @ t -∗ Φ vtrue)
+    ⊢ WP ECAS_typed t (Evalue (Vptr l)) (Evalue v) (Evalue v2) @ E {{ Φ }}.
+  Proof.
+    iIntros (??) "[Hl HΦ]".
+    iApply wp_lift_atomic_step=>//.
+    iIntros (σ1) "[Hσ [HΓ Hs]]".
+    unfold mapstoval.
+    iDestruct "Hl" as "[>% >Hl]".
+    iDestruct (mapsto_readbytes with "[Hσ Hl]") as "%"; first iFrame.
+    iModIntro. iSplit; first eauto.
+    { iPureIntro. destruct σ1. eexists _, _, []. split=>//.
+      constructor. apply ESCASSuc=>//. }
+    iNext; iIntros (s2 σ2 Hstep).
+    inversion_cstep_as Hes Hjs; subst.
+    - inversion Hes; subst.
+      + escape_false.
+      + exfalso. simpl in *.
+        rewrite (same_type_encode_inj h' t v vl l) in H15=>//.
+      + simpl in *. iFrame.
+        iMod (gen_heap_update_bytes _ (encode_val v)
+                                         _ (encode_val v2)
+                   with "Hσ Hl") as "[H ?]".
+        { rewrite -(typeof_preserves_size v t)=>//.
+          rewrite -(typeof_preserves_size v2 t)=>//. }
+        iFrame. iModIntro. iApply "HΦ".
+        iSplit=>//.
+    - absurd_jstep Hjs.
+  Qed.
+  
   Ltac wp_solve_pure :=
     iApply wp_lift_pure_step; first eauto;
     [ intros; solve_red |
@@ -578,4 +636,7 @@ Section rules.
       by rewrite big_sepL_nil.
   Qed.
 
+
+  
+    
 End rules.

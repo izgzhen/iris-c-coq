@@ -24,6 +24,7 @@ Definition tid := nat.
 Inductive expr :=
 | Evalue (v: val)
 | Evar (x: ident)
+| ECAS_typed (t: type) (e1 e2 e3: expr)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
 | Ederef (e: expr)
 | Ederef_typed (t: type) (e: expr)
@@ -50,6 +51,9 @@ Record function :=
 Inductive exprctx :=
 | EKbinopr (op: bop) (re: expr)
 | EKbinopl (op: bop) (lv: val)
+| EKCASl (t: type) (e1 e2: expr)
+| EKCASm (t: type) (l0: addr) (e2: expr)
+| EKCASr (t: type) (l0: addr) (v1: val)
 | EKderef_typed (t: type)
 | EKaddrof
 | EKfst
@@ -74,6 +78,7 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
     | Evalue v => Some (type_infer_v v)
     | Evar x => p ← sget x (lenv ev); Some (p.1)
     | Ebinop _ e1 _ => type_infer ev e1 (* FIXME *)
+    | ECAS_typed t _ e1 _ => Some t
     | Ederef e' =>
       (match type_infer ev e' with
          | Some (Tptr t) => Some t
@@ -100,6 +105,9 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
   match Ke with
     | EKbinopr op re => Ebinop op e re
     | EKbinopl op lv => Ebinop op (Evalue lv) e
+    | EKCASl t e1 e2 => ECAS_typed t e e1 e2
+    | EKCASm t l0 e2 => ECAS_typed t (Evalue (Vptr l0)) e e2
+    | EKCASr t l0 v1 => ECAS_typed t (Evalue (Vptr l0)) (Evalue v1) e
     | EKderef_typed t => Ederef_typed t e
     | EKaddrof => Eaddrof e
     | EKfst => Efst e
@@ -115,7 +123,6 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
   end.
 
 Definition fill_ectxs := foldr (λ x y, fill_expr y x).
-
 Definition heap := gmap addr byteval.
 Definition text := gmap ident function.
 Definition cont := list exprctx.
@@ -156,8 +163,10 @@ Definition evalbop (op: bop) v1 v2 : option val :=
 
 Fixpoint readbytes l bs (σ: heap) :=
   match bs with
-    | byte::bs' => let '(b, o) := l in σ !! l = Some byte ∧ readbytes (b, o + 1)%nat bs' σ
-    | _ => True
+  | byte::bs' =>
+    let '(b, o) := l in
+    σ !! l = Some byte ∧ readbytes (b, o + 1)%nat bs' σ
+  | _ => True
   end.
 
 Lemma readbytes_segment σ bs': ∀ bs l,
@@ -186,11 +195,14 @@ Qed.
 
 Fixpoint storebytes l bs (σ: heap) :=
   match bs with
-    | byte::bs' => let '(b, o) := l in <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
-    | _ => σ
+  | byte::bs' =>
+    let '(b, o) := l in
+    <[ l := byte ]> (storebytes (b, o + 1)%nat bs' σ)
+  | _ => σ
   end.
 
-Definition alloc_heap (l: addr) (v: val) (σ: heap) : heap := storebytes l (encode_val v) σ.
+Definition alloc_heap (l: addr) (v: val) (σ: heap) : heap :=
+  storebytes l (encode_val v) σ.
 
 Definition to_val (c: expr) :=
   match c with
@@ -207,7 +219,8 @@ Proof. induction e; crush. Qed.
 Lemma fill_ectx_not_val e K: to_val (fill_expr e K) = None.
 Proof. induction K; crush. Qed.
 
-Lemma fill_ectxs_not_val Kes: ∀ e, to_val e = None → to_val (fill_ectxs e Kes) = None.
+Lemma fill_ectxs_not_val Kes:
+  ∀ e, to_val e = None → to_val (fill_ectxs e Kes) = None.
 Proof. induction Kes; first by inversion 1.
        intros. simpl. apply fill_ectx_not_val.
 Qed.
@@ -260,6 +273,11 @@ Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
         | Some s1', Some s2' => Some (Eseq s1' s2')
         | _, _ => None
       end
+    | ECAS_typed t e1 e2 e3 =>
+      match resolve_rhs ev e1, resolve_rhs ev e2, resolve_rhs ev e3 with
+        | Some e1', Some e2', Some e3' => Some (ECAS_typed t e1' e2' e3')
+        | _, _, _ => None
+      end
   end.
 
 Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
@@ -288,7 +306,7 @@ Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
     | Eassign e1 e2 => e'' ← resolve_lhs ev e1; Some (Eassign e'' e2)
     | Eif ex s1 s2 =>
       match resolve_lhs ev s1, resolve_lhs ev s2 with
-        | Some s1', Some s2' => Some (Eif ex s1' s2')
+      | Some s1', Some s2' => Some (Eif ex s1' s2')
         | _, _ => None
       end
     | Ewhile c ex s => Ewhile c ex <$> resolve_lhs ev s
@@ -297,13 +315,19 @@ Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
         | Some s1', Some s2' => Some (Eseq s1' s2')
         | _, _ => None
       end
+    | ECAS_typed t e1 e2 e3 =>
+      match resolve_lhs ev e1, resolve_lhs ev e2, resolve_lhs ev e3 with
+        | Some e1', Some e2', Some e3' => Some (ECAS_typed t e1' e2' e3')
+        | _, _, _ => None
+      end
     | Erete e => Some (Erete e)
   end.
 
 Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
   match params, ls with
-    | (x, t)::ps, l::ls' => add_params_to_env (Env (sset x (t, l) (lenv e)) (fenv e)) ps ls'
-    | _, _ => e
+  | (x, t)::ps, l::ls' =>
+    add_params_to_env (Env (sset x (t, l) (lenv e)) (fenv e)) ps ls'
+  | _, _ => e
   end.
 
 Definition instantiate_f_body (ev: env) (s: expr) : option expr :=
@@ -324,6 +348,7 @@ Fixpoint is_jmp (e: expr) :=
     | Eif e1 e2 e3 => is_jmp e1 || is_jmp e2 || is_jmp e3
     | Eseq e1 e2 => is_jmp e1 || is_jmp e2
     | Ewhile c e e2 => is_jmp e || is_jmp c || is_jmp e2
+    | ECAS_typed t e1 e2 e3 => is_jmp e1 || is_jmp e2 || is_jmp e3
     | _ => false
   end.
 
@@ -407,7 +432,19 @@ Inductive estep : expr → heap → expr → heap → Prop :=
       is_jmp e = false →
       estep e σ e' σ' →
       estep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'
-.
+| ESCASFail l t v1 v2 vl σ :
+    typeof v1 t →
+    typeof v2 t →
+    typeof vl t →
+    readbytes l (encode_val vl) σ → vl ≠ v1 →
+    estep (ECAS_typed t (Evalue (Vptr l)) (Evalue v1) (Evalue v2)) σ
+          (Evalue vfalse) σ
+| ESCASSuc l t v1 v2 σ :
+    typeof v1 t →
+    typeof v2 t →
+    readbytes l (encode_val v1) σ →
+    estep (ECAS_typed t (Evalue (Vptr l)) (Evalue v1) (Evalue v2)) σ
+          (Evalue vtrue) (storebytes l (encode_val v2) σ).
 
 Lemma ESbind:
     ∀ kes e e' σ σ',
@@ -479,19 +516,19 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
         | _, _ => unfill_expr e1 (EKassignr e2 :: ks)
       end
     | Eif e1 e2 e3 =>
-      match e with
-        | Evalue v => Some (ks, e)
+      match e1 with
+        | Evalue _ => Some (ks, e)
         | _ => unfill_expr e1 (EKif e2 e3 :: ks)
       end
-    | Ewhile c e s =>
-      match e with
+    | Ewhile c e1 s =>
+      match e1 with
         | Evalue v => Some (ks, e)
-        | _ => unfill_expr e (EKwhile c s :: ks)
+        | _ => unfill_expr e1 (EKwhile c s :: ks)
       end
-    | Erete e =>
-      match e with
-        | Evalue v => Some (ks, Erete e)
-        | _ => unfill_expr e (EKrete :: ks)
+    | Erete e1 =>
+      match e1 with
+        | Evalue v => Some (ks, e)
+        | _ => unfill_expr e1 (EKrete :: ks)
       end
     | Eseq e1 e2 =>
       match e with
@@ -502,6 +539,13 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
       if forallb is_val es
         then Some (ks, e)
         else None (* Unsound *)
+    | ECAS_typed t e1 e2 e3 =>
+      match e1, e2, e3 with
+      | Evalue (Vptr l), Evalue v2, Evalue v3 => Some (ks, e)
+      | Evalue (Vptr l), Evalue v2, _ => unfill_expr e3 (EKCASr t l v2 :: ks)
+      | Evalue (Vptr l), _, _ => unfill_expr e2 (EKCASm t l e3 :: ks)
+      | _, _, _ => unfill_expr e1 (EKCASl t e2 e3 :: ks)
+      end
     | _ => None
   end.
 
@@ -518,7 +562,9 @@ Inductive enf: expr → Prop :=
   | NFassign: ∀ l v, enf (Eassign (Evalue (Vptr l)) (Evalue v))
   | NFif: ∀ v e2 e3, enf (Eif (Evalue v) e2 e3)
   | NFseq: ∀ v e2, enf (Eseq (Evalue v) e2)
-  | NFwhile: ∀ c v s, enf (Ewhile c (Evalue v) s).
+  | NFwhile: ∀ c v s, enf (Ewhile c (Evalue v) s)
+  | NFCAS: ∀ l t v1 v2, enf (ECAS_typed t (Evalue (Vptr l))
+                                        (Evalue v1) (Evalue v2)).
 
 Global Hint Constructors enf.
 
@@ -531,7 +577,9 @@ Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
 Axiom cont_uninj: ∀ kes e, enf e → unfill e kes.
-Axiom cont_uninj': ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
+
+Axiom cont_uninj':
+  ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
 
 Arguments cont_uninj' {_ _ _} _.
 
@@ -993,9 +1041,7 @@ Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ' ∧ efs = [].
 
 Lemma step_not_val e σ e' σ' efs:
   step e σ e' σ' efs → to_val e = None.
-Proof.
-  destruct 1. by eapply cstep_not_val.
-Qed.
+Proof. destruct 1. by eapply cstep_not_val. Qed.
 
 Definition clang_lang :=
   Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
