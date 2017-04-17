@@ -14,9 +14,15 @@ Section spin_lock.
   Parameter lk: val.
 
   Definition acquire : expr :=
-    while [Ebinop oequals (ECAS_typed tybool lk vfalse vtrue) vfalse]
-          (Ebinop oequals (ECAS_typed tybool lk vfalse vtrue) vfalse)
+    while [ECAS_typed tybool lk vfalse vtrue == vfalse]
+          (ECAS_typed tybool lk vfalse vtrue == vfalse )
     <{ void }>.
+
+  Definition newlock : expr :=
+    Ealloc tybool vfalse.
+
+  Definition release : expr :=
+    lk <- vfalse.
 
   Context `{!clangG Σ, !lockG Σ} (N: namespace).
 
@@ -40,9 +46,26 @@ Section spin_lock.
   Proof. apply _. Qed.
   Global Instance locked_timeless γ : TimelessP (locked γ).
   Proof. apply _. Qed.
-  
+
+  Lemma locked_exclusive (γ : gname) : locked γ -∗ locked γ -∗ False.
+  Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
+
+  Lemma newlock_spec (R : iProp Σ) Φ:
+    R ∗ (∀ γ lk, is_lock γ lk R -∗ Φ lk) ⊢ WP newlock {{ Φ }}.
+  Proof.
+    iIntros "[HR HΦ]".
+    rewrite -wp_fupd /newlock /=.
+    iApply wp_alloc.
+    { constructor. }
+    iIntros (l) "Hl".
+    iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
+    iMod (inv_alloc N _ (lock_inv γ l R) with "[-HΦ]") as "#?".
+    { iIntros "!>". iExists false. by iFrame. }
+    iModIntro. iApply "HΦ". iExists l. eauto.
+  Qed.
+
   Lemma acquire_spec γ R Φ:
-    is_lock γ lk R ∗ (locked γ -∗ R -∗ Φ Vvoid)
+    is_lock γ lk R ∗ (locked γ -∗ R -∗ Φ void)
     ⊢ WP acquire {{ Φ }}.
   Proof.
     iLöb as "IH".
@@ -67,4 +90,24 @@ Section spin_lock.
       iDestruct "HR" as "[Ho HR]".
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
+
+  Lemma release_spec γ R Φ:
+    is_lock γ lk R ∗ locked γ ∗ R ∗ Φ void
+    ⊢ WP release {{ Φ }}.
+  Proof.
+    iIntros "(#Hlk & Hlked & HR & HΦ)".
+    unfold release.
+    iDestruct "Hlk" as (l) "[% ?]". rewrite H.
+    iApply wp_atomic.
+    { by apply atomic_enf. }
+    iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
+    - simpl. iApply wp_assign; last iFrame.
+      { apply typeof_int8. }
+      { constructor. }
+      iNext. iIntros "Hl". iMod ("Hclose" with "[-]")=>//.
+      iNext. iExists false. iFrame.
+    - iDestruct "HR'" as "[>Ho' HR']".
+      by iDestruct (locked_exclusive with "Hlked Ho'") as "%".
+  Qed.
+
 End spin_lock.

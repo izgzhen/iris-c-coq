@@ -65,7 +65,7 @@ Section algebra.
 
   Instance op_cfgs: Op (list cfg) :=
     λ cs1 cs2, if (Nat.leb (length cs1) (length cs2)) then cs2 else cs1.
-  
+
   Instance assoc_op_cfgs: Assoc (@eq (list cfg)) (⋅).
   Proof.
     intros ???; unfold op, op_cfgs.
@@ -172,7 +172,7 @@ Section algebra.
     inversion 1. inversion 1.
     simplify_eq. by eapply suffix_app.
   Qed.
-  
+
   Lemma refine_dra : DRAMixin refine_car.
   Proof.
     split; try apply _; auto.

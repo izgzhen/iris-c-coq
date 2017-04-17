@@ -50,7 +50,7 @@ Section wp.
 
   Definition mapstoval (l: addr) (q: Qp) (v: val) (t: type) : iProp Σ :=
     (⌜ typeof v t ⌝ ∗ mapstobytes l q (encode_val v))%I.
-  
+
 End wp.
 
 Instance heapG_irisG `{clangG Σ}: irisG clang_lang Σ := {
@@ -82,7 +82,7 @@ Section rules.
 
   Global Instance timeless_mapstoval p q v t : TimelessP (p ↦{q} v @ t)%I.
   Proof. rewrite /mapstoval. apply _. Qed.
-  
+
   Lemma wp_bind' kes E e Φ :
     ⌜ is_jmp e = false ⌝ ∗
     WP e @ E {{ v, WP (fill_ectxs (Evalue v) kes) @ E {{ Φ }} }}
@@ -159,7 +159,7 @@ Section rules.
     iMod (own_pair_update with "[-]") as "[? [? %]]"; first iFrame.
     inversion H0. by iFrame.
   Qed.
-  
+
   Lemma wp_ret k k' ks v E Φ:
     own_stack (k'::ks) ∗
     (own_stack ks -∗ WP fill_ectxs (Evalue v) k' @ E {{ Φ }})
@@ -300,7 +300,7 @@ Section rules.
       replace (o + S (length l))%nat with ((o + 1) + length l)%nat; last omega.
       iApply IHl. iFrame.
   Qed.
-  
+
   Lemma mapstoval_split b o q v1 v2 t1 t2:
     (b, o) ↦{q} Vpair v1 v2 @ Tprod t1 t2 ⊢
     (b, o) ↦{q} v1 @ t1 ∗ (b, o + sizeof t1)%nat ↦{q} v2 @ t2.
@@ -415,7 +415,7 @@ Section rules.
         iSplit=>//.
     - absurd_jstep Hjs.
   Qed.
-  
+
   Ltac wp_solve_pure :=
     iApply wp_lift_pure_step; first eauto;
     [ intros; solve_red |
@@ -424,7 +424,7 @@ Section rules.
       let Hcs := fresh "Hcs" in
       iIntros (????(Hcs&?));
       atomic_step Hcs; iSplitL; last by rewrite big_sepL_nil ].
-  
+
   Lemma wp_op E op v1 v2 v' Φ:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP Ebinop op (Evalue v1) (Evalue v2) @ E {{ Φ }}.
@@ -571,7 +571,7 @@ Section rules.
     by iDestruct (own_valid_2 with "HΓ Hf")
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
-  
+
   Lemma wp_call {E k ks es} ls params f_body f_body' f retty Φ:
     es = map (fun l => Evalue (Vptr l)) ls →
     instantiate_f_body (add_params_to_env (Env [] []) params ls)
@@ -610,6 +610,6 @@ Section rules.
   Qed.
 
 
-  
-    
+
+
 End rules.
