@@ -1,5 +1,3 @@
-Definition btrue : bool := true.
-
 From iris_os.clang Require Import logic notations tactics.
 From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import wsat fancy_updates.
@@ -70,7 +68,7 @@ Section spin_lock.
       { constructor. }
       iNext. iFrame. iIntros "Hl'".
       iMod ("Hclose" with "[-HΦ HR]").
-      { iNext. iExists btrue. iFrame. }
+      { iNext. iExists true. iFrame. }
       iModIntro.
       wp_run. iNext. wp_run. iDestruct "HR" as "[Ho HR]".
       iApply ("HΦ" with "[-HR]")=>//.

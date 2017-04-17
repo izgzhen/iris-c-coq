@@ -9,8 +9,6 @@ Coercion Evar : ident >-> expr.
 
 Notation "'void'" := Vvoid.
 Notation "'null'" := Vnull.
-Notation "'true'" := vtrue : expr_scope.
-Notation "'false'" := vfalse : expr_scope.
 Notation "# v" := (Evalue v) (at level 8) : expr_scope.
 Notation "!? e" := (Ederef e%E) (at level 9, right associativity) : expr_scope.
 Notation "! e @ t" := (Ederef_typed t e%E) (at level 9, right associativity) : expr_scope.
