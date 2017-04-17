@@ -49,7 +49,7 @@ Section example.
     iFrame. iNext. iIntros "Hstk".
     wp_bind (Ealloc _ _). iApply wp_alloc=>//. iIntros (px) "Hpx".
     iApply wp_let=>//. iNext.
-    iApply wp_seq=>//. { apply cli_nj. }
+    iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
@@ -60,11 +60,7 @@ Section example.
     { apply spec_step_rel'. unfold f_rel. eexists _. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-    wp_run. iApply wp_seq=>//. { apply sti_nj. } iApply sti_spec.
-    iFrame. iFrame "#".  iSplitL "Hss' Hy".
-    { iExists _. iFrame. by rewrite Int.add_commut. }
-    iIntros "Hp". wp_run. iFrame.
-    iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
+    wp_run. iFrame. iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
   Qed.
 
 End example.
