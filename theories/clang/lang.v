@@ -1046,53 +1046,71 @@ Proof. destruct 1. by eapply cstep_not_val. Qed.
 Definition clang_lang :=
   Language expr val state Evalue to_val step to_of_val of_to_val step_not_val.
 
-  Ltac absurd_jstep' :=
-    match goal with
-      | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
-        replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
-              by destruct HF
-    end.
+Ltac absurd_jstep' :=
+  match goal with
+  | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
+    replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
+      by destruct HF
+  end.
 
-  Ltac absurd_jstep Hjs :=
-    inversion Hjs; subst;
-    [ match goal with
-      | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-          by rewrite /unfill HF /= in HU
-      end
-    | absurd_jstep' ].
-  
-  Ltac atomic_step H :=
-    inversion H; subst;
-    [ match goal with
-        | [ HE: estep _ _ _ _ |- _ ] =>
-          inversion HE; subst;
-            [ idtac | exfalso; by escape_false ]
-      end
-    | match goal with
-        | [ HJ : jstep _ _ _ _ _ |- _ ] => absurd_jstep HJ
-      end
-    ].
+Ltac absurd_jstep Hjs :=
+  inversion Hjs; simplify_eq;
+  [ match goal with
+    | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
+        by rewrite /unfill HF /= in HU
+    end
+  | absurd_jstep' ].
+
+Ltac atomic_step H :=
+  inversion H; subst;
+  [ match goal with
+    | [ HE: estep _ _ _ _ |- _ ] =>
+      inversion HE; subst;
+      [ idtac | exfalso; by escape_false ]
+    end
+  | match goal with
+    | [ HJ : jstep _ _ _ _ _ |- _ ] => absurd_jstep HJ
+    end
+  ].
 
 Definition clang_atomic (e: expr) :=
   match e with
   | ECAS_typed t e1 e2 e3 => bool_decide (is_loc e1 ∧ is_val e2 ∧ is_val e3)
+  | Ederef_typed t e => bool_decide (is_loc e)
+  | Ealloc t e => bool_decide (is_val e)
+  | Eassign e1 e2 => bool_decide (is_loc e1 ∧ is_val e2)
   | _ => false
   end.
 
 Lemma atomic_enf e:
   clang_atomic e → language.atomic (e: language.expr clang_lang).
 Proof.
-  - destruct e=>//. destruct e1=>//. destruct v=>//.
-    destruct e2=>//. destruct e3=>//.
-    intros _. intros ???? [Hcs ?].
-    intros ??? [Hcs' ?].
-    inversion Hcs.
-    + inversion H1; subst.
-      * exfalso; by escape_false.
-      * apply cstep_not_val in Hcs'. done.
-      * apply cstep_not_val in Hcs'. done.
-    + absurd_jstep H1.
-Qed.
+  - intros ????? [Hcs ?]. apply language.val_irreducible.
+    destruct e=>//.
+    + destruct e1=>//. destruct v=>//.
+      destruct e2=>//. destruct e3=>//.
+      inversion_cstep_as Hes Hjs.
+      { inversion Hes; subst=>//;
+        ((exfalso; by escape_false) || (simpl; by eauto)). }
+      { absurd_jstep Hjs. }
+    + destruct e=>//. inversion_cstep_as Hes Hjs.
+      inversion_cstep_as Hes Hjs.
+      { inversion Hes; subst=>//;
+        ((exfalso; by escape_false) || (simpl; by eauto)). }
+      { absurd_jstep Hjs. }
+      { absurd_jstep Hjs. }
+    + destruct e=>//. inversion_cstep_as Hes Hjs.
+      inversion_cstep_as Hes Hjs.
+      { inversion Hes; subst=>//;
+        ((exfalso; by escape_false) || (simpl; by eauto)). }
+      { absurd_jstep Hjs. }
+      { absurd_jstep Hjs. }
+    + destruct e1=>//. destruct v=>//. destruct e2=>//.
+      inversion_cstep_as Hes Hjs.
+      { inversion Hes; subst=>//;
+        ((exfalso; by escape_false) || (simpl; by eauto)). }
+      { absurd_jstep Hjs. }
+Qed. (* FIXME: prettify the proof *)
 
 Lemma empty_ctx e: e = fill_ectxs e []. done. Qed.
 
