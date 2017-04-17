@@ -53,24 +53,18 @@ Section spin_lock.
     iApply wp_atomic.
     { by apply atomic_enf. }
     iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro.
-    - iApply wp_cas_fail; last iFrame; first by simpl.
-      { constructor. }
-      { constructor. }
-      iNext. iIntros "Hl".
-      iMod ("Hclose" with "[-HΦ]"). 
+    - wp_cas_fail.
+      iIntros "Hl".
+      iMod ("Hclose" with "[-HΦ]").
       { iNext. iExists _. iFrame. }
-      iModIntro.
-      wp_run. iNext. wp_run.
-      iApply "IH".
-       iFrame. iExists _. iSplit=>//.
-    - iApply wp_cas_suc.
-      { constructor. }
-      { constructor. }
-      iNext. iFrame. iIntros "Hl'".
+      iModIntro. wp_run. iNext. wp_run.
+      iApply "IH". iFrame. iExists _. iSplit=>//.
+    - wp_cas_suc.
+      iIntros "Hl'".
       iMod ("Hclose" with "[-HΦ HR]").
       { iNext. iExists true. iFrame. }
-      iModIntro.
-      wp_run. iNext. wp_run. iDestruct "HR" as "[Ho HR]".
+      iModIntro. wp_run. iNext. wp_run.
+      iDestruct "HR" as "[Ho HR]".
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
 End spin_lock.

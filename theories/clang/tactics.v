@@ -170,6 +170,14 @@ Tactic Notation "wp_snd" :=
   | _ => fail "wp_op: not a 'wp'"
 end.
 
+Tactic Notation "wp_cas_fail" :=
+  iApply wp_cas_fail; last iFrame;
+  [ by simpl | constructor | constructor | iNext ].
+
+Tactic Notation "wp_cas_suc" :=
+  iApply wp_cas_suc;
+  [ constructor | constructor | iNext; iFrame ].
+
 Tactic Notation "wp_ret" := iApply (wp_ret []).
 
 Ltac wp_run :=
