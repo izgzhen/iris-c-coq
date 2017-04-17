@@ -1,5 +1,5 @@
-From iris_os.clang Require Import logic.
-From iris_os.lib Require Import pair.
+From iris_c.clang Require Import logic.
+From iris_c.lib Require Import pair.
 
 Section wp_ret.
   Context `{clangG Σ}.

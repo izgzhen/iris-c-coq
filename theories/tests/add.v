@@ -1,7 +1,7 @@
 From iris.base_logic.lib Require Export wsat.
-From iris_os.clang Require Import logic tactics notations.
+From iris_c.clang Require Import logic tactics notations.
 From iris.base_logic Require Import big_op.
-From iris_os.os Require Import refine interrupt.
+From iris_c.clang.lib Require Import refine interrupt.
 Require Import lib.gmap_solve.
 From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".

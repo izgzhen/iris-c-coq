@@ -1,4 +1,4 @@
-From iris_os.clang Require Import memory.
+From iris_c.clang Require Import memory.
 
 Inductive type : Set :=
 | Tnull

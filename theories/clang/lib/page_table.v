@@ -1,6 +1,6 @@
 (* Virtual Memory Model *)
 
-Require Import iris_os.clang.logic.
+Require Import iris_c.clang.logic.
 
 Definition option_addr_to_val (opt_a: option addr) : val :=
   match opt_a with

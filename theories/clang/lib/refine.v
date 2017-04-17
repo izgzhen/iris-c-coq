@@ -5,10 +5,13 @@ From iris.algebra Require Import dra gmap agree auth frac.
 From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
-From iris_os.os Require Export spec refine_ra.
-From iris_os.lib Require Import pair.
+From iris_c.clang.lib Require Export spec.
+From iris_c.lib Require Import pair refine_ra.
 Set Default Proof Using "Type".
 Import uPred.
+
+Definition refine_ucmra := @refine_ucmra spec_state spec_code spec_step.
+Definition spec_step' := @spec_step' spec_state spec_code spec_step.
 
 Class refineG Σ := RefineG {
     refine_inG :> inG Σ refine_ucmra;

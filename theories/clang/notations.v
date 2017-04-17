@@ -1,4 +1,4 @@
-From iris_os.clang Require Import lang.
+From iris_c.clang Require Import lang.
 Set Default Proof Using "Type".
 
 Coercion Vint8 : int8 >-> val.

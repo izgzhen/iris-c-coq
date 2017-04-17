@@ -2,12 +2,6 @@
 
 Require Import logic.
 
-(* TODO: implementation *)
-(* Class intG (n: nat) Σ := IntG { *)
-(*   intG_ieG :> inG Σ (exclR unitC); (* FIXME: un-reentrant lock *) *)
-(*   intG_hpriG :> inG Σ (authR (optionUR (agreeR (leibnizC nat)))) (* highest priority *) *)
-(* }. *)
-
 Section definitions.
   Context `{!clangG Σ} {invs: nat → iProp Σ}.
 
@@ -16,9 +10,6 @@ Section definitions.
       | S p' => (invs p ∗ INVS p')%I
       | O => invs O
     end.
-
-(* Definition interrupt_handler_pre (γie γpri: gname) (prio: nat) := *)
-(*   (own γie (Excl ()) ∗ hpri γpri prio ∗ INVS prio)%I. *)
 
   Definition INVS_up (p: nat) :=
     match p with
@@ -37,7 +28,6 @@ Section definitions.
     closed (γ: name): iProp Σ;
     int_ctx (N: namespace) (γ γp: name): iProp Σ;
     (* -- general properties -- *)
-    (* int_ctx_ne N γ γp n: Proper (dist n ==> dist n) (int_ctx N γ γp); *) (* FIXME *)
     int_ctx_persistent N γ γp : PersistentP (int_ctx N γ γp);
     closed_timeless γ : TimelessP (closed γ);
     closed_exclusive γ : closed γ -∗ closed γ -∗ False;

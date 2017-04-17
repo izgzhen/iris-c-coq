@@ -1,9 +1,11 @@
 From iris.prelude Require Export prelude.
 From iris.algebra Require Import cmra dra cmra_tactics.
-From iris_os.os Require Import spec.
-From iris_os.lib Require Import prelude.
+From iris_c.lib Require Import prelude.
 
 Section algebra.
+  Context {spec_state spec_code: Type}.
+  Context {spec_step: spec_code → spec_state → spec_code → spec_state → Prop}.
+    
   Inductive view : Set := master | snapshot.
 
   Definition max_view (v1 v2: view) :=

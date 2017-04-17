@@ -3,8 +3,8 @@
 From iris.algebra Require Export gmap agree auth frac excl.
 From iris.base_logic.lib Require Export wsat fancy_updates namespaces.
 From iris.program_logic Require Export weakestpre.
-From iris_os.clang Require Export lang.
-From iris_os.lib Require Import pair.
+From iris_c.clang Require Export lang.
+From iris_c.lib Require Import pair.
 From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.

@@ -1,4 +1,4 @@
-From iris_os.clang Require Import logic notations tactics.
+From iris_c.clang Require Import logic notations tactics.
 From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.

@@ -1,6 +1,6 @@
 (* Re-export of Iris and some general stuff *)
 
-From iris_os.lib Require Export CpdtTactics Integers.
+From iris_c.lib Require Export CpdtTactics Integers.
 From iris.prelude Require Import prelude countable.
 Open Scope Z_scope.
 

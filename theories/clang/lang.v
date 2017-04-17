@@ -2,9 +2,9 @@
 
 From iris.base_logic Require Export gen_heap big_op.
 From iris.algebra Require Import gmap.
-From iris_os.lib Require Export smap prelude.
+From iris_c.lib Require Export smap prelude.
 From iris.program_logic Require Export language.
-From iris_os.clang Require Export memory types.
+From iris_c.clang Require Export memory types.
 
 Open Scope Z_scope.
 

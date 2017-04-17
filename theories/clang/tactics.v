@@ -1,6 +1,6 @@
-Require Import iris_os.clang.logic.
+Require Import iris_c.clang.logic.
 From iris.proofmode Require Import coq_tactics tactics.
-Require Import iris_os.lib.gmap_solve.
+Require Import iris_c.lib.gmap_solve.
 
 Set Default Proof Using "Type".
 Import uPred.

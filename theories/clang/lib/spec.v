@@ -1,7 +1,7 @@
 (* Spec Monoid *)
 
 Require Import iris.algebra.gmap.
-Require Import iris_os.clang.lang.
+Require Import iris_c.clang.lang.
 
 Definition spec_state := gmap ident val.
 

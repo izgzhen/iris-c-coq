@@ -5,18 +5,18 @@ From iris.algebra Require Import dra gmap agree auth frac.
 From iris.base_logic.lib Require Import wsat fancy_updates.
 From iris.base_logic.lib Require Export namespaces invariants.
 From iris.proofmode Require Import tactics.
-From iris_os.os Require Export spec refine_ra refine.
-From iris_os.lib Require Import pair.
+From iris_c.clang.lib Require Export spec refine.
+From iris_c.lib Require Import pair refine_ra.
 Set Default Proof Using "Type".
 Import uPred.
 
 Section sound.
   Context `{refineG Σ, clangG Σ} {N: namespace}.
 
-  Inductive simulate: expr → spec_code → Prop :=
+  Inductive simulate: expr → spec.spec_code → Prop :=
   | SimVal: ∀ v, simulate (Evalue v) (SCdone (Some v))
   | SimStep:
-      ∀ σ σ' (Σ Σ': spec_state) e c e' c',
+      ∀ σ σ' (Σ Σ': spec.spec_state) e c e' c',
         cstep e σ e' σ' →
         spec_step_star c Σ c' Σ →
         simulate e c.
@@ -75,7 +75,7 @@ Qed.
     subst. done.
   Qed.
 
-  Lemma foo' ss sc:
+  Lemma bar' ss sc:
     (inv N spec_inv ∗ own_sstate ss ∗ own_scode sc)
     ⊢ |==> ▷ (inv N spec_inv ∗ own_sstate ss ∗ own_scode sc).
   Proof. iIntros "?". iModIntro. by iNext. Qed.
@@ -86,7 +86,7 @@ Qed.
     WP e1 {{ v, own_sstate Σ2 ∗ own_scode (SCdone (Some v)) }} ∗ wptp t1 ⊢
     Nat.iter (S (S n)) (λ P, |==> ▷ P) ⌜simulate (Evalue v2) c1⌝.
   Proof.
-    intros. rewrite wptp_steps' //; last by apply foo'.
+    intros. rewrite wptp_steps' //; last by apply bar'.
     rewrite (Nat_iter_S_r (S n)). apply bupd_iter_mono.
     iDestruct 1 as (e2 t2') "(% & (Hw & HE & _) & (?&?&?) & [H _])"; simplify_eq.
     iDestruct (wp_value_inv with "H") as "H". rewrite fupd_eq /fupd_def.

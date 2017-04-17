@@ -1,5 +1,5 @@
-From iris_os.clang Require Import logic notations.
-Require Import iris_os.os.page_table.
+From iris_c.clang Require Import logic notations.
+Require Import iris_c.clang.lib.page_table.
 
 Section vmm.
   Context `{clangG Σ} {pt: page_table Σ}.

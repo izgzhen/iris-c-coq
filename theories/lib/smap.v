@@ -1,6 +1,6 @@
 (* Simple map structure *)
 
-Require Import iris_os.lib.prelude.
+Require Import iris_c.lib.prelude.
 
 Definition smap (A: Type) := list (ident * A).
 
