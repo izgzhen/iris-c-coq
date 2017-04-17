@@ -24,6 +24,7 @@ Definition tid := nat.
 Inductive expr :=
 | Evalue (v: val)
 | Evar (x: ident)
+| Eident (x: ident) (* kinda weird, normally function identifier *)
 | ECAS_typed (t: type) (e1 e2 e3: expr)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
 | Ederef (e: expr)
@@ -38,6 +39,8 @@ Inductive expr :=
 | Ewhile (cond: expr) (curcond: expr) (s: expr)
 | Erete (e: expr)
 | Eseq (s1 s2: expr).
+
+Definition Enat (n: nat) := Evalue (Vint8 (Byte.repr n)).
 
 Record function :=
   Function {
@@ -235,6 +238,7 @@ Fixpoint params_match (params: decls) (vs: list val) :=
 Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
   match e with
     | Evalue v => Some e
+    | Eident x => Some e
     | Ederef_typed t e => Some e
     | Ealloc t e => Ealloc t <$> resolve_rhs ev e
     | Evar x => (* closed-ness? *)
@@ -283,6 +287,7 @@ Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
 Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
   match e with
     | Evalue (Vptr l) => Some e
+    | Eident x => None
     | Evalue _ => None
     | Ebinop _ _ _ => None (* XXX: too restrictive *)
     | Ederef_typed _ _ => None

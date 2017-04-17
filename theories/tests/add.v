@@ -21,7 +21,7 @@ Section example.
       | _ => True%I
     end.
 
-  Context `{i: interrupt invs}.
+  Context `{i: interrupt invs 1}.
 
   Definition f_body : expr :=
     cli i ;;
@@ -35,11 +35,11 @@ Section example.
               r = Some (Vint32 (Int.add vx vy)) ∧
               s' = <[ Y := (Vint32 (Int.add vx vy)) ]> s.
 
-  Definition int_ctx := @interrupt.int_ctx _ _ invs i.
+  Definition int_ctx := @interrupt.int_ctx _ _ invs 1 i.
 
   Lemma f_spec γ γp f vx Φ k ks:
     text_interp f (Function Tint32 [(x, Tint32); (y, Tint32)] f_body)  ∗
-    int_ctx N γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ own_stack ks ∗
+    int_ctx γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ own_stack ks ∗
     own_scode (SCrel (f_rel vx)) ∗ px ↦ vx @ Tint32 ∗
     (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ own_stack ks -∗
           WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
