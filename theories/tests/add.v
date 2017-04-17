@@ -9,9 +9,8 @@ Set Default Proof Using "Type".
 Section example.
   Context `{clangG Σ, refineG Σ} {N: namespace}.
 
-  Parameter px py: addr.
+  Parameter py: addr.
   Definition x: ident := 1.
-  Definition y: ident := 3.
   Definition Y: ident := 2.
   Definition I := (∃ vy, py ↦ Vint32 vy @ Tint32 ∗ own_sstate {[ Y := Vint32 vy ]})%I.
 
@@ -25,8 +24,8 @@ Section example.
 
   Definition f_body : expr :=
     cli i ;;
-    y <- y + x ;;
-    x <- y ;;
+    py <- !py@Tint32 + x ;;
+    x <- !py@Tint32 ;;
     sti i ;;
     rete x.
 
@@ -38,16 +37,19 @@ Section example.
   Definition int_ctx := @interrupt.int_ctx _ _ invs 1 i.
 
   Lemma f_spec γ γp f vx Φ k ks:
-    text_interp f (Function Tint32 [(x, Tint32); (y, Tint32)] f_body)  ∗
+    text_interp f (Function Tint32 [(x, Tint32)] f_body)  ∗
     int_ctx γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ own_stack ks ∗
-    own_scode (SCrel (f_rel vx)) ∗ px ↦ vx @ Tint32 ∗
+    own_scode (SCrel (f_rel vx)) ∗
     (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ own_stack ks -∗
           WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
-    ⊢ WP fill_ectxs (Ecall f [Evalue (Vptr px); Evalue (Vptr py)]) k {{ _, Φ }}.
+    ⊢ WP fill_ectxs (Ecall_typed Tint32 f [Evalue vx]) k {{ _, Φ }}.
   Proof.
-    iIntros "(? & #? & #? & Hp & Hs & Hsc & Hx & HΦ)".
-    iApply (wp_call [px; py] [(x, Tint32); (y, Tint32)] f_body)=>//.
-    iFrame. iNext. iIntros "Hstk". iApply wp_seq=>//. { apply cli_nj. }
+    iIntros "(? & #? & #? & Hp & Hs & Hsc & HΦ)".
+    iApply (wp_call [Vint32 vx] [(x, Tint32)] f_body)=>//.
+    iFrame. iNext. iIntros "Hstk".
+    wp_bind (Ealloc _ _). iApply wp_alloc=>//. iIntros (px) "Hpx".
+    iApply wp_let=>//. iNext.
+    iApply wp_seq=>//. { apply cli_nj. }
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.

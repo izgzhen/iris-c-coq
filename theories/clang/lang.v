@@ -24,6 +24,7 @@ Definition tid := nat.
 Inductive expr :=
 | Evalue (v: val)
 | Evar (x: ident)
+| Elet_typed (t: type) (x: ident) (ex ebody: expr)
 | Eident (x: ident) (* kinda weird, normally function identifier *)
 | ECAS_typed (t: type) (e1 e2 e3: expr)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
@@ -32,7 +33,7 @@ Inductive expr :=
 | Eaddrof (e: expr)
 | Efst (e: expr)
 | Esnd (e: expr)
-| Ecall (fid: ident) (args: list expr)
+| Ecall_typed (t: type) (fid: ident) (args: list expr)
 | Ealloc (t: type) (e: expr)
 | Eassign (lhs: expr) (rhs: expr)
 | Eif (cond: expr) (s1 s2: expr)
@@ -52,6 +53,7 @@ Record function :=
 (* Operational Semantics *)
 
 Inductive exprctx :=
+| EKlet (t: type) (x: ident) (ebody: expr)
 | EKbinopr (op: bop) (re: expr)
 | EKbinopl (op: bop) (lv: val)
 | EKCASl (t: type) (e1 e2: expr)
@@ -61,7 +63,7 @@ Inductive exprctx :=
 | EKaddrof
 | EKfst
 | EKsnd
-| EKcall (fid: ident) (vargs: list val) (args: list expr)
+| EKcall (t: type) (fid: ident) (vargs: list val) (args: list expr)
 | EKalloc (t: type)
 | EKassignr (rhs: expr)
 | EKassignl (lhs: addr)
@@ -70,18 +72,15 @@ Inductive exprctx :=
 | EKrete
 | EKseq (s: expr).
 
-Record env :=
-  Env {
-      lenv: smap (type * addr);
-      fenv: smap function
-    }.
+Definition env := smap type.
 
 Fixpoint type_infer (ev: env) (e: expr) : option type :=
   match e with
     | Evalue v => Some (type_infer_v v)
-    | Evar x => p ← sget x (lenv ev); Some (p.1)
+    | Evar x => sget x ev
     | Ebinop _ e1 _ => type_infer ev e1 (* FIXME *)
     | ECAS_typed t _ e1 _ => Some t
+    | Elet_typed t x ex ebody => type_infer (sset x t ev) ebody
     | Ederef e' =>
       (match type_infer ev e' with
          | Some (Tptr t) => Some t
@@ -99,7 +98,7 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
          | Some (Tprod _ t2) => Some t2
          | _ => None
        end)
-    | Ecall f args => f_retty <$> sget f (fenv ev)
+    | Ecall_typed t f args => Some t
     | Ealloc t _ => Some (Tptr t)
     | _ => Some Tvoid
   end.
@@ -115,7 +114,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKaddrof => Eaddrof e
     | EKfst => Efst e
     | EKsnd => Esnd e
-    | EKcall f vargs args => Ecall f (map Evalue vargs ++ e :: args)
+    | EKcall t f vargs args => Ecall_typed t f (map Evalue vargs ++ e :: args)
     | EKalloc t => Ealloc t e
     | EKassignr rhs => Eassign e rhs
     | EKassignl lhs => Eassign (Evalue (Vptr lhs)) e
@@ -123,6 +122,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKwhile c s => Ewhile c e s
     | EKrete => Erete e
     | EKseq s => Eseq e s
+    | EKlet t x ebody => Elet_typed t x e ebody
   end.
 
 Definition fill_ectxs := foldr (λ x y, fill_expr y x).
@@ -228,119 +228,113 @@ Proof. induction Kes; first by inversion 1.
        intros. simpl. apply fill_ectx_not_val.
 Qed.
 
-Fixpoint params_match (params: decls) (vs: list val) :=
-  match params, vs with
-    | (_, t)::params, v::vs => typeof v t ∧ params_match params vs
-    | [], [] => True
-    | _, _ => False
-  end.
-
-Fixpoint resolve_rhs (ev: env) (e: expr) : option expr :=
+Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
   match e with
     | Evalue v => Some e
     | Eident x => Some e
-    | Ederef_typed t e => Some e
-    | Ealloc t e => Ealloc t <$> resolve_rhs ev e
-    | Evar x => (* closed-ness? *)
-      (match sget x (lenv ev) with
-         | Some (t, l) => Some $ Ederef_typed t (Evalue (Vptr l))
-         | None => None
-       end)
+    | Ederef_typed _ _ => Some e
+    | Ealloc t e => Ealloc t <$> resolve_rhs ev x vx tx e
+    | Evar x' => (* closed-ness? *)
+      (if bool_decide (x' = x)
+         then Some $ Ederef_typed tx (Evalue vx)
+         else Some e)
     | Ebinop op e1 e2 =>
-      match resolve_rhs ev e1, resolve_rhs ev e2 with
+      match resolve_rhs ev x vx tx e1, resolve_rhs ev x vx tx e2 with
         | Some e1', Some e2' => Some (Ebinop op e1' e2')
         | _, _ => None
       end
     | Ederef e =>
-      match type_infer ev e, resolve_rhs ev e with
+      match type_infer ev e, resolve_rhs ev x vx tx e with
         | Some (Tptr t), Some e' => Some (Ederef_typed t e')
         | _, _ => None
       end
-    | Eaddrof e => Eaddrof <$> resolve_rhs ev e
-    | Efst e => Efst <$> resolve_rhs ev e
-    | Esnd e => Esnd <$> resolve_rhs ev e
-    | Ecall f args => Ecall f <$> lift_list_option (map (resolve_rhs ev) args)
-    | Eassign e1 e2 => Eassign e1 <$> resolve_rhs ev e2
+    | Eaddrof e => Eaddrof <$> resolve_rhs ev x vx tx e
+    | Efst e => Efst <$> resolve_rhs ev x vx tx e
+    | Esnd e => Esnd <$> resolve_rhs ev x vx tx e
+    | Ecall_typed t f args => Ecall_typed t f <$> lift_list_option (map (resolve_rhs ev x vx tx) args)
+    | Eassign e1 e2 => Eassign e1 <$> resolve_rhs ev x vx tx e2
     | Eif e s1 s2 =>
-      match resolve_rhs ev e, resolve_rhs ev s1, resolve_rhs ev s2 with
+      match resolve_rhs ev x vx tx e, resolve_rhs ev x vx tx s1, resolve_rhs ev x vx tx s2 with
         | Some e', Some s1', Some s2' => Some $ Eif e' s1' s2'
         | _, _, _ => None
       end
     | Ewhile c e s =>
-      match resolve_rhs ev c, resolve_rhs ev e, resolve_rhs ev s with
+      match resolve_rhs ev x vx tx c, resolve_rhs ev x vx tx e, resolve_rhs ev x vx tx s with
         | Some c', Some e', Some s' => Some $ Ewhile c' e' s'
         | _, _, _ => None
       end
-    | Erete e => Erete <$> resolve_rhs ev e
+    | Erete e => Erete <$> resolve_rhs ev x vx tx e
     | Eseq s1 s2 =>
-      match resolve_rhs ev s1, resolve_rhs ev s2 with
+      match resolve_rhs ev x vx tx s1, resolve_rhs ev x vx tx s2 with
         | Some s1', Some s2' => Some (Eseq s1' s2')
         | _, _ => None
       end
     | ECAS_typed t e1 e2 e3 =>
-      match resolve_rhs ev e1, resolve_rhs ev e2, resolve_rhs ev e3 with
+      match resolve_rhs ev x vx tx e1, resolve_rhs ev x vx tx e2, resolve_rhs ev x vx tx e3 with
         | Some e1', Some e2', Some e3' => Some (ECAS_typed t e1' e2' e3')
         | _, _, _ => None
       end
+    | Elet_typed t y ey ebody =>
+      if bool_decide (x = y)
+      then Some e
+      else match resolve_rhs ev x vx tx ey with
+             | Some ey' => Elet_typed t y ey' <$> (resolve_rhs (sset y t ev) x vx tx ebody)
+             | _ => None
+           end
   end.
 
-Fixpoint resolve_lhs (ev: env) (e: expr) : option expr :=
+Fixpoint resolve_lhs_inner (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
   match e with
     | Evalue (Vptr l) => Some e
-    | Eident x => None
-    | Evalue _ => None
-    | Ebinop _ _ _ => None (* XXX: too restrictive *)
-    | Ederef_typed _ _ => None
-    | Eaddrof _ => None
-    | Ealloc _ _ => None
-    | Evar x =>
-      (match sget x (lenv ev) with
-         | Some (_, l) => Some (Evalue (Vptr l))
-         | None => None
-       end)
-    | Ederef e' => resolve_rhs ev e'
-    | Efst e' => resolve_lhs ev e'
+    | Ederef_typed _ e' => Some e
+    | Evar x' =>
+      if bool_decide (x = x')
+      then Some (Evalue vx)
+      else Some e
+    | Ederef e' => resolve_rhs ev x vx tx e'
+    | Efst e' => resolve_lhs_outer ev x vx tx e'
     | Esnd e' =>
-      (e'' ← resolve_lhs ev e';
+      (e'' ← resolve_lhs_inner ev x vx tx e';
        match type_infer ev e'' with
          | Some (Tptr (Tprod t1 _)) =>
            Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
          | _ => None
        end)
-    | Ecall f es => Some $ Ecall f es
-    | Eassign e1 e2 => e'' ← resolve_lhs ev e1; Some (Eassign e'' e2)
-    | Eif ex s1 s2 =>
-      match resolve_lhs ev s1, resolve_lhs ev s2 with
-      | Some s1', Some s2' => Some (Eif ex s1' s2')
+    | Ebinop op e1 e2 =>
+      match resolve_lhs_inner ev x vx tx e1, resolve_rhs ev x vx tx e2 with
+        | Some e1, Some e2 => Some $ Ebinop op e1 e2
         | _, _ => None
       end
-    | Ewhile c ex s => Ewhile c ex <$> resolve_lhs ev s
+    | _ => None
+  end
+with
+resolve_lhs_outer (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
+  match e with
+    | Eassign e1 e2 => e'' ← resolve_lhs_inner ev x vx tx e1; Some (Eassign e'' e2)
+    | Eif ex s1 s2 =>
+      match resolve_lhs_outer ev x vx tx s1, resolve_lhs_outer ev x vx tx s2 with
+      | Some s1', Some s2' => Some (Eif ex s1' s2')
+      | _, _ => None
+      end
+    | Ewhile c ex s => Ewhile c ex <$> resolve_lhs_outer ev x vx tx s
     | Eseq s1 s2 =>
-      match resolve_lhs ev s1, resolve_lhs ev s2 with
+      match resolve_lhs_outer ev x vx tx s1, resolve_lhs_outer ev x vx tx s2 with
         | Some s1', Some s2' => Some (Eseq s1' s2')
         | _, _ => None
       end
-    | ECAS_typed t e1 e2 e3 =>
-      match resolve_lhs ev e1, resolve_lhs ev e2, resolve_lhs ev e3 with
-        | Some e1', Some e2', Some e3' => Some (ECAS_typed t e1' e2' e3')
-        | _, _, _ => None
-      end
-    | Erete e => Some (Erete e)
+    | Elet_typed t y ey ebody =>
+      if bool_decide (x = y)
+      then Some e
+      else Elet_typed t y ey <$> (resolve_lhs_outer (sset y t ev) x vx tx ebody)
+    | _ => Some e
   end.
 
-Fixpoint add_params_to_env (e: env) (params: list (ident * type)) ls : env :=
-  match params, ls with
-  | (x, t)::ps, l::ls' =>
-    add_params_to_env (Env (sset x (t, l) (lenv e)) (fenv e)) ps ls'
-  | _, _ => e
-  end.
-
-Definition instantiate_f_body (ev: env) (s: expr) : option expr :=
-  (resolve_rhs ev s ≫= resolve_lhs ev).
+Definition instantiate_let (x: ident) (vx: val) (tx: type) (s: expr) : option expr :=
+  (resolve_rhs (ssig x tx) x vx tx s ≫= resolve_lhs_outer (ssig x tx) x vx tx).
 
 Fixpoint is_jmp (e: expr) :=
   match e with
-    | Ecall _ es => true
+    | Ecall_typed _ _ es => true
     | Erete e => true
     | Ebinop _ e1 e2 => is_jmp e1 || is_jmp e2
     | Ederef e => is_jmp e
@@ -354,11 +348,12 @@ Fixpoint is_jmp (e: expr) :=
     | Eseq e1 e2 => is_jmp e1 || is_jmp e2
     | Ewhile c e e2 => is_jmp e || is_jmp c || is_jmp e2
     | ECAS_typed t e1 e2 e3 => is_jmp e1 || is_jmp e2 || is_jmp e3
+    | Elet_typed t x ex ebody => is_jmp ex || is_jmp ebody
     | _ => false
   end.
 
 Inductive jnf: expr → Prop :=
-  | JNFcall: ∀ f ls, jnf (Ecall f (map (λ l, Evalue (Vptr l)) ls))
+  | JNFcall: ∀ t f vs, jnf (Ecall_typed t f (map Evalue vs))
   | JNFrete: ∀ v, jnf (Erete (Evalue v)).
 
 Global Hint Constructors jnf.
@@ -449,7 +444,10 @@ Inductive estep : expr → heap → expr → heap → Prop :=
     typeof v2 t →
     readbytes l (encode_val v1) σ →
     estep (ECAS_typed t (Evalue (Vptr l)) (Evalue v1) (Evalue v2)) σ
-          (Evalue vtrue) (storebytes l (encode_val v2) σ).
+          (Evalue vtrue) (storebytes l (encode_val v2) σ)
+| ESlet t x xv e e' σ:
+    instantiate_let x xv t e = Some e' →
+    estep (Elet_typed t x (Evalue xv) e) σ e' σ.
 
 Lemma ESbind:
     ∀ kes e e' σ σ',
@@ -468,9 +466,9 @@ Lemma to_val_is_val e:
   to_val e = None ↔ is_val e = false.
 Proof. induction e; crush. Qed.
 
-Lemma forall_is_val ls:
-  forallb is_val (map (λ l : addr, Evalue (Vptr l)) ls) = true.
-Proof. by induction ls=>//. Qed.
+Lemma forall_is_val vs:
+  forallb is_val (map Evalue vs) = true.
+Proof. by induction vs=>//. Qed.
 
 Definition is_loc e :=
   match to_val e with
@@ -540,7 +538,7 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
         | Evalue v => Some (ks, e)
         | _ => unfill_expr e1 (EKseq e2 :: ks)
       end
-    | Ecall f es =>
+    | Ecall_typed t f es =>
       if forallb is_val es
         then Some (ks, e)
         else None (* Unsound *)
@@ -551,11 +549,16 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
       | Evalue (Vptr l), _, _ => unfill_expr e2 (EKCASm t l e3 :: ks)
       | _, _, _ => unfill_expr e1 (EKCASl t e2 e3 :: ks)
       end
+    | Elet_typed t x ex ebody =>
+      match ex with
+        | Evalue _ => Some (ks, e)
+        | _ => unfill_expr ex (EKlet t x ebody :: ks)
+      end
     | _ => None
   end.
 
 Inductive enf: expr → Prop :=
-  | NFcall: ∀ f ls, enf (Ecall f (map (λ l, Evalue (Vptr l)) ls))
+  | NFcall: ∀ t f vs, enf (Ecall_typed t f (map Evalue vs))
   | NFrete: ∀ v, enf (Erete (Evalue v))
   | NFbinop: ∀ op v1 v2, enf (Ebinop op (Evalue v1) (Evalue v2))
   | NFderef: ∀ v, enf (Ederef (Evalue v))
@@ -569,7 +572,8 @@ Inductive enf: expr → Prop :=
   | NFseq: ∀ v e2, enf (Eseq (Evalue v) e2)
   | NFwhile: ∀ c v s, enf (Ewhile c (Evalue v) s)
   | NFCAS: ∀ l t v1 v2, enf (ECAS_typed t (Evalue (Vptr l))
-                                        (Evalue v1) (Evalue v2)).
+                                        (Evalue v1) (Evalue v2))
+  | NFlet: ∀ t x v e2, enf (Elet_typed t x (Evalue v) e2).
 
 Global Hint Constructors enf.
 
@@ -612,7 +616,7 @@ Proof. induction k=>//; simpl; intros H1 H2;
        try (inversion H2; by subst).
        inversion H2. subst.
        assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
-       { rewrite -H3. apply forall_is_val. }
+       { rewrite -H4. apply forall_is_val. }
        rewrite forallb_app in Hcontra.
        replace (e::args) with ([e] ++ args) in Hcontra; last done.
        rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
@@ -727,8 +731,8 @@ Tactic Notation "escape_false" :=
       by eapply (escape_false' Hes Henf)=>//
   end.
 
-Lemma estep_call_false f ls σ1 e' σ2:
-  estep (Ecall f (map (λ l, Evalue (Vptr l)) ls)) σ1 e' σ2 → False.
+Lemma estep_call_false t f vs σ1 e' σ2:
+  estep (Ecall_typed t f (map Evalue vs)) σ1 e' σ2 → False.
 Proof. inversion 1. subst. escape_false. Qed.
 
 Lemma estep_ret_false v σ1 e' σ2:
@@ -832,6 +836,13 @@ Lemma cont_incl {e' kes kes' e}:
   ∃ kes'', e' = fill_ectxs e kes''.
 Proof. move: cont_incl' => /= H. intros. by eapply H. Qed.
 
+Fixpoint let_params (vs: list val) (params: decls) e : option expr :=
+  match vs, params with
+    | v::vs', (x, tx)::ps' => Elet_typed tx x (Ealloc tx (Evalue v)) <$> let_params vs' ps' e
+    | [], [] => Some e
+    | _, _ => None
+  end.
+
 Inductive jstep: text → expr → stack → expr → stack → Prop :=
 | JSrete:
     ∀ t v k k' ks,
@@ -840,12 +851,11 @@ Inductive jstep: text → expr → stack → expr → stack → Prop :=
             (fill_ectxs (Erete (Evalue v)) k') (k::ks)
             (fill_ectxs (Evalue v) k) ks
 | JScall:
-    ∀ t es ls retty params f_body f_body' f k ks,
-      es = map (fun l => Evalue (Vptr l)) ls →
+    ∀ vs e' retty params f_body f t k ks,
       t !! f = Some (Function retty params f_body) →
-      instantiate_f_body (add_params_to_env (Env [] []) params ls)
-                         f_body = Some f_body' →
-      jstep t (fill_ectxs (Ecall f es) k) ks f_body' (k::ks).
+      let_params vs params f_body = Some e' →
+      jstep t (fill_ectxs (Ecall_typed retty f (map Evalue vs)) k) ks
+            e' (k::ks).
 
 Bind Scope val_scope with val.
 Delimit Scope val_scope with V.
@@ -882,7 +892,7 @@ Global Hint Constructors estep jstep cstep.
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
-Lemma is_jmp_call k' f es: is_jmp (fill_ectxs (Ecall f es) k') = true.
+Lemma is_jmp_call k' t f es: is_jmp (fill_ectxs (Ecall_typed t f es) k') = true.
 Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
 
 Lemma is_jmp_jstep_false {e e' σ} k {ks ks'}:
@@ -961,6 +971,12 @@ Proof.
     + by rewrite is_jmp_call in Hnj.
 Qed.
 
+Lemma instantiate_let_preserves_not_jmp x xv xt e e':
+  instantiate_let x xv xt e = Some e' →
+  is_jmp e = false →
+  is_jmp e' = false.
+Admitted.
+
 Lemma estep_preserves_not_jmp' σ1 σ2:
   let P e1 :=
       (∀ e2, is_jmp e1 = false → estep e1 σ1 e2 σ2 → is_jmp e2 = false)
@@ -972,14 +988,17 @@ Proof.
     + inversion Hjn. simpl. solve_is_jmp_false.
     + simpl in Hjn. exfalso.
       simpl in Henf. escape_false.
+    + by eapply instantiate_let_preserves_not_jmp.
   - unfold P. intros e ks Henf Hind e2 Hjn Hes.
     inversion_cstep Henf ltac:(inversion Hjn).
-    { subst. simpl. rewrite -H0 in Hjn. inversion Hjn. solve_is_jmp_false. }
-    assert (is_jmp e' = false).
-    { apply (Hind K')=>//. rewrite app_length. simpl. omega. }
-    rewrite -fill_app in Hjn.
-    eapply is_jmp_out in Hjn=>//.
-Qed.
+    + subst. simpl. rewrite -H0 in Hjn. inversion Hjn. solve_is_jmp_false.
+    + assert (is_jmp e' = false).
+      { apply (Hind K')=>//. rewrite app_length. simpl. omega. }
+      rewrite -fill_app in Hjn.
+      eapply is_jmp_out in Hjn=>//.
+    + simplify_eq. eapply instantiate_let_preserves_not_jmp=>//.
+      admit.
+Admitted.
 
 Lemma estep_preserves_not_jmp'' e σ1 e2' σ2:
   to_val e = None → is_jmp e = false →
@@ -1004,6 +1023,7 @@ Proof.
   - inversion_estep; subst=>//.
     + simpl in *. solve_is_jmp_false.
     + by eapply estep_preserves_not_jmp.
+    + by eapply instantiate_let_preserves_not_jmp.
   - exfalso. move:(cstep_not_val H0)=>Hn.
     by eapply (is_jmp_jstep_false []).
 Qed.

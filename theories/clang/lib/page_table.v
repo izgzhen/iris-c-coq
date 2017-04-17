@@ -5,7 +5,7 @@ Require Import iris_c.clang.logic.
 Definition option_addr_to_val (opt_a: option addr) : val :=
   match opt_a with
     | Some a => Vptr a
-    | None => Vvoid
+    | None => Vnull
   end.
 
 Structure page_table Σ `{!clangG Σ} :=  {
@@ -18,13 +18,13 @@ Structure page_table Σ `{!clangG Σ} :=  {
   (* -- operation specs -- *)
   insert_pt_spec i l m Φ:
     is_page_table m ∗ (is_page_table (<[ i := l ]> m) -∗ Φ Vvoid)
-    ⊢ WP (Ecall insert_pt [Evalue (Vint32 i); Evalue (Vptr l)]) {{ Φ }};
+    ⊢ WP (Ecall_typed Tvoid insert_pt [Evalue (Vint32 i); Evalue (Vptr l)]) {{ Φ }};
   delete_pt_spec i m Φ:
     is_page_table m ∗ (is_page_table (delete i m) -∗ Φ Vvoid)
-    ⊢ WP (Ecall delete_pt [Evalue (Vint32 i)]) {{ Φ }};
+    ⊢ WP (Ecall_typed Tvoid delete_pt [Evalue (Vint32 i)]) {{ Φ }};
   lookup_pt_spec i m Φ:
     is_page_table m ∗ (is_page_table m -∗ Φ (option_addr_to_val (m !! i)))
-    ⊢ WP (Ecall lookup_pt [Evalue (Vint32 i)]) {{ Φ }}
+    ⊢ WP (Ecall_typed (Tptr Tvoid) lookup_pt [Evalue (Vint32 i)]) {{ Φ }}
 }.
 
 Arguments insert_pt {_ _} _.

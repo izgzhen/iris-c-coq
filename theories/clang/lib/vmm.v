@@ -8,7 +8,7 @@ Section vmm.
     x <- Int.repr 0 ;;
     while [ !x@Tint32 :<: Int.repr n ] ( !x@Tint32 :<: Int.repr n ) <{
       y <- Ealloc (Tprod Tint8 Tvoid) (Vpair vfalse Vvoid) ;;
-      insert_pt pt <$ !x@Tint32 , Evalue (Vptr y) $>
+      Ecall_typed Tvoid (insert_pt pt) [!x@Tint32 ; Evalue (Vptr y)]
     }>.
 
   Fixpoint allocated m (n: nat) : iProp Σ :=

@@ -45,6 +45,8 @@ Ltac reshape_expr e tac :=
     go (EKCASm t l e2 :: K) e1
   | ECAS_typed ?t ?e0 ?e1 ?e2 =>
     go (EKCASl t e1 e2 :: K) e0
+  | Elet_typed ?t ?x ?ex ?ebody =>
+    go (EKlet t x ebody :: K) ex
   end in go (@nil exprctx) e.
 
 Ltac wp_bind_core Kes :=
@@ -194,4 +196,4 @@ Ltac wp_run :=
   end; wp_run) || idtac.
 
 Ltac unfold_f_inst :=
-  rewrite /instantiate_f_body /resolve_rhs; repeat gmap_simplify.
+  rewrite /instantiate_let /resolve_rhs; repeat gmap_simplify.

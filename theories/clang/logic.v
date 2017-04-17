@@ -572,23 +572,20 @@ Section rules.
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
 
-  Lemma wp_call {E k ks es} ls params f_body f_body' f retty Φ:
-    es = map (fun l => Evalue (Vptr l)) ls →
-    instantiate_f_body (add_params_to_env (Env [] []) params ls)
-                       f_body = Some f_body' →
-    text_interp f (Function retty params f_body) ∗
+  Lemma wp_call {E k ks} vs params e e' f retty Φ:
+    let_params vs params e = Some e' →
+    text_interp f (Function retty params e) ∗
     own_stack ks ∗
-    ▷ (own_stack (k::ks) -∗ WP f_body' @ E {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall f es) k @ E {{ Φ }}.
+    ▷ (own_stack (k::ks) -∗ WP e' @ E {{ Φ }})
+    ⊢ WP fill_ectxs (Ecall_typed retty f (map Evalue vs)) k @ E {{ Φ }}.
   Proof.
-    iIntros (Hls Hf) "[Hf [Hstk HΦ]]".
+    iIntros (Hls) "[Hf [Hstk HΦ]]".
     iApply wp_lift_step=>//.
     { apply fill_ectxs_not_val. done. }
     iIntros ((σ1&Γ) ks1) "[Hσ1 [HΓ Hs]]".
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
-    simpl in H0.
-    iModIntro. iSplit.
+    simpl in *. iModIntro. iSplit.
     { iPureIntro. eexists _, _, []. split; last done.
       apply CSjstep. eapply JScall=>//. }
     iNext. iIntros (e2 σ2 efs (Hcs&?)).
@@ -599,17 +596,33 @@ Section rules.
     + apply cont_inj in Heq=>//.
       destruct Heq as [Heq ?]. inversion Heq. subst.
       iFrame. iDestruct (own_pair_agree with "[Hs Hstk]") as "%"; first iFrame.
-      subst.
-      iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
-      iFrame.
-      assert (ls0 = ls) as ?.
+      subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.
+      iFrame. assert (vs0 = vs) as ?.
       { eapply map_inj=>//. simpl. by inversion 1. }
       subst. clear Heq. simplify_eq.
       iSplitL; first by iApply "HΦ".
       by rewrite big_sepL_nil.
   Qed.
 
-
-
+  Lemma wp_let E x t v e e' Φ:
+    instantiate_let x v t e = Some e' →
+    ▷ WP e' @ E {{ Φ }}
+    ⊢ WP Elet_typed t x (Evalue v) e @ E {{ Φ }}.
+  Proof.
+    iIntros (?) "HΦ".
+    iApply wp_lift_pure_step; first eauto.
+    - intros; solve_red.
+    - destruct 1 as [Hcs ?].
+      inversion_cstep_as Hes Hjs.
+      + inversion Hes=>//. simplify_eq.
+        escape_false.
+      + absurd_jstep Hjs.
+    - iNext. iIntros (e2 σ1 σ2 efs (Hcs&?)). subst.
+      iSplitL; last by rewrite big_sepL_nil.
+      inversion_cstep_as Hes Hjs.
+      + inversion Hes=>//; simplify_eq=>//.
+        escape_false.
+      + absurd_jstep Hjs.
+  Qed.
 
 End rules.

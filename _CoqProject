@@ -18,7 +18,6 @@ theories/clang/lib/list.v
 theories/clang/lib/spec.v
 theories/clang/lib/refine.v
 theories/clang/lib/refine_sound.v
-theories/clang/lib/reentrant.v
 theories/clang/lib/interrupt.v
 theories/clang/lib/page_table.v
 theories/clang/lib/vmm.v

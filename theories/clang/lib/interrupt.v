@@ -40,9 +40,9 @@ Section definitions.
     closed_timeless γ : TimelessP (closed γ);
     closed_exclusive γ : closed γ -∗ closed γ -∗ False; (* can't close twice *)
     (* HACK *)
-    sti : expr := Ecall f_sti [];
-    cli : expr := Ecall f_cli [];
-    create_task (f: ident) (p: nat): expr := Ecall f_create_task [Eident f; Enat p];
+    sti : expr := Ecall_typed Tvoid f_sti [];
+    cli : expr := Ecall_typed Tvoid f_cli [];
+    create_task (f: ident) (p: nat): expr := Ecall_typed Tvoid f_create_task [Eident f; Enat p];
     sti_nj: is_jmp sti = false;
     cli_nj: is_jmp cli = false;
     (* -- operation specs -- *)
