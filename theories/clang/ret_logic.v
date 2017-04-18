@@ -1,4 +1,4 @@
-From iris_c.clang Require Import logic.
+From iris_c.clang Require Export logic.
 From iris_c.lib Require Import pair.
 
 Section wp_ret.
@@ -120,6 +120,10 @@ Section wp_ret.
           rewrite -fill_app. iApply "IH".
           done.
   Qed.
+
+  Lemma wpr_seq E e1 e2 Φ Φret:
+    wpr E e1 (λ v, wpr E (Eseq (Evalue v) e2) Φ Φret) Φret ⊢ wpr E (Eseq e1 e2) Φ Φret.
+  Proof. iIntros "Hseq". iApply (wpr_bind [EKseq e2])=>//. Qed.
 
   Lemma wpr_ret v E Φ Φret:
     Φret v ⊢ wpr E (Erete (Evalue v)) Φ Φret.

@@ -36,6 +36,6 @@ Notation "'while' [ c ] ( e ) <{ s }>" := (Ewhile c%E e%E s%E)
   (at level 200, c, e, s at level 200) : expr_scope.
 Notation "s1 ;; s2" := (Eseq s1%E s2%E)
   (at level 100, s2 at level 200, format "s1  ;;  s2") : expr_scope.
-Notation "'rete' e" := (Erete e%E) (at level 80): expr_scope.
+Notation "'return:' e" := (Erete e%E) (at level 80): expr_scope.
 Notation "'let:' x ::: t := e1 'in' e2" := (Elet_typed t x e1%E e2%E)
   (at level 102, x, t at level 1, e1, e2 at level 200) : expr_scope.

@@ -27,7 +27,7 @@ Section example.
     py <- !py@Tint32 + x ;;
     x <- !py@Tint32 ;;
     sti i ;;
-    rete x.
+    return: x.
 
   Definition f_rel (vx: int) (s: spec_state) (r: option val) (s': spec_state) :=
     ∃ vy:int, s !! Y = Some (Vint32 vy) ∧
