@@ -572,7 +572,7 @@ Section rules.
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
 
-  Lemma wp_call {E k ks} vs params e e' f retty Φ:
+  Lemma wp_call {E ks} k vs params e e' f retty Φ:
     let_params vs params e = Some e' →
     text_interp f (Function retty params e) ∗
     own_stack ks ∗

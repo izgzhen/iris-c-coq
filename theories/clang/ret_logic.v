@@ -172,7 +172,7 @@ Section wp_ret.
     ⊢ wp E (fill_ectxs (Ecall_typed retty f (map Evalue vs)) k) Φ.
   Proof.
     iIntros (?) "(?&?&?)".
-    iApply (@wp_call _ _ _ k)=>//.
+    iApply (wp_call k)=>//.
     iFrame. iNext. iIntros "H". clear H0.
     iLöb as "IH" forall (Φ k ks e').
     rewrite wp_unfold /wp_pre.

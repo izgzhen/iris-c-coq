@@ -45,7 +45,7 @@ Section example.
     ⊢ WP fill_ectxs (Ecall_typed Tint32 f [Evalue vx]) k {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & HΦ)".
-    iApply (wp_call [Vint32 vx] [(x, Tint32)] f_body)=>//.
+    iApply (wp_call _ [Vint32 vx] [(x, Tint32)] f_body)=>//.
     iFrame. iNext. iIntros "Hstk".
     wp_bind (Ealloc _ _). wp_alloc px as "Hpx".
     iApply wp_value=>//. wp_let. iApply wp_seq=>//.

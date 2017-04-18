@@ -107,7 +107,7 @@ Section proof.
       ⊢ WP Ecall_typed Tvoid f [Evalue lx ; Evalue ly] {{ Φ }}.
    Proof.
     iIntros (???) "(Hf & Hlx & Hly & Hs & HΦ)". unfold rev_list.
-    iApply (@wp_call _ _ _ [] _ [lx; ly]); last iFrame; first by simpl.
+    iApply (wp_call [] [lx; ly]); last iFrame; first by simpl.
     iNext. iIntros "Hs'". 
     iDestruct (isList_ptr with "Hly") as "%".
     iDestruct (isList_ptr' with "Hlx") as "%".
@@ -118,4 +118,3 @@ Section proof.
   Qed.
 
 End proof.
-
