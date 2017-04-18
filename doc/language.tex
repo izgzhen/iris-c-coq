@@ -10,15 +10,42 @@ The language is a simplified version of C. It mainly consists of
 
 \begin{align*}
     \tau : \Type \bnfdef{}&
-        \tyvoid \mid \tynull \mid \tybyte \mid \tyword \mid \typtr{\tau} \mid \tau \times \tau
+        \tyvoid \mid
+        \tynull \mid
+        \tybyte \mid
+        \tyword \mid
+        \typtr{\tau} \mid
+        \tau \times \tau
 \\
     v : \Val \bnfdef{}&
-        \void \mid \vnull \mid i \in [0, 2^8) \mid i \in [0, 2^{32}) \mid l \mid (v, v)
+        \void \mid
+        \vnull \mid
+        i \in [0, 2^8) \mid
+        i \in [0, 2^{32}) \mid
+        l \mid
+        (v, v)
 \\
     e : \Expr \bnfdef{}&
-       v \mid x \mid e \oplus e \mid \deref{e} \mid \dereft{\tau}{e} \mid \& e \mid \efst{e} \mid \esnd{e} \\&
-       \sskip \mid e \la e \mid \sif{e}{e}{e} \mid \swhile{e}{e}{e} \mid \\&
-       \srete{e} \mid \scall{f}{e_1, ..., e_n} \mid e ; e \mid \alloc{\tau}{e}
+       v \mid
+       x \mid
+       e \oplus e \mid
+       \ederef{e} \mid
+       \edereft{\tau}{e} \mid
+       \eaddrof{e} \mid
+       \efst{e} \mid
+       \esnd{e}
+       \\&
+       e \la e \mid
+       \eif{e}{e}{e} \mid
+       \ewhile{e}{e}{e} \mid
+       \\&
+       \erete{e} \mid
+       \ecall{\tau}{f}{e_1, ..., e_n} \mid
+       e ; e \mid
+       \ealloc{\tau}{e} \mid
+       \\&
+       \elet{\tau}{x}{e}{e} \mid
+       \eCAS{\tau}{e}{e}{e}
 \\
 \end{align*}
 
@@ -33,7 +60,7 @@ We also have following definitions:
     parameter declarations and function body.
 \end{itemize}
 
-(NOTE) The relationship between $\deref{e}$ and $\dereft{\tau}{e}$: The former one is only used in source,
+(NOTE) The relationship between $\ederef{e}$ and $\edereft{\tau}{e}$: The former one is only used in source,
 and the later one is used in the actual semantics and inference rules.
 By adding a pre-processing step which instantiates all source-only expression to substituted/typed ones,
 we can remove lexical and typing environment from the core program logic. The details are in \ref{par:tyev}.
@@ -53,11 +80,27 @@ we define the \emph{evaluation context}:
 
 \begin{align*}
     \ctx : \ectx \eqdef{}&
-        \emptyctx \oplus e \mid v \oplus \emptyctx \mid
-        \deref{\emptyctx} \mid \& \emptyctx \mid
-        \efst{\emptyctx} \mid \esnd{\emptyctx} \mid \\&
-        \emptyctx \la e \mid l \la \emptyctx \mid \sif{\emptyctx}{e}{e} \mid \swhile{e}{\emptyctx}{e} \mid \\&
-        \srete{\emptyctx} \mid \scall{f}{v_1, ..., \emptyctx, e_1, ...} \mid \alloc{\tau}{\emptyctx} \mid \emptyctx ; e
+        \elet{\tau}{x}{\emptyctx}{e} \mid
+        \emptyctx \oplus e \mid
+        v \oplus \emptyctx \mid
+        \edereft{\tau}{\emptyctx} \mid
+        \eaddrof{\emptyctx} \mid
+        \efst{\emptyctx} \mid
+        \esnd{\emptyctx} \mid
+        \\&
+        \eCAS{\tau}{\emptyctx}{e}{e} \mid
+        \eCAS{\tau}{l}{\emptyctx}{e} \mid
+        \eCAS{\tau}{l}{v}{\emptyctx} \mid
+        \\&
+        \emptyctx \la e \mid
+        l \la \emptyctx \mid
+        \eif{\emptyctx}{e}{e} \mid
+        \ewhile{e}{\emptyctx}{e} \mid
+        \\&
+        \erete{\emptyctx} \mid
+        \ecall{\tau}{f}{v_1, ..., \emptyctx, e_1, ...} \mid
+        \ealloc{\tau}{\emptyctx} \mid
+        \emptyctx ; e
 \end{align*}
 
 \subsection{Semantics}\label{sec:semantics}
@@ -86,33 +129,44 @@ and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) point-wise.
 \begin{figure}[!ht]
 \begin{mathpar}\label{fig:semantics}
 
-\infer[ES-BINOP]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{h}{v'}{h}}
+\infer[es-binop]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{h}{v'}{h}}
 
-\infer[ES-DEREF-TYPED]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\dereft{\tau}{l}}{h}{v}{h}}
+\infer[es-deref-typed]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\edereft{\tau}{l}}{h}{v}{h}}
 
-\infer[ES-FST]{}{\estep{\efst{(v_1, v_2)}}{h}{v_1}{h}}
+\infer[es-fst]{}{\estep{\efst{(v_1, v_2)}}{h}{v_1}{h}}
 
-\infer[ES-SND]{}{\estep{\esnd{(v_1, v_2)}}{h}{v_2}{h}}
+\infer[es-snd]{}{\estep{\esnd{(v_1, v_2)}}{h}{v_2}{h}}
 
-\infer[ES-ASSIGN]{}{\estep{l \la v}{h}{\sskip}{h[ l \mapsto \encode(v) ]}}
+\infer[es-assign]{}{\estep{l \la v}{h}{\eskip}{h[ l \mapsto \encode(v) ]}}
 
-\infer[ES-SEQ]{}{\estep{v ; e}{h}{e}{h}}
+\infer[es-seq]{}{\estep{v ; e}{h}{e}{h}}
 
-\infer[ES-ALLOC]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\alloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
+\infer[es-alloc]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\ealloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
 
-\infer[ES-WHILE-TRUE]{}{\estep{\swhile{c}{\vtrue}{s}}{h}{s; \swhile{c}{c}{s}}{h}}
+\infer[es-while-true]{}{\estep{\ewhile{c}{\vtrue}{s}}{h}{s; \ewhile{c}{c}{s}}{h}}
 
-\infer[ES-WHILE-FALSE]{}{\estep{\swhile{c}{\vfalse}{s}}{h}{\sskip}{h}}
+\infer[es-while-false]{}{\estep{\ewhile{c}{\vfalse}{s}}{h}{\eskip}{h}}
 
-\infer[ES-BIND']{\isjmp(e) = \FALSE \quad \estep{e}{h}{e'}{h'}}{\estep{(k::ks)e}{h}{(k::ks)e'}{h'}}
+\infer[es-bind']{\isjmp(e) = \FALSE \quad \estep{e}{h}{e'}{h'}}{\estep{(k::ks)e}{h}{(k::ks)e'}{h'}}
 
-\infer[JS-RETE]
-  {\unfill(k(\srete{v})) = (k', \srete{v})}
-  {\jstep{\Sigma}{k'(\srete{v})}{k::ks}{k(v)}{ks}}
+\infer[es-cas-fail]
+{\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad \tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v) \quad v_1 \neq v}
+{\estep{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vfalse}{h}}
 
-\infer[JS-CALL]
-  {\Sigma(f) = \Funct(\any, ps, e)}
-  {\jstep{\Sigma}{k(\scall{f}{ls})}{ks}{e[ps/ls]}{k::ks}}
+\infer[es-cas-suc]
+{\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad h \vdash l \mapsto \encode(v_1)}
+{\estep{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vtrue}{h[ l \mapsto \encode(v_2) ]}}
+
+\infer[es-let]
+{}{\estep{\elet{\tau}{x}{v}{e}}{h}{e[x/v:\tau]}{h}}
+
+\infer[js-rete]
+  {\unfill(k(\erete{v})) = (k', \erete{v})}
+  {\jstep{\Sigma}{k'(\erete{v})}{k::ks}{k(v)}{ks}}
+
+\infer[js-call]
+  {\Sigma(f) = \Funct(\tau, ps, e)}
+  {\jstep{\Sigma}{k(\ecall{\tau}{f}{ls})}{ks}{e[ps/ls]}{k::ks}}
 
 \end{mathpar}
 \caption{Semantics rules}
@@ -122,7 +176,7 @@ and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) point-wise.
 
 \paragraph{Local Typing Rules.}
 
-The types are defined in \Sref{p:type}, and all values in $\val$ can be \emph{locally} typed trivially (since $\val$ is introduced to reflect type structure in some sense). Nevertheless, due to the fact that language of study is weakly-typed in the vein of C, we still have some ``weird'' rules worth documenting.
+The types are defined in \Sref{p:type}, and all values in $\val$ can be \emph{locally} typed trivially (since $\val$ is introduced to reflect type structure in some sense). Nevertheless, due to the fact that the language of study is weakly-typed in the vein of C, we still have some ``weird'' rules worth documenting.
 
 Here we define local typing judgment $\tychk{v}{\tau}$ for values.
 
@@ -148,35 +202,18 @@ and TYPEOF-PTR means that a pointer can have \emph{any} pointer type.
 
 \paragraph{Lexical Environment}\label{par:tyev}
 
-In \irisc{}, before we do any real work over a function body,
-variables are all replaced with their bindings, and type information is tagged to the untyped parts when in need.
-More specifically, we will replace variables with either their location (when in left-hand side)
-or the dereference of their location (when in right-hand side). We will produce a pointer arithmetic
+Formally, the lexical environment for a function body consists of two parts:
+parameter bindings (free variables) and local bindings (introduced by \texttt{let}).
+
+Every time we call a function, we will desugar the first part into the second part by recursively
+binding parameters to allocated argument values (as implemented in \texttt{let\_params} and typesetted as $e[ps/ls]$).
+
+Now we focus on what $e[x/v:\tau]$ means in the semantics of \texttt{let}-binding:
+Essentially, variable $x$ is replaced with its binding $v$, and type information is tagged to the untyped parts when in need.
+More specifically, we will replace variable with either its location (when in left-hand side)
+or the dereference of its location (when in right-hand side). We will produce a pointer arithmetic
 expression when processing the left-hand side expression, which in turn requires type inference $\tyinf{e}{\tau}$
 (since it is standard and trivial, we will leave out the details here).
 
-Now we write down the algorithmic rules  for rewriting left-hand side expression ($\reslhs{e}$)
-and right-hand side expression ($\resrhs{e}$). Essentially, $\reslhs{e}$ will rewrite the left-hand side $e$ into its location
-in memory, while $\resrhs{e}$ will add dereference to all variables in $e$.
-
-Note that environment $\Gamma : \Env \eqdef [x \gmapsto (\tau, l)]$ is assumed, and if any operation fails, like missing something in $\Gamma$,
-then the rule will indicate it in the actual implementation.
-And also, the cases not covered are defined trivially.
-
-\begin{align*}\label{envrules}
-\reslhs{e_1 \la e_2} =&\, \reslhs{e_1} \la e_2\\
-\reslhs{x} =&\, \Gamma(x).l \\
-\reslhs{\deref{e}} =&\, \resrhs{e} \\
-\reslhs{\efst{e}} =&\, \reslhs{e} \\
-\reslhs{\esnd{e}} =&\, \reslhs{e} + \sizeof(\tau_1) \quad \text{if } \tyinf{\reslhs{e}}{\typtr{(\tau_1 \times \tau_2)}}\\
-\reslhs{l} =&\, l\\
-\\
-\resrhs{e_1 \la e_2} =&\, e_1 \la \resrhs{e_2}\\
-\resrhs{x} =&\, \dereft{\Gamma(x).t}{\Gamma(x).l} \\
-\resrhs{\deref{e}} =&\, \dereft{\tau}{\resrhs{e}} \quad \text{if } \tyinf{e}{\typtr{\tau}}
-\end{align*}
-
-%%% Local Variables:
-%%% mode: latex
-%%% TeX-master: "iris"
-%%% End:
+We won't document the algorithmic rules for rewriting expressions.
+You may refer to \texttt{resolve\_rhs}, \texttt{resolve\_lhs\_outer} and \texttt{resolve\_lhs\_inner} for details.

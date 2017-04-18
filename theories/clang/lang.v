@@ -25,7 +25,6 @@ Inductive expr :=
 | Evalue (v: val)
 | Evar (x: ident)
 | Elet_typed (t: type) (x: ident) (ex ebody: expr)
-| Eident (x: ident) (* kinda weird, normally function identifier *)
 | ECAS_typed (t: type) (e1 e2 e3: expr)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
 | Ederef (e: expr)
@@ -231,7 +230,6 @@ Qed.
 Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
   match e with
     | Evalue v => Some e
-    | Eident x => Some e
     | Ederef_typed _ _ => Some e
     | Ealloc t e => Ealloc t <$> resolve_rhs ev x vx tx e
     | Evar x' => (* closed-ness? *)

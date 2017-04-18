@@ -45,10 +45,19 @@ Here are some conventions:
 \end{itemize}
 
 \paragraph{Laws of weakest precondition.}
-The following rules can all be derived:
+The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all be derived.
+
+\begin{figure}[!ht]
+\label{fig:wp-general}
 \begin{mathpar}
 \infer[wp-value]
 {}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}}
+
+
+\infer[wp-atomic]
+{\physatomic{\expr}}
+{\pvs[\mask_1][\mask_2] \wpre\expr[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
+ \proves \wpre\expr[\mask_1]{\Ret\var.\prop}}
 
 \infer[wp-strong-mono]
 {\mask_1 \subseteq \mask_2}
@@ -61,25 +70,25 @@ The following rules can all be derived:
 \infer[wp-fup]
 {}{\wpre\cureval[\mask]{\Ret\var.\pvs[\mask] \pred(\var)}{\Ret\var.\pvs[\mask] \predret(\var)} \proves \wpre\expr[\mask]{\pred}}
 
-%%%% The following ones are Iris-C specific
+\end{mathpar}
+\caption{General WP rules provided by Iris}
+\end{figure}
+
+\begin{figure}[!ht]
+\label{fig:wp-irisc}
+\begin{mathpar}
 
 \infer[wp-skip]
 {}{\later \wpre{e}[\mask]{\pred} \proves \wpre{\val; e}[\mask]{\pred}}
 
+ \infer[wp-assign]
+{\tychk{v}{\tau'} \quad \assigncomp{\tau}{\tau'}}
+{ \later l \mapsto - : \tau * \later (l \mapsto v : \tau \wand \pred)
+ \proves
+ \wpre{l \la v}[\mask]{\pred}}
+
 \infer[wp-ret]
-{}{\ownstack(k'::ks) * (\ownstack(ks) \wand \wpre{k'(v)}[\mask]{\pred}) \proves \wpre{k(\srete{v})}[\mask]{\pred}}
-
-% \infer[wp-atomic]
-% {\physatomic{\expr}}
-% {\pvs[\mask_1][\mask_2] \wpre\expr[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
-%  \proves \wpre\expr[\mask_1]{\Ret\var.\prop}}
-
-% \infer[wp-frame]
-% {}{\propB * \wpre\expr[\mask]{\Ret\var.\prop} \proves \wpre\expr[\mask]{\Ret\var.\propB*\prop}}
-
-% \infer[wp-frame-step]
-% {\toval(\expr) = \bot \and \mask_2 \subseteq \mask_1}
-% {\wpre\expr[\mask_2]{\Ret\var.\prop} * \pvs[\mask_1][\mask_2]\later\pvs[\mask_2][\mask_1]\propB \proves \wpre\expr[\mask_1]{\Ret\var.\propB*\prop}}
+{}{\ownstack(k'::ks) * (\ownstack(ks) \wand \wpre{k'(v)}[\mask]{\pred}) \proves \wpre{k(\erete{v})}[\mask]{\pred}}
 
 \infer[wp-bind]
 {\isjmp(e) = \FALSE}
@@ -93,17 +102,11 @@ The following rules can all be derived:
  \proves
  \wpre{v_1 \oplus v_2}[\mask]{\pred}}
 
- \infer[wp-assign]
-{\tychk{v}{\tau'} \quad \assigncomp{\tau}{\tau'}}
-{ \later l \mapsto - : \tau * \later (l \mapsto v : \tau \wand \pred)
- \proves
- \wpre{l \la v}[\mask]{\pred}}
-
  \infer[wp-load]
 {}
 { \later l \mapsto_q v : \tau  * \later (l \mapsto_q v : \tau \wand \pred (v))
  \proves
- \wpre{\dereft{\tau}{l}}[\mask]{\pred}}
+ \wpre{\edereft{\tau}{l}}[\mask]{\pred}}
 
 \infer[wp-seq]
 {\isjmp(e_1) = \FALSE}
@@ -112,18 +115,18 @@ The following rules can all be derived:
  \wpre{e_1 ; e_2}[\mask]{\pred}}
 
 \infer[wp-while-true]
-{}{\later \wpre{s; \swhile{c}{c}{s}}[\mask]{\pred}
-   \proves \wpre{\swhile{c}{\vtrue}{s}}[\mask]{\pred}}
+{}{\later \wpre{s; \ewhile{c}{c}{s}}[\mask]{\pred}
+   \proves \wpre{\ewhile{c}{\vtrue}{s}}[\mask]{\pred}}
 
 \infer[wp-while-false]
 {}{\later \pred(\void)
-   \proves \wpre{\swhile{c}{\vfalse}{s}}[\mask]{\pred}}
+   \proves \wpre{\ewhile{c}{\vfalse}{s}}[\mask]{\pred}}
 
 \infer[wp-while-inv]
 { {\begin{inbox}
       \qquad\qquad\qquad \isjmp(s) = \FALSE \qquad \isjmp(c) = \FALSE \\ \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{c}{\pred} \\ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
  \end{inbox}} }
-{I \proves \wpre{\swhile{c}{c}{s}}{Q}}
+{I \proves \wpre{\ewhile{c}{c}{s}}{Q}}
 
 \infer[wp-fst]
 {}
@@ -135,14 +138,29 @@ The following rules can all be derived:
 
 \infer[wp-alloc]
 {\tychk{v}{\tau}}
-{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\alloc{\tau}{v}}[\mask]{\pred}}
+{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\ealloc{\tau}{v}}[\mask]{\pred}}
 
 \infer[wp-call]
 {}
-{ f \tmapsto \Funct(\any, ps, e) * \ownstack(ks) * \later (\ownstack(k::ks) \wand \wpre{e[ps/ls]}[\mask]{\pred})
-  \proves \wpre{k(\scall{f}{ls})}[\mask]{\pred}}
+{ f \tmapsto \Funct(\tau, ps, e) * \ownstack(ks) * \later (\ownstack(k::ks) \wand \wpre{e[ps/ls]}[\mask]{\pred})
+  \proves \wpre{k(\ecall{\tau}{f}{ls})}[\mask]{\pred}}
+
+\infer[wp-cas-fail]
+{\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad v_1 \neq v}
+{\later l \mapsto_q v : \tau * \later (l \mapsto_q v : \tau \wand \pred(\vfalse))
+ \proves \wpre{\eCAS{\tau}{l}{v_1}{v_2}}[\mask]{\pred}}
+
+\infer[wp-cas-suc]
+{\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau}}
+{\later l \mapsto_q v_1 : \tau * \later (l \mapsto_q v_2 : \tau \wand \pred(\vfalse))
+ \proves \wpre{\eCAS{\tau}{l}{v_1}{v_2}}[\mask]{\pred}}
+
+\infer[wp-let]
+{}{\later \wpre{e[x/v:\tau]}[\mask]{\pred} \proves \wpre{\elet{\tau}{x}{v}{e}}[\mask]{\pred}}
 
 \end{mathpar}
+\caption{WP rules specific to \irisc{}}
+\end{figure}
 
 \subsection{Extending Weakest Precondition}\label{def:wpr}
 
@@ -154,7 +172,7 @@ by defining it as below:
         & (\Exists v. \toval(e) = v \land \pred(v)) \lor {}\\
         & (\toval(e) = \bot \,\land \Exists e_h, K. e = K(e_h) \land \Bigl({}\\
         &\qquad (\isjmp(e_h) = \FALSE * \wpre{e_h}[\mask]{\Ret v. \wprer{K(v)}[\mask]{\pred}{\predret}}) \lor \\
-        &\qquad (\Exists v. e_h = \srete{v} * \later \predret(v)) \lor \\
+        &\qquad (\Exists v. e_h = \erete{v} * \later \predret(v)) \lor \\
         &\qquad (\Exists f, ps, ls, F. \\
                            & \qquad \qquad f \tmapsto \Funct(\any, ps, F) * \\
                            & \qquad \qquad \later (\wprer{F[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v.
@@ -167,7 +185,7 @@ And this definition supports the following inference rules:
 \begin{mathpar}
 \infer[wpr-value]{}{\pred(v) \proves \wprer{v}[\mask]{\pred}{\predret}}
 
-\infer[wpr-ret]{}{\predret(v) \proves \wprer{\srete{v}}[\mask]{\pred}{\predret}}
+\infer[wpr-ret]{}{\predret(v) \proves \wprer{\erete{v}}[\mask]{\pred}{\predret}}
 
 \infer[wpr-bind]
 {}
@@ -175,27 +193,35 @@ And this definition supports the following inference rules:
  \proves 
  \wprer{k(\expr)}[\mask]{\pred}{\predret}}
 
+\infer[wpr-seq]
+{}
+{\wprer{e_1}{\Ret\var. \wprer{\var ; e_2}[\mask]{\pred}{\predret}}{\predret}
+ \proves 
+ \wprer{e_1; e_2}[\mask]{\pred}{\predret}}
+
 \infer[wpr-call]
 {}
-{ f \tmapsto \Funct(\any, ps, e) * \later (\wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\pred})
-  \proves \wprer{k(\scall{f}{ls})}[\mask]{\pred}{\predret}}
+{ f \tmapsto \Funct(\tau, ps, e) * \later (\wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\pred})
+  \proves \wprer{k(\ecall{\tau}{f}{ls})}[\mask]{\pred}{\predret}}
 
- \infer[wpr-op]
+\infer[wpr-op]
 {\llbracket oplus \rrbracket (v_1, v_2) = v'}
 {\pred(v')
  \proves
  \wprer{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
 
 \infer[wp-call-r]
-{f \tmapsto \Funct(\any, ps, e) * \ownstack(ks) *
+{f \tmapsto \Funct(\tau, ps, e) * \ownstack(ks) *
  \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \ownstack(ks) * \wpre{k(v)}[\mask]{\pred}} }
-{\wpre{k(\scall{f}{ls})}[\mask]{\pred}}
+{\wpre{k(\ecall{\tau}{f}{ls})}[\mask]{\pred}}
 
 \end{mathpar}
 
-Note how WP-CALL, WP-RET, and WP-BIND are simplified in their new, corresponding versions,
+Note how WP-CALL, WP-RET, WP-SEQ, and WP-BIND are simplified in their new, corresponding versions,
 also the fact that we can recover local evaluation like WP-OP trivially
 (and we won't duplicate too much here).
+
+We also features a rule to compose two styles together freely: WP-CALL-R.
 
 \subsection{Soundness}
 

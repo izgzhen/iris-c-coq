@@ -13,9 +13,11 @@ including:
     \item \texttt{wp\_bind <p>}: bind to a head term, or a term containing the head term, with pattern \texttt{p}
     \item \texttt{wp\_assign}: make a step by evaluating assignment's head term $l \la v$
         (it also shifts following statements by applying \texttt{wp\_seq} repetitively beforehand)
-    \item \texttt{wp\_load}, \texttt{wp\_op}, \texttt{wp\_fst}, \texttt{wp\_snd} are similar to the one above
+    \item \texttt{wp\_load}, \texttt{wp\_alloc}, \texttt{wp\_op}, \texttt{wp\_fst},
+        \texttt{wp\_snd}, \texttt{wp\_cas\_fail}, \texttt{wp\_cas\_suc}, \texttt{wp\_let}
+        are similar to the one above
     \item \texttt{wp\_skip}: skip over any value before a sequencing operator
-    \item \texttt{wp\_run}: keep executing as long as any of the above applies, which feels like doing
+    \item \texttt{wp\_run}: keep executing as long as it can, which feels like doing
       symbolic execution automatically
     \item \texttt{wp\_ret}: return if the head expression is already value
 \end{itemize}

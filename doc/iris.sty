@@ -419,20 +419,20 @@
 % expressions
 
 \newcommand{\ecast}[2]{{#1} \, \texttt{as} \, {#2}}
-\newcommand{\deref}[1]{\,!\,{#1}}
-\newcommand{\dereft}[2]{\,!_{#1}\,{#2}}
+\newcommand{\ederef}[1]{\,!\,{#1}}
+\newcommand{\edereft}[2]{\,!_{#1}\,{#2}}
 \newcommand{\efst}[1]{{#1}.1}
+\newcommand{\eaddrof}[1]{\& {#1}}
 \newcommand{\esnd}[1]{{#1}.2}
+\newcommand{\eif}[3]{\texttt{if}({#1})\,\{{#2}\}\,\texttt{else}\,\{{#3}\}}
+\newcommand{\ewhile}[3]{\texttt{while}_{#1}({#2})\,\{{#3}\}}
+\newcommand{\erete}[1]{\texttt{return}\,{#1}}
+\newcommand{\ealloc}[2]{\texttt{alloc}_{#1}(#2)}
+\newcommand{\elet}[4]{\texttt{let}\,{#2} : {#1} \vcentcolon= {#3} \,\texttt{in} \, {#4}}
+\newcommand{\eCAS}[4]{\texttt{CAS}({#2}, {#3}, {#4}):{#1}}
+\newcommand{\ecall}[3]{{#2}({#3}):{#1}}
 
-% statements
-
-\newcommand{\sskip}{\texttt{skip}}
-\newcommand{\sif}[3]{\texttt{if}({#1})\,\{{#2}\}\,\texttt{else}\,\{{#3}\}}
-\newcommand{\swhile}[3]{\texttt{while}_{#1}({#2})\,\{{#3}\}}
-\newcommand{\sret}{\texttt{return}}
-\newcommand{\srete}[1]{\texttt{return}\,{#1}}
-\newcommand{\alloc}[2]{\texttt{alloc}_{#1}(#2)}
-\newcommand{\scall}[2]{{#1}({#2})}
+\newcommand{\eskip}{\void}
 
 % primitives
 
