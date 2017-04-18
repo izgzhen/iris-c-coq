@@ -47,3 +47,9 @@ but included for convenience:
 - `lib/CoqLib.v`
 - `lib/CpdtTactics.v`
 - `lib/Integers.v`
+
+## Licensing
+
+All code is licensed under [3-clause BSD](https://opensource.org/licenses/BSD-3-Clause).
+
+All doc is licensed under [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/).
