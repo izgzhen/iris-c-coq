@@ -528,7 +528,7 @@ Section rules.
 
   Lemma wp_alloc E v t Φ:
     typeof v t →
-    (∀ l, l ↦ v @ t -∗ Φ (Vptr l))
+    ▷ (∀ l, l ↦ v @ t -∗ Φ (Vptr l))
     ⊢ WP Ealloc t (Evalue v) @ E {{ Φ }}.
   Proof.
     iIntros (?) "HΦ".

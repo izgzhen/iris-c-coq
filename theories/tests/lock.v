@@ -55,9 +55,7 @@ Section spin_lock.
   Proof.
     iIntros "[HR HΦ]".
     rewrite -wp_fupd /newlock /=.
-    iApply wp_alloc.
-    { constructor. }
-    iIntros (l) "Hl".
+    wp_alloc l as "Hl". iApply wp_value=>//.
     iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
     iMod (inv_alloc N _ (lock_inv γ l R) with "[-HΦ]") as "#?".
     { iIntros "!>". iExists false. by iFrame. }
@@ -80,13 +78,13 @@ Section spin_lock.
       iIntros "Hl".
       iMod ("Hclose" with "[-HΦ]").
       { iNext. iExists _. iFrame. }
-      iModIntro. wp_run. iNext. wp_run.
+      iModIntro. wp_run.
       iApply "IH". iFrame. iExists _. iSplit=>//.
     - wp_cas_suc.
       iIntros "Hl'".
       iMod ("Hclose" with "[-HΦ HR]").
       { iNext. iExists true. iFrame. }
-      iModIntro. wp_run. iNext. wp_run.
+      iModIntro. wp_run.
       iDestruct "HR" as "[Ho HR]".
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.

@@ -68,6 +68,21 @@ Tactic Notation "wp_bind" open_constr(efoc) :=
 Section heap.
 Context `{clangG Σ}.
 
+Lemma tac_wp_alloc Δ Δ' E j v t Φ :
+  typeof v t →
+  IntoLaterNEnvs 1 Δ Δ' →
+  (∀ l, ∃ Δ'',
+    envs_app false (Esnoc Enil j (l ↦ v @ t)) Δ' = Some Δ'' ∧
+    (Δ'' ⊢ Φ (Vptr l))) →
+  Δ ⊢ WP Ealloc t (Evalue v) @ E {{ Φ }}.
+Proof.
+  intros ?? HΔ. eapply (wand_apply True%I).
+  { iApply wp_alloc; first done. }
+  rewrite left_id into_laterN_env_sound; apply later_mono, forall_intro=> l.
+  destruct (HΔ l) as (Δ''&?&HΔ'). rewrite envs_app_sound //; simpl.
+  by rewrite right_id HΔ'.
+Qed.
+
 Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ:
   typeof v' t' → assign_type_compatible t t' →
   IntoLaterNEnvs 1 Δ Δ' →
@@ -122,6 +137,25 @@ Tactic Notation "wp_assign" :=
   | _ => fail "wp_assign: not a 'wp'"
   end.
 
+Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
+  iStartProof;
+  repeat (iApply wp_seq; first by simpl);
+  lazymatch goal with
+  | |- _ ⊢ wp ?E ?e ?Q =>
+    first
+      [reshape_expr e ltac:(fun K e' =>
+         match eval hnf in e' with Ealloc _ _ => wp_bind_core K end)
+      |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
+    eapply tac_wp_alloc with (j:=H);
+      [ wp_done || fail "wp_alloc: not typeof"
+      | apply _
+      | first [intros l | fail 1 "wp_alloc:" l "not fresh"];
+        eexists; split;
+          [ env_cbv; reflexivity || fail "wp_alloc:" H "not fresh"
+          | auto ]]
+  | _ => fail "wp_alloc: not a 'wp'"
+end.
+
 Tactic Notation "wp_load" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
@@ -135,7 +169,7 @@ Tactic Notation "wp_load" :=
       [apply _
       |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
        iAssumptionCore || fail "wp_load: cannot find" l "↦ ?"
-      |(* wp_finish *) auto]
+      | auto]
   | _ => fail "wp_load: not a 'wp'"
   end.
 
@@ -172,6 +206,9 @@ Tactic Notation "wp_snd" :=
   | _ => fail "wp_op: not a 'wp'"
 end.
 
+Tactic Notation "wp_alloc" ident(l) :=
+  let H := iFresh in wp_alloc l as H.
+
 Tactic Notation "wp_cas_fail" :=
   iApply wp_cas_fail; last iFrame;
   [ by simpl | constructor | constructor | iNext ].
@@ -181,6 +218,8 @@ Tactic Notation "wp_cas_suc" :=
   [ constructor | constructor | iNext; iFrame ].
 
 Tactic Notation "wp_ret" := iApply (wp_ret []).
+
+Tactic Notation "wp_let" := iApply wp_let=>//; iNext.
 
 Ltac wp_run :=
   (match goal with
@@ -193,6 +232,7 @@ Ltac wp_run :=
    | |- _ => wp_load
    | |- _ => wp_ret
    | |- _ => wp_op
+   | |- _ ⊢ ▷ _ => iNext
   end; wp_run) || idtac.
 
 Ltac unfold_f_inst :=

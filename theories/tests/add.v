@@ -47,9 +47,8 @@ Section example.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & HΦ)".
     iApply (wp_call [Vint32 vx] [(x, Tint32)] f_body)=>//.
     iFrame. iNext. iIntros "Hstk".
-    wp_bind (Ealloc _ _). iApply wp_alloc=>//. iIntros (px) "Hpx".
-    iApply wp_let=>//. iNext.
-    iApply wp_seq=>//.
+    wp_bind (Ealloc _ _). wp_alloc px as "Hpx".
+    iApply wp_value=>//. wp_let. iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
