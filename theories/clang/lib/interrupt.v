@@ -47,9 +47,8 @@ Section definitions.
     create_task_spec E f e prio Φ :
       text_interp f (Function Tvoid [] e) ∗
       (∀ N: namespace,
-         (|={⊤, ⊤∖↑N}=> INVS_range prio ptot) -∗
-         (INVS_range prio ptot ={⊤, ⊤∖↑N}=∗ True) -∗
-         WP e {{ v, True%I}})
+         ⌜ ∀ E, N ⊥ E ⌝ -∗ INVS_range prio ptot -∗
+         WP e @ ⊤∖↑N {{ v, INVS_range prio ptot}})
       ⊢ WP create_task f prio @ E {{ Φ }};
     sti_spec prio γ γp Φ :
       int_ctx γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ Vvoid)
