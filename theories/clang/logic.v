@@ -341,6 +341,10 @@ Section rules.
       destruct σ; eexists _, _, _; by repeat constructor
     end.
 
+  Lemma mapsto_typeof l v t:
+    l ↦ v @ t ⊢ ⌜ typeof v t ⌝.
+  Proof. by iDestruct 1 as "[% ?]". Qed.
+  
   Lemma wp_load {E} Φ p v t q:
     ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP Ederef_typed t (Evalue (Vptr p)) @ E {{ Φ }}.
@@ -544,6 +548,30 @@ Section rules.
     iApply "HΦ". by iFrame.
   Qed.
 
+  Lemma wp_let E x t v e e' Φ:
+    instantiate_let x v t e = Some e' →
+    ▷ WP e' @ E {{ Φ }}
+    ⊢ WP Elet_typed t x (Evalue v) e @ E {{ Φ }}.
+  Proof.
+    iIntros (?) "HΦ".
+    iApply wp_lift_pure_step; first eauto.
+    - intros; solve_red.
+    - destruct 1 as [Hcs ?].
+      inversion_cstep_as Hes Hjs.
+      + inversion Hes=>//. simplify_eq.
+        escape_false.
+      + absurd_jstep Hjs.
+    - iNext. iIntros (e2 σ1 σ2 efs (Hcs&?)). subst.
+      iSplitL; last by rewrite big_sepL_nil.
+      inversion_cstep_as Hes Hjs.
+      + inversion Hes=>//; simplify_eq=>//.
+        escape_false.
+      + absurd_jstep Hjs.
+  Qed.
+  
+  Definition Edecl (t: type) (x: ident) e : expr :=
+    Elet_typed (Tptr t) x (Ealloc t (Evalue (default_val t))) e.
+    
   (* Call *)
 
   Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=
@@ -604,25 +632,5 @@ Section rules.
       by rewrite big_sepL_nil.
   Qed.
 
-  Lemma wp_let E x t v e e' Φ:
-    instantiate_let x v t e = Some e' →
-    ▷ WP e' @ E {{ Φ }}
-    ⊢ WP Elet_typed t x (Evalue v) e @ E {{ Φ }}.
-  Proof.
-    iIntros (?) "HΦ".
-    iApply wp_lift_pure_step; first eauto.
-    - intros; solve_red.
-    - destruct 1 as [Hcs ?].
-      inversion_cstep_as Hes Hjs.
-      + inversion Hes=>//. simplify_eq.
-        escape_false.
-      + absurd_jstep Hjs.
-    - iNext. iIntros (e2 σ1 σ2 efs (Hcs&?)). subst.
-      iSplitL; last by rewrite big_sepL_nil.
-      inversion_cstep_as Hes Hjs.
-      + inversion Hes=>//; simplify_eq=>//.
-        escape_false.
-      + absurd_jstep Hjs.
-  Qed.
 
 End rules.

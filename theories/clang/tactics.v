@@ -7,7 +7,7 @@ Import uPred.
 
 Ltac wp_done :=
   match goal with
-    | |- typeof _ _ => (fast_done || constructor)
+    | |- typeof _ _ => (fast_done || constructor || apply default_val_types)
     | |- assign_type_compatible _ _ => (fast_done || constructor)
     | _ => fast_done
   end.
@@ -133,7 +133,7 @@ Tactic Notation "wp_assign" :=
          iAssumptionCore || fail "wp_assign: cannot find" l "↦ ?"
         |env_cbv; reflexivity
         | auto (* wp_finish *)]
-    end); wp_skip
+    end); try wp_skip
   | _ => fail "wp_assign: not a 'wp'"
   end.
 

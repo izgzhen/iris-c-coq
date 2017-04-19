@@ -1153,3 +1153,17 @@ Ltac fill_enf_neq :=
     rewrite_empty_ctx; apply cont_inj in H=>//; by destruct H as [? ?]
   | _ => done
   end.
+
+Fixpoint default_val (t: type) :=
+  match t with
+    | Tvoid => Vvoid
+    | Tnull => Vnull
+    | Tint8 => Vint8 (Byte.repr 0)
+    | Tint32 => Vint32 (Int.repr 0)
+    | Tptr _ => Vnull
+    | Tprod t1 t2 => Vpair (default_val t1) (default_val t2)
+  end.
+
+Lemma default_val_types (t: type) :
+  typeof (default_val t) t.
+Proof. induction t; crush. Qed.
