@@ -11,17 +11,16 @@ Definition lockΣ : gFunctors := #[GFunctor (exclR unitC)].
 
 Section spin_lock.
 
-  Parameter lk: val.
-
-  Definition acquire : expr :=
+  Definition acquire (lk: expr) : expr :=
     while [ECAS_typed tybool lk vfalse vtrue == vfalse]
           (ECAS_typed tybool lk vfalse vtrue == vfalse )
-    <{ void }>.
+    <{ void }> ;;
+    return: void.
 
   Definition newlock : expr :=
     return: Ealloc tybool vfalse.
 
-  Definition release : expr :=
+  Definition release (lk: expr) : expr :=
     lk <- vfalse.
 
   Context `{!clangG Σ, !lockG Σ} (N: namespace).
@@ -30,8 +29,10 @@ Section spin_lock.
     (∃ b : bool, l ↦ b_to_v b @ tybool ∗
                  if b then True else own γ (Excl ()) ∗ R)%I.
 
+  Definition tylock := Tptr tybool.
+  
   Definition is_lock (γ : gname) (lk : val) (R : iProp Σ) : iProp Σ :=
-    (∃ l: addr, ⌜lk = Vptr l⌝ ∧ inv N (lock_inv γ l R))%I.
+    (∃ l: addr, ⌜lk = Vptr l ∧ typeof lk tylock ⌝ ∧ inv N (lock_inv γ l R))%I.
 
   Definition locked (γ : gname): iProp Σ := own γ (Excl ()).
 
@@ -50,6 +51,9 @@ Section spin_lock.
   Lemma locked_exclusive (γ : gname) : locked γ -∗ locked γ -∗ False.
   Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
 
+  Lemma is_lock_tylock γ l R: is_lock γ l R ⊢ ⌜ typeof l tylock ⌝.
+  Proof. iIntros "Hlk". iDestruct "Hlk" as (?) "[% ?]". by destruct H0. Qed.
+  
   Lemma newlock_spec' (R : iProp Σ) Φ k ks:
     own_stack (k::ks) ∗
     R ∗ (∀ γ lk, is_lock γ lk R -∗ own_stack ks -∗ WP fill_ectxs lk k {{ Φ }}) ⊢
@@ -62,9 +66,12 @@ Section spin_lock.
     iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
     iMod (inv_alloc N _ (lock_inv γ l R) with "[-Hs HΦ]") as "#?".
     { iIntros "!>". iExists false. by iFrame. }
-    iModIntro. iApply ("HΦ" with "[-Hs]")=>//. iExists l. eauto.
+    iModIntro. iApply ("HΦ" with "[-Hs]")=>//. iExists l. iSplit=>//.
+    iPureIntro. split=>//. constructor.
   Qed.
 
+  Definition lkx: ident := 1.
+  
   Lemma newlock_spec (R: iProp Σ) f Φ k ks:
     text_interp f (Function (Tptr tybool) [] newlock) ∗
     R ∗ own_stack ks ∗ (∀ γ lk, own_stack ks -∗ is_lock γ lk R -∗ WP fill_ectxs lk k {{ Φ }})
@@ -77,40 +84,44 @@ Section spin_lock.
     iApply ("HΦ" with "[-Hlk]")=>//.
   Qed.
 
-  Lemma acquire_spec γ R Φ:
-    is_lock γ lk R ∗ (locked γ -∗ R -∗ Φ void)
-    ⊢ WP acquire {{ Φ }}.
+  Lemma acquire_spec γ R Φ k ks (lk: val) f:
+    own_stack ks ∗ text_interp f (Function Tvoid [(lkx, tylock)] (acquire lkx)) ∗
+    is_lock γ lk R ∗ (locked γ -∗ R -∗ own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
+    ⊢ WP fill_ectxs (Ecall_typed Tvoid f [Evalue lk]) k {{ Φ }}.
   Proof.
+    iIntros "(Hs & Hf & #Hlk & HΦ)".
+    iApply (wp_call k [lk]); last iFrame; first done.
+    iNext. iIntros "Hs'". iDestruct (is_lock_tylock with "Hlk") as "%".
+    wp_alloc lkx as "Hlkx". wp_let. wp_load.
     iLöb as "IH".
-    iIntros "[#Hlk HΦ]".
     unfold acquire.
-    iDestruct "Hlk" as (l) "[% ?]". rewrite H.
+    iDestruct "Hlk" as (l) "[% ?]". destruct H0. rewrite H0.
     wp_bind (ECAS_typed _ _ _ _).
     iApply wp_atomic.
     { by apply atomic_enf. }
     iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro.
     - wp_cas_fail.
       iIntros "Hl".
-      iMod ("Hclose" with "[-HΦ]").
+      iMod ("Hclose" with "[-Hs' Hlkx HΦ]").
       { iNext. iExists _. iFrame. }
       iModIntro. wp_run.
-      iApply "IH". iFrame. iExists _. iSplit=>//.
+      iApply ("IH" with "HΦ Hs' Hlkx").
     - wp_cas_suc.
       iIntros "Hl'".
-      iMod ("Hclose" with "[-HΦ HR]").
+      iMod ("Hclose" with "[-HΦ Hlkx Hs' HR]").
       { iNext. iExists true. iFrame. }
       iModIntro. wp_run.
-      iDestruct "HR" as "[Ho HR]".
+      iDestruct "HR" as "[Ho HR]". iFrame.
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
 
-  Lemma release_spec γ R Φ:
+  Lemma release_spec lk γ R Φ:
     is_lock γ lk R ∗ locked γ ∗ R ∗ Φ void
-    ⊢ WP release {{ Φ }}.
+    ⊢ WP release lk {{ Φ }}.
   Proof.
     iIntros "(#Hlk & Hlked & HR & HΦ)".
     unfold release.
-    iDestruct "Hlk" as (l) "[% ?]". rewrite H.
+    iDestruct "Hlk" as (l) "[% ?]". destruct H. rewrite H.
     iApply wp_atomic.
     { by apply atomic_enf. }
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
