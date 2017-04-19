@@ -19,7 +19,7 @@ Section spin_lock.
     <{ void }>.
 
   Definition newlock : expr :=
-    Ealloc tybool vfalse.
+    return: Ealloc tybool vfalse.
 
   Definition release : expr :=
     lk <- vfalse.
@@ -50,16 +50,31 @@ Section spin_lock.
   Lemma locked_exclusive (γ : gname) : locked γ -∗ locked γ -∗ False.
   Proof. iIntros "H1 H2". by iDestruct (own_valid_2 with "H1 H2") as %?. Qed.
 
-  Lemma newlock_spec (R : iProp Σ) Φ:
-    R ∗ (∀ γ lk, is_lock γ lk R -∗ Φ lk) ⊢ WP newlock {{ Φ }}.
+  Lemma newlock_spec' (R : iProp Σ) Φ k ks:
+    own_stack (k::ks) ∗
+    R ∗ (∀ γ lk, is_lock γ lk R -∗ own_stack ks -∗ WP fill_ectxs lk k {{ Φ }}) ⊢
+    WP newlock {{ Φ }}.
   Proof.
-    iIntros "[HR HΦ]".
-    rewrite -wp_fupd /newlock /=.
-    wp_alloc l as "Hl". iApply wp_value=>//.
+    iIntros "(HS & HR & HΦ)".
+    rewrite /newlock /=.
+    wp_alloc l as "Hl". iApply (wp_ret []).
+    iFrame. iIntros "Hs". iApply fupd_wp.
     iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
-    iMod (inv_alloc N _ (lock_inv γ l R) with "[-HΦ]") as "#?".
+    iMod (inv_alloc N _ (lock_inv γ l R) with "[-Hs HΦ]") as "#?".
     { iIntros "!>". iExists false. by iFrame. }
-    iModIntro. iApply "HΦ". iExists l. eauto.
+    iModIntro. iApply ("HΦ" with "[-Hs]")=>//. iExists l. eauto.
+  Qed.
+
+  Lemma newlock_spec (R: iProp Σ) f Φ k ks:
+    text_interp f (Function (Tptr tybool) [] newlock) ∗
+    R ∗ own_stack ks ∗ (∀ γ lk, own_stack ks -∗ is_lock γ lk R -∗ WP fill_ectxs lk k {{ Φ }})
+    ⊢ WP fill_ectxs (Ecall_typed (Tptr tybool) f []) k {{ Φ }}.
+  Proof.
+    iIntros "(Hf & HR & Hs & HΦ)".
+    iApply (wp_call k []); last iFrame; first done.
+    iNext. iIntros "Hs'". iApply (newlock_spec' R). iFrame.
+    iIntros (??) "Hlk". iIntros "Hs".
+    iApply ("HΦ" with "[-Hlk]")=>//.
   Qed.
 
   Lemma acquire_spec γ R Φ:
