@@ -91,7 +91,7 @@ Section wp_ret.
     - iDestruct "H" as (v) "[% ?]".
       apply of_to_val in H0. subst.
       by rewrite wpr_unfold /wpr_pre.
-    - iDestruct "H" as (eh K) "(% & [[% ?]| [? | ?]])"; destruct H0.
+    - iDestruct "H" as (eh K) "(% & [[% ?]| [? | ?]])"; destruct_ands.
       + iRight. iExists eh, (kes ++ K).
         iSplit.
         * iPureIntro. split.
@@ -107,7 +107,7 @@ Section wp_ret.
           { by apply fill_ectxs_not_val. }
           { by apply unfill_app. }
         * iRight. iLeft. iExists v. by iSplitL "".
-      + iDestruct "~" as (??????) "[% [? ?]]". destruct H8.
+      + iDestruct "~" as (??????) "[% [? ?]]". destruct_ands.
         iRight. iExists eh, (kes ++ K). iSplit.
         * iPureIntro. split.
           { by apply fill_ectxs_not_val. }
@@ -184,7 +184,7 @@ Section wp_ret.
     iDestruct "~2" as "[H' | H']".
     - by iDestruct "H'" as (?) "[_ %]".
     - iDestruct "H'" as (??) "[% [[% ?] | [? | ?]]]".
-      + iRight. destruct H2.
+      + iRight. destruct_ands.
         iSplit=>//.
         iIntros (?) "Hσ1".
         move: (cont_uninj' H4) => [Ha Hb]. subst.
@@ -220,9 +220,9 @@ Section wp_ret.
             iApply (wp_strong_mono E E)=>//.
           iFrame. iIntros (?) "H'".
           iModIntro. iApply ("IH" with "[-H]")=>//.
-      +  destruct H2.
+      +  destruct_ands.
          iDestruct "~" as (?) "[% ?]". subst.
-         apply cont_uninj' in H3. destruct H3. subst.
+         apply cont_uninj' in H3. destruct_ands. subst.
          iRight.
          iSplit=>//.
          iIntros (σ1) "Hσ1".
@@ -243,17 +243,17 @@ Section wp_ret.
            inversion Heq. subst.
            iDestruct "Hσ1" as "(?&?&?)".
            iMod (stack_pop with "[H ~2]") as "(Hstk & Hs & %)"; first iFrame.
-           destruct H7; subst.
+           destruct_ands; subst.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
            { simpl. by iApply "~1". }
            by rewrite big_sepL_nil.
          * apply cont_inj in Heq=>//.
            by destruct Heq as [? ?].
-      + destruct H2.
+      + destruct_ands.
         iDestruct "~" as (??????) "[% [? ?]]".
-        destruct H10.
-        apply cont_uninj' in H3. destruct H3. subst.
+        destruct_ands.
+        apply cont_uninj' in H3. destruct_ands. subst.
         iRight. iSplit=>//.
         iIntros (σ1) "Hσ1".
         iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.

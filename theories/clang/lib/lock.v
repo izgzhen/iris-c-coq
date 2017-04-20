@@ -95,7 +95,7 @@ Section spin_lock.
     wp_alloc lkx as "Hlkx". wp_let. wp_load.
     iLöb as "IH".
     unfold acquire.
-    iDestruct "Hlk" as (l) "[% ?]". destruct H0. rewrite H0.
+    iDestruct "Hlk" as (l) "[% ?]". destruct_ands. subst.
     wp_bind (ECAS_typed _ _ _ _).
     iApply wp_atomic.
     { by apply atomic_enf. }
@@ -121,7 +121,7 @@ Section spin_lock.
   Proof.
     iIntros "(#Hlk & Hlked & HR & HΦ)".
     unfold release.
-    iDestruct "Hlk" as (l) "[% ?]". destruct H. rewrite H.
+    iDestruct "Hlk" as (l) "[% ?]". destruct_ands. subst.
     iApply wp_atomic.
     { by apply atomic_enf. }
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.

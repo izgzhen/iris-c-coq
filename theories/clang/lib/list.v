@@ -33,7 +33,7 @@ Section proof.
     - iIntros "%". iPureIntro. by subst.
     - simpl. iIntros "H".
       iDestruct "H" as (??) "(% & ? & _)".
-      destruct H2 as (?&?&?). by subst.
+      destruct_ands. by subst.
   Qed.
 
   Lemma isList_ptr' (l: val) (xs: list val) (t: type) :
@@ -43,7 +43,7 @@ Section proof.
     - iIntros "%". iPureIntro. by subst.
     - simpl. iIntros "H".
       iDestruct "H" as (??) "(% & ? & _)".
-      destruct H2 as (?&?&?). by subst.
+      destruct_ands. by subst.
   Qed.
 
   Definition x: ident := 1.

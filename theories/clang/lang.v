@@ -1048,17 +1048,16 @@ Proof.
     inversion Htv; inversion Htv'=>//; subst;
     intros Hv1 Hv2; subst; destruct p; simpl in Hv1, Hv2.
   - rewrite Byte.repr_unsigned in Hv2, Hv1.
-    destruct Hv1. destruct Hv2. rewrite H in H1.
+    destruct_ands. rewrite H in H1.
     inversion H1. by rewrite Byte.repr_unsigned.
-  - destruct Hv2 as (?&?&?&?&?).
-    destruct Hv1 as (?&?&?&?&?).
+  - destruct_ands.
     admit. (* Hairy arithmetic -- should be right *)
-  - destruct Hv1. destruct Hv2.
-    by rewrite H in H1.
-  - destruct Hv1. destruct Hv2.
-      by rewrite H in H1.
-  - destruct Hv1. destruct Hv2.
-    rewrite H in H1. by inversion H1.
+  - destruct_ands.
+    by rewrite H in H4.
+  - destruct_ands.
+    by rewrite H in H4.
+  - destruct_ands.
+    rewrite H in H4. by inversion H4.
   - f_equal.
     + eapply IHt1=>//; by eapply readbytes_segment.
     + eapply IHt2=>//.
