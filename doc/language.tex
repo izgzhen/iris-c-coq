@@ -147,6 +147,10 @@ and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) point-wise.
 
 \infer[es-while-false]{}{\estep{\ewhile{c}{\vfalse}{s}}{h}{\eskip}{h}}
 
+\infer[es-if-true]{}{\estep{\eif{\vtrue}{e_1}{e_2}}{h}{e_1}{h}}
+
+\infer[es-if-false]{}{\estep{\eif{\vfalse}{e_1}{e_2}}{h}{e_2}{h}}
+
 \infer[es-bind']{\isjmp(e) = \FALSE \quad \estep{e}{h}{e'}{h'}}{\estep{(k::ks)e}{h}{(k::ks)e'}{h'}}
 
 \infer[es-cas-fail]

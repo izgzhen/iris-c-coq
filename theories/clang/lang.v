@@ -41,8 +41,6 @@ Inductive expr :=
 | Erete (e: expr)
 | Eseq (s1 s2: expr).
 
-Definition Enat (n: nat) := Evalue (Vint8 (Byte.repr n)).
-
 Record function :=
   Function {
       f_retty: type;
