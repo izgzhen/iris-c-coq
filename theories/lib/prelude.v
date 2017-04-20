@@ -92,3 +92,8 @@ Proof. rewrite Nat.leb_gt. simpl. omega. Qed.
 Lemma leb_cancel_true {A: Type} (c: A) (l1 l2: list A):
   length l2 <=? length (c :: l1 ++ l2) = true.
 Proof. rewrite Nat.leb_le. simpl. rewrite app_length. omega. Qed.
+
+Ltac destruct_ands :=
+  repeat (match goal with
+            | [H: context [?H1 ∧ ?H2] |- _ ] => destruct H
+          end).

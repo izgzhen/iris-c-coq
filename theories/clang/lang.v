@@ -230,7 +230,7 @@ Qed.
 Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
   match e with
     | Evalue v => Some e
-    | Ederef_typed _ _ => Some e
+    | Ederef_typed t e => Ederef_typed t <$> resolve_rhs ev x vx tx e
     | Ealloc t e => Ealloc t <$> resolve_rhs ev x vx tx e
     | Evar x' => (* closed-ness? *)
       (if bool_decide (x' = x)
@@ -425,11 +425,6 @@ Inductive estep : expr → heap → expr → heap → Prop :=
 | ESwhile_false:
     ∀ s cond σ,
       estep (Ewhile cond (Evalue vfalse) s) σ (Evalue Vvoid) σ
-| ESbind':
-    ∀ e e' σ σ' k kes,
-      is_jmp e = false →
-      estep e σ e' σ' →
-      estep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'
 | ESCASFail l t v1 v2 vl σ :
     typeof v1 t →
     typeof v2 t →
@@ -445,7 +440,17 @@ Inductive estep : expr → heap → expr → heap → Prop :=
           (Evalue vtrue) (storebytes l (encode_val v2) σ)
 | ESlet t x xv e e' σ:
     instantiate_let x xv t e = Some e' →
-    estep (Elet_typed t x (Evalue xv) e) σ e' σ.
+    estep (Elet_typed t x (Evalue xv) e) σ e' σ
+| ESifTrue e1 e2 σ:
+    estep (Eif (Evalue vtrue) e1 e2) σ e1 σ
+| ESifFalse e1 e2 σ:
+    estep (Eif (Evalue vfalse) e1 e2) σ e2 σ
+| ESbind':
+    ∀ e e' σ σ' k kes,
+      is_jmp e = false →
+      estep e σ e' σ' →
+      estep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ'.
+(* !!!!!!!!!!!: NEVER add new semantic rules after ESbind', which would break everything *)
 
 Lemma ESbind:
     ∀ kes e e' σ σ',
@@ -982,20 +987,22 @@ Lemma estep_preserves_not_jmp' σ1 σ2:
 Proof.
   intros P. apply (not_val_ind' P).
   - unfold P. intros e Henf e2 Hjn Hes.
-    inversion Hes=>//; subst; simpl in Hes=>//.
+    inversion Hes=>//; subst; simpl in Hes=>//; simpl in Hjn.
     + inversion Hjn. simpl. solve_is_jmp_false.
+    + by eapply instantiate_let_preserves_not_jmp.
+    + solve_is_jmp_false.
+    + solve_is_jmp_false.
     + simpl in Hjn. exfalso.
       simpl in Henf. escape_false.
-    + by eapply instantiate_let_preserves_not_jmp.
   - unfold P. intros e ks Henf Hind e2 Hjn Hes.
-    inversion_cstep Henf ltac:(inversion Hjn).
-    + subst. simpl. rewrite -H0 in Hjn. inversion Hjn. solve_is_jmp_false.
+    inversion_cstep Henf ltac:(inversion Hjn); simplify_eq
+    ; try by (simpl; rewrite -H0 in Hjn; inversion Hjn; solve_is_jmp_false).
+    + simplify_eq. eapply instantiate_let_preserves_not_jmp=>//.
+      admit.
     + assert (is_jmp e' = false).
       { apply (Hind K')=>//. rewrite app_length. simpl. omega. }
       rewrite -fill_app in Hjn.
       eapply is_jmp_out in Hjn=>//.
-    + simplify_eq. eapply instantiate_let_preserves_not_jmp=>//.
-      admit.
 Admitted.
 
 Lemma estep_preserves_not_jmp'' e σ1 e2' σ2:
@@ -1018,10 +1025,9 @@ Lemma cstep_preserves_not_jmp e σ1 e2' σ2:
   is_jmp e = false → cstep e σ1 e2' σ2 → is_jmp e2' = false.
 Proof.
   inversion 2; subst.
-  - inversion_estep; subst=>//.
-    + simpl in *. solve_is_jmp_false.
-    + by eapply estep_preserves_not_jmp.
+  - inversion_estep; subst=>//; try by (simpl in *; solve_is_jmp_false).
     + by eapply instantiate_let_preserves_not_jmp.
+    + by eapply estep_preserves_not_jmp.
   - exfalso. move:(cstep_not_val H0)=>Hn.
     by eapply (is_jmp_jstep_false []).
 Qed.

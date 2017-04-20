@@ -47,6 +47,8 @@ Ltac reshape_expr e tac :=
     go (EKCASl t e1 e2 :: K) e0
   | Elet_typed ?t ?x ?ex ?ebody =>
     go (EKlet t x ebody :: K) ex
+  | Eif ?e ?e1 ?e2 => go (EKif e1 e2 :: K) e
+  | Ealloc ?t ?e => go (EKalloc t :: K) e
   end in go (@nil exprctx) e.
 
 Ltac wp_bind_core Kes :=

@@ -381,11 +381,11 @@ Section rules.
     iNext; iIntros (s2 σ2 Hstep). iModIntro.
     inversion_cstep_as Hes Hjs; subst.
     - inversion Hes; subst.
-      + escape_false.
       + iFrame. iApply ("HΦ" with "[-]").
         iSplitR=>//.
       + simpl in *.
         rewrite (same_type_encode_inj h t v' v1 l) in H0=>//.
+      + escape_false.
     - absurd_jstep Hjs.
   Qed.
 
@@ -406,7 +406,6 @@ Section rules.
     iNext; iIntros (s2 σ2 Hstep).
     inversion_cstep_as Hes Hjs; subst.
     - inversion Hes; subst.
-      + escape_false.
       + exfalso. simpl in *.
         rewrite (same_type_encode_inj h' t v vl l) in H15=>//.
       + simpl in *. iFrame.
@@ -417,6 +416,7 @@ Section rules.
           rewrite -(typeof_preserves_size v2 t)=>//. }
         iFrame. iModIntro. iApply "HΦ".
         iSplit=>//.
+      + escape_false.
     - absurd_jstep Hjs.
   Qed.
 
@@ -471,11 +471,21 @@ Section rules.
     ▷ Φ v1
     ⊢ WP Efst (Evalue (Vpair v1 v2)) {{ Φ }}.
   Proof. iIntros "HΦ". wp_solve_pure. iApply wp_value=>//. Qed.
-
+  
   Lemma wp_snd v1 v2 Φ:
     ▷ Φ v2
     ⊢ WP Esnd (Evalue (Vpair v1 v2)) {{ Φ }}.
   Proof. iIntros "HΦ". wp_solve_pure. iApply wp_value=>//. Qed.
+
+  Lemma wp_if_true e1 e2 Φ:
+    ▷ WP e1 {{ Φ }}
+    ⊢ WP (Eif (Evalue vtrue) e1 e2) {{ Φ }}.
+  Proof. iIntros "HΦ". wp_solve_pure. done. Qed.
+
+  Lemma wp_if_false e1 e2 Φ:
+    ▷ WP e2 {{ Φ }}
+    ⊢ WP (Eif (Evalue vfalse) e1 e2) {{ Φ }}.
+  Proof. iIntros "HΦ". wp_solve_pure. done. Qed.
 
   (* Freshness and memory allocation *)
 
@@ -570,7 +580,7 @@ Section rules.
   Qed.
   
   Definition Edecl (t: type) (x: ident) e : expr :=
-    Elet_typed (Tptr t) x (Ealloc t (Evalue (default_val t))) e.
+    Elet_typed t x (Ealloc t (Evalue (default_val t))) e.
     
   (* Call *)
 

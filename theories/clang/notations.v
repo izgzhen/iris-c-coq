@@ -30,7 +30,7 @@ Notation "f # t <$ e1 , e2 , .. , en $>" := (Ecall_typed t f (cons e1%E (cons e2
   (at level 50) : expr_scope.
 
 Notation "e1 <- e2" := (Eassign e1%E e2%E) (at level 80) : expr_scope.
-Notation "'if' ( e ) { s1 } 'else' { s2 }" := (Eif e%E s1%E s2%E)
+Notation "'if:' ( e ) then: { s1 } 'else:' { s2 }" := (Eif e%E s1%E s2%E)
   (at level 200, e, s1, s2 at level 200) : expr_scope.
 Notation "'while' [ c ] ( e ) <{ s }>" := (Ewhile c%E e%E s%E)
   (at level 200, c, e, s at level 200) : expr_scope.
