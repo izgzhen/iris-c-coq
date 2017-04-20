@@ -341,8 +341,8 @@ Section rules.
       destruct σ; eexists _, _, _; by repeat constructor
     end.
 
-  Lemma mapsto_typeof l v t:
-    l ↦ v @ t ⊢ ⌜ typeof v t ⌝.
+  Lemma mapsto_typeof q l v t:
+    l ↦{q} v @ t ⊢ ⌜ typeof v t ⌝.
   Proof. by iDestruct 1 as "[% ?]". Qed.
   
   Lemma wp_load {E} Φ p v t q:
@@ -557,7 +557,7 @@ Section rules.
     iFrame. iModIntro.
     iApply "HΦ". by iFrame.
   Qed.
-
+  
   Lemma wp_let E x t v e e' Φ:
     instantiate_let x v t e = Some e' →
     ▷ WP e' @ E {{ Φ }}

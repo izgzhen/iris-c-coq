@@ -15,6 +15,7 @@ Inductive bop :=
 | ominus
 | oequals
 | oneq
+| omult
 | oless.
 
 Definition decls := list (ident * type).
@@ -152,6 +153,11 @@ Definition evalbop (op: bop) v1 v2 : option val :=
     | ominus => (match v1, v2 with
                   | Vint8 i1, Vint8 i2 => Some (Vint8 (Byte.sub i1 i2))
                   | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.sub i1 i2))
+                  | _, _ => None
+                 end)
+    | omult => (match v1, v2 with
+                  | Vint8 i1, Vint8 i2 => Some (Vint8 (Byte.mul i1 i2))
+                  | Vint32 i1, Vint32 i2 => Some (Vint32 (Int.mul i1 i2))
                   | _, _ => None
                  end)
     | oequals => if decide (v1 = v2) then Some vtrue else Some vfalse

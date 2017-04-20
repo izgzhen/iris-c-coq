@@ -18,6 +18,8 @@ Notation "& e" := (Eaddrof e%E)
   (at level 30, right associativity) : expr_scope.
 Notation "e1 + e2" := (Ebinop oplus e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
+Notation "e1 <*> e2" := (Ebinop omult e1%E e2%E)
+  (at level 50, left associativity) : expr_scope.
 Notation "e1 - e2" := (Ebinop ominus e1%E e2%E)
   (at level 50, left associativity) : expr_scope.
 Notation "e1 == e2" := (Ebinop oequals e1%E e2%E)
