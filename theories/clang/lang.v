@@ -986,7 +986,7 @@ Lemma instantiate_let_preserves_not_jmp x xv xt e e':
   instantiate_let x xv xt e = Some e' →
   is_jmp e = false →
   is_jmp e' = false.
-Admitted.
+Admitted. (* Apparent but hard for now. Documented *)
 
 Lemma estep_preserves_not_jmp' σ1 σ2:
   let P e1 :=
@@ -1006,12 +1006,12 @@ Proof.
     inversion_cstep Henf ltac:(inversion Hjn); simplify_eq
     ; try by (simpl; rewrite -H0 in Hjn; inversion Hjn; solve_is_jmp_false).
     + simplify_eq. eapply instantiate_let_preserves_not_jmp=>//.
-      admit.
+      rewrite -H in Hjn. by simpl in Hjn.
     + assert (is_jmp e' = false).
       { apply (Hind K')=>//. rewrite app_length. simpl. omega. }
       rewrite -fill_app in Hjn.
       eapply is_jmp_out in Hjn=>//.
-Admitted.
+Qed.
 
 Lemma estep_preserves_not_jmp'' e σ1 e2' σ2:
   to_val e = None → is_jmp e = false →
@@ -1055,7 +1055,7 @@ Proof.
     destruct_ands. rewrite H in H1.
     inversion H1. by rewrite Byte.repr_unsigned.
   - destruct_ands.
-    admit. (* Hairy arithmetic -- should be right *)
+    admit.
   - destruct_ands.
     by rewrite H in H4.
   - destruct_ands.
@@ -1071,7 +1071,7 @@ Proof.
         by eapply readbytes_segment_2.
         { rewrite -(typeof_preserves_size v0 t1)=>//.
           rewrite -(typeof_preserves_size v1 t1)=>//. }
-Admitted.
+Admitted. (* Hairy arithmetic -- should be right. Documented *)
 
 Definition step e σ e' σ' (efs: list expr) := cstep e σ e' σ' ∧ efs = [].
 
