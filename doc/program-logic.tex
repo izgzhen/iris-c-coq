@@ -53,11 +53,11 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 \infer[wp-value]
 {}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}}
 
-
 \infer[wp-atomic]
-{\physatomic{\expr}}
-{\pvs[\mask_1][\mask_2] \wpre\expr[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
- \proves \wpre\expr[\mask_1]{\Ret\var.\prop}}
+{ \textlog{atomic}(e)}
+{ \pvs[\mask_1][\mask_2]  \wpre{\expr}[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
+   \proves \wpre{\expr}[\mask_1]{\Ret\var.\prop} }
+
 
 \infer[wp-strong-mono]
 {\mask_1 \subseteq \mask_2}
@@ -172,15 +172,16 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 
 \subsection{Soundness}
 
-The soundness of WP-style program is proven by showing that it is \emph{adequate}: For all $e, \sigma, \pred: \Val \ra \Prop$,
+The soundness of WP-style program is proven by showing that it is \emph{adequate}:
 
+\begin{lemma}
+For all $e, \sigma, \pred: \Val \ra \Prop$,
 \begin{align*}
 &\TRUE \proves \wpre{e}[\top]{\pred} \ra \\
 &\quad (\All v, \sigma'. \cstep{e}{\sigma}{v}{\sigma'} \ra \pred(v)) \land \\
 &\quad (\All e', \sigma'. \cstep{e}{\sigma}{e'}{\sigma'} \ra (\Exists v. e = v) \lor \red(e', \sigma'))
 \end{align*}
-
-(NOTE) However, that doesn't look strong enough.
+\end{lemma}
 
 %%% Local Variables:
 %%% mode: latex
