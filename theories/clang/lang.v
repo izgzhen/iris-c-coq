@@ -564,28 +564,29 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
     | _ => None
   end.
 
-Inductive enf: expr → Prop :=
-  | NFcall: ∀ t f vs, enf (Ecall_typed t f (map Evalue vs))
-  | NFrete: ∀ v, enf (Erete (Evalue v))
-  | NFbinop: ∀ op v1 v2, enf (Ebinop op (Evalue v1) (Evalue v2))
-  | NFderef: ∀ v, enf (Ederef (Evalue v))
-  | NFderef_typed: ∀ t v, enf (Ederef_typed t (Evalue v))
-  | NFaddrof: ∀ v, enf (Eaddrof (Evalue v))
-  | NFfst: ∀ v, enf (Efst (Evalue v))
-  | NFsnd: ∀ v, enf (Esnd (Evalue v))
-  | NFalloc: ∀ t v, enf (Ealloc t (Evalue v))
-  | NFassign: ∀ l v, enf (Eassign (Evalue (Vptr l)) (Evalue v))
-  | NFif: ∀ v e2 e3, enf (Eif (Evalue v) e2 e3)
-  | NFseq: ∀ v e2, enf (Eseq (Evalue v) e2)
-  | NFwhile: ∀ c v s, enf (Ewhile c (Evalue v) s)
-  | NFCAS: ∀ l t v1 v2, enf (ECAS_typed t (Evalue (Vptr l))
-                                        (Evalue v1) (Evalue v2))
-  | NFlet: ∀ t x v e2, enf (Elet_typed t x (Evalue v) e2).
+Inductive lnf: expr → Prop :=
+  | LNFbinop: ∀ op v1 v2, lnf (Ebinop op (Evalue v1) (Evalue v2))
+  | LNFderef: ∀ v, lnf (Ederef (Evalue v))
+  | LNFderef_typed: ∀ t v, lnf (Ederef_typed t (Evalue v))
+  | LNFaddrof: ∀ v, lnf (Eaddrof (Evalue v))
+  | LNFfst: ∀ v, lnf (Efst (Evalue v))
+  | LNFsnd: ∀ v, lnf (Esnd (Evalue v))
+  | LNFalloc: ∀ t v, lnf (Ealloc t (Evalue v))
+  | LNFassign: ∀ l v, lnf (Eassign (Evalue (Vptr l)) (Evalue v))
+  | LNFif: ∀ v e2 e3, lnf (Eif (Evalue v) e2 e3)
+  | LNFseq: ∀ v e2, lnf (Eseq (Evalue v) e2)
+  | LNFwhile: ∀ c v s, lnf (Ewhile c (Evalue v) s)
+  | LNFCAS: ∀ l t v1 v2, lnf (ECAS_typed t (Evalue (Vptr l)) (Evalue v1) (Evalue v2))
+  | LNFlet: ∀ t x v e2, lnf (Elet_typed t x (Evalue v) e2).
 
-Global Hint Constructors enf.
+Inductive enf: expr → Prop :=
+| jnf_enf: ∀ e, jnf e → enf e
+| lnf_enf: ∀ e, lnf e → enf e.
+
+Global Hint Constructors lnf enf.
 
 Lemma enf_not_val e: enf e → to_val e = None.
-Proof. induction e; crush. inversion H. Qed.
+Proof. induction e; crush. inversion H; inversion H0. Qed.
 
 Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
 Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
@@ -620,14 +621,16 @@ Qed.
 Lemma fill_not_enf e k:
   is_val e = false → enf (fill_expr e k) → False.
 Proof. induction k=>//; simpl; intros H1 H2;
-       try (inversion H2; by subst).
-       inversion H2. subst.
-       assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
-       { rewrite -H4. apply forall_is_val. }
-       rewrite forallb_app in Hcontra.
-       replace (e::args) with ([e] ++ args) in Hcontra; last done.
-       rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
-       by rewrite andb_false_r in Hcontra.
+       try (inversion H2; by subst);
+       try (inversion H2;
+            [ inversion H | subst; inversion H; by subst ]).
+       - assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
+         { subst. rewrite -H6. apply forall_is_val. }
+         rewrite forallb_app in Hcontra.
+         replace (e::args) with ([e] ++ args) in Hcontra; last done.
+         rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
+           by rewrite andb_false_r in Hcontra.
+       - subst. done.
 Qed.
 
 Lemma escape_false {e a e' a2 kes k0 e''}:
@@ -732,10 +735,10 @@ Tactic Notation "escape_false" :=
   match goal with
   | [ Hes: estep ?e ?a ?e' ?a2,
       Heq: fill_expr (fill_ectxs ?e ?kes) ?k0 = ?e'' |- _ ] =>
-      by eapply (escape_false Hes Heq)=>//
+      by eapply (escape_false Hes Heq)=>//; auto
   | [ Hes: estep ?e ?a ?e' ?a2,
       Henf: enf (fill_expr (fill_ectxs ?e ?kes) ?k) |- _ ] =>
-      by eapply (escape_false' Hes Henf)=>//
+      by eapply (escape_false' Hes Henf)=>//; auto
   end.
 
 Lemma estep_call_false t f vs σ1 e' σ2:
@@ -745,9 +748,6 @@ Proof. inversion 1. subst. escape_false. Qed.
 Lemma estep_ret_false v σ1 e' σ2:
   estep (Erete (Evalue v)) σ1 e' σ2 → False.
 Proof. inversion 1. subst. escape_false. Qed.
-
-Lemma jnf_enf e: jnf e → enf e.
-Proof. by induction 1. Qed.
 
 Lemma fill_estep_false' e σ σ':
   jnf e →
@@ -916,7 +916,9 @@ Proof.
       destruct H as [? [? ?]]; subst
     end.
   - by rewrite is_jmp_ret in Hnj.
+  - auto.
   - by rewrite is_jmp_call in Hnj.
+  - auto.
 Qed.
 
 Lemma cstep_not_val {e σ e' σ'}:
@@ -975,7 +977,9 @@ Proof.
     eapply cont_incl in Heq=>//;
     destruct Heq as (?&?); subst.
     + by rewrite is_jmp_ret in Hnj.
+    + auto.
     + by rewrite is_jmp_call in Hnj.
+    + auto.
 Qed.
 
 Lemma instantiate_let_preserves_not_jmp x xv xt e e':
@@ -1082,7 +1086,7 @@ Ltac absurd_jstep' :=
   match goal with
   | [ HF: fill_ectxs _ _ = ?E |- _ ] =>
     replace E with (fill_ectxs E []) in HF=>//; apply cont_inj in HF=>//;
-      by destruct HF
+      by destruct HF; auto
   end.
 
 Ltac absurd_jstep Hjs :=
@@ -1157,9 +1161,9 @@ Ltac rewrite_empty_ctx :=
 Ltac fill_enf_neq :=
   match goal with
   | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
-    apply cont_inj in H=>//; by destruct H as [? ?]
+    apply cont_inj in H=>//; auto; by destruct H as [? ?]
   | [ H : fill_ectxs _ _ = _ |- _ ] =>
-    rewrite_empty_ctx; apply cont_inj in H=>//; by destruct H as [? ?]
+    rewrite_empty_ctx; apply cont_inj in H=>//; auto; by destruct H as [? ?]
   | _ => done
   end.
 

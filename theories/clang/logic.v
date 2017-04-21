@@ -173,12 +173,12 @@ Section rules.
     { iDestruct (own_pair_agree with "[Hstk Hs]") as "%"; first iFrame.
       subst. iPureIntro. destruct σ. eexists _, (State s_heap s_text _), [].
       split; last done. apply CSjstep. simpl in *. subst. constructor.
-      by apply cont_uninj. }
+      apply cont_uninj. auto. }
     iNext. iIntros (e2 σ2 efs (Hcs & ?)).
     inversion_cstep_as Hes Hjs; subst.
     { by apply fill_estep_false in Hes. }
     inversion_jstep_as Heq; subst.
-    apply cont_inj in Heq=>//;
+    apply cont_inj in Heq=>//; auto;
     destruct Heq as [Heq ?]; inversion Heq; subst.
     iMod (stack_pop with "[Hstk Hs]") as "(Hstk & Hs & %)"; first iFrame.
     destruct H1; subst. iFrame. iMod "Hclose" as "_".
@@ -631,7 +631,7 @@ Section rules.
     { apply fill_estep_false in Hes=>//. }
     inversion_jstep_as Heq.
     + fill_enf_neq.
-    + apply cont_inj in Heq=>//.
+    + apply cont_inj in Heq=>//; auto.
       destruct Heq as [Heq ?]. inversion Heq. subst.
       iFrame. iDestruct (own_pair_agree with "[Hs Hstk]") as "%"; first iFrame.
       subst. iMod (stack_push with "[Hs Hstk]") as "(Hs & Hstk & %)"; first iFrame.

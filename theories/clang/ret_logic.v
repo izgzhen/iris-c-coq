@@ -250,7 +250,7 @@ Section wp_ret.
          inversion_cstep_as Hes Hjs; subst.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
-         * apply cont_inj in Heq=>//. destruct Heq as [Heq ?].
+         * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
            inversion Heq. subst.
            iDestruct "Hσ1" as "(H1&H2&H3)".
            iMod (stack_pop with "[H H3]") as "(Hstk & Hs & %)"; first iFrame.
@@ -259,7 +259,7 @@ Section wp_ret.
            iModIntro. iSplitL.
            { simpl. by iApply "H'". }
            by rewrite big_sepL_nil.
-         * apply cont_inj in Heq=>//. by destruct_ands.
+         * apply cont_inj in Heq=>//; auto. by destruct_ands.
       + destruct_ands.
         iDestruct "H'" as (??????) "[% [H1 H2]]".
         destruct_ands. cont_uninj'.
@@ -278,7 +278,7 @@ Section wp_ret.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
          * fill_enf_neq.
-         * apply cont_inj in Heq=>//. destruct Heq as [Heq ?].
+         * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
            inversion Heq. simplify_eq.
            apply map_inj in Heq. subst.
            simpl in *. subst. simplify_eq.
@@ -295,17 +295,24 @@ Section wp_ret.
            { intros. by simplify_eq. }
   Qed.
 
-  Lemma wpr_op E op v1 v2 v' Φ Φret:
-    evalbop op v1 v2 = Some v' →
-    Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
+  Lemma wpr_head E eh Φ Φret:
+    is_jmp eh = false → enf eh → WP eh @ E {{ Φ }} ⊢ wpr E eh Φ Φret.
   Proof.
-    iIntros (?) "?".
+    iIntros (??) "?".
     rewrite wpr_unfold /wpr_pre.
-    iRight. iSplit=>//. iExists _, _.
-    iSplit=>//.
+    iRight. iSplit=>//.
+    { iPureIntro. by apply enf_not_val. }
+    iExists eh, []. iSplit=>//.
+    { iPureIntro. by eapply (cont_uninj []). }
     iLeft. iSplitL ""=>//.
-    iApply wp_op=>//.
+    iApply (wp_strong_mono E E)=>//. iFrame.
+    iIntros (?) "HΦ".
     by iApply wpr_value.
   Qed.
 
+  Lemma wpr_op E op v1 v2 v' Φ Φret:
+    evalbop op v1 v2 = Some v' →
+    Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
+  Proof. iIntros (?) "?". iApply wpr_head=>//; auto. iApply wp_op=>//. Qed.
+ 
 End wp_ret.
