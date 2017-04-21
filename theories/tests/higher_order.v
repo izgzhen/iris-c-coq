@@ -9,7 +9,7 @@ Section example.
   Definition abs_spec g E (P Q: iProp Σ) :=
     (∃ gbody, text_interp g (Function Tvoid [] gbody) ∗
               (∀ Φ, P -∗ (Q -∗ Φ Vvoid) -∗ WP gbody @ E {{ Φ }}))%I.
-  
+
   Lemma f_spec ks E g Φ P Q:
     abs_spec g E P Q ∗ P ∗
     own_stack ks ∗ (own_stack ([]::ks) -∗ Q -∗ Φ Vvoid)

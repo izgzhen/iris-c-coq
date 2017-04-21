@@ -30,7 +30,7 @@ Section spin_lock.
                  if b then True else own γ (Excl ()) ∗ R)%I.
 
   Definition tylock := Tptr tybool.
-  
+
   Definition is_lock (γ : gname) (lk : val) (R : iProp Σ) : iProp Σ :=
     (∃ l: addr, ⌜lk = Vptr l ∧ typeof lk tylock ⌝ ∧ inv N (lock_inv γ l R))%I.
 
@@ -53,7 +53,7 @@ Section spin_lock.
 
   Lemma is_lock_tylock γ l R: is_lock γ l R ⊢ ⌜ typeof l tylock ⌝.
   Proof. iIntros "Hlk". iDestruct "Hlk" as (?) "[% ?]". by destruct H0. Qed.
-  
+
   Lemma newlock_spec' (R : iProp Σ) Φ k ks:
     own_stack (k::ks) ∗
     R ∗ (∀ γ lk, is_lock γ lk R -∗ own_stack ks -∗ WP fill_ectxs lk k {{ Φ }}) ⊢
@@ -71,7 +71,7 @@ Section spin_lock.
   Qed.
 
   Definition lkx: ident := 1.
-  
+
   Lemma newlock_spec (R: iProp Σ) f Φ k ks:
     text_interp f (Function (Tptr tybool) [] newlock) ∗
     R ∗ own_stack ks ∗ (∀ γ lk, own_stack ks -∗ is_lock γ lk R -∗ WP fill_ectxs lk k {{ Φ }})

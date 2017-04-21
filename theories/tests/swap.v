@@ -7,7 +7,7 @@ Section example.
 
   Definition Edecl (t: type) (x: ident) e : expr :=
     Elet_typed t x (Ealloc t (Evalue (default_val t))) e.
-    
+
   Definition swap (t: type) (l1 l2: addr) :=
     Edecl t x
     (x <- ! l1 @ t ;; l1 <- !l2 @ t ;; l2 <- x).
@@ -24,5 +24,5 @@ Section example.
     wp_alloc lx as "Hlx". wp_let.
     wp_run. iApply ("HΦ" with "Hl1 Hl2").
   Qed.
-  
+
 End example.

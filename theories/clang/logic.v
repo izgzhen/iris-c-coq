@@ -344,7 +344,7 @@ Section rules.
   Lemma mapsto_typeof q l v t:
     l ↦{q} v @ t ⊢ ⌜ typeof v t ⌝.
   Proof. by iDestruct 1 as "[% ?]". Qed.
-  
+
   Lemma wp_load {E} Φ p v t q:
     ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
     ⊢ WP Ederef_typed t (Evalue (Vptr p)) @ E {{ Φ }}.
@@ -471,7 +471,7 @@ Section rules.
     ▷ Φ v1
     ⊢ WP Efst (Evalue (Vpair v1 v2)) {{ Φ }}.
   Proof. iIntros "HΦ". wp_solve_pure. iApply wp_value=>//. Qed.
-  
+
   Lemma wp_snd v1 v2 Φ:
     ▷ Φ v2
     ⊢ WP Esnd (Evalue (Vpair v1 v2)) {{ Φ }}.
@@ -557,7 +557,7 @@ Section rules.
     iFrame. iModIntro.
     iApply "HΦ". by iFrame.
   Qed.
-  
+
   Lemma wp_let E x t v e e' Φ:
     instantiate_let x v t e = Some e' →
     ▷ WP e' @ E {{ Φ }}
@@ -578,10 +578,10 @@ Section rules.
         escape_false.
       + absurd_jstep Hjs.
   Qed.
-  
+
   Definition Edecl (t: type) (x: ident) e : expr :=
     Elet_typed t x (Ealloc t (Evalue (default_val t))) e.
-    
+
   (* Call *)
 
   Fixpoint alloc_params (addrs: list (type * addr)) (vs: list val) :=

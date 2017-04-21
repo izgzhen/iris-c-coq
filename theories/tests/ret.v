@@ -17,5 +17,5 @@ Section example.
     unfold ret_one. iApply wpr_seq.
     by iApply wpr_ret.
   Qed.
-  
+
 End example.

@@ -25,7 +25,7 @@ Section proof.
                      ⌜ l = Vptr p ∧ typeof x t ∧ typeof l' (Tptr (tcell t)) ⌝ ∗
                      p ↦ Vpair x l' @ tcell t ∗ isListSeg l' lt lt2 x' xs' t)%I
     end.
-  
+
   Lemma isList_ptr (l: val) (xs: list val) (t: type) :
     isList l xs t ⊢ ⌜ typeof l (Tptr Tvoid) ⌝.
   Proof.
@@ -67,7 +67,7 @@ Section proof.
 
   Definition traverse_list (lx: val) : expr :=
     while [ !lx@Tlist != null ] (!lx@Tlist != null) <{ lx <- snd (!(!lx@Tlist)@(tcell Tint32)) }>.
-  
+
   Lemma traverse_spec Φ lx xs: ∀ l,
     lx ↦ l @ Tlist ∗ isList l xs Tint32 ∗ (isList l xs Tint32 -∗ Φ void)
     ⊢ WP traverse_list lx {{ v, Φ v }}.
@@ -109,7 +109,7 @@ Section proof.
     isListSeg p p' p'' x xs Tint32 ∗ p'' ↦ Vpair v l'' @ tcell Tint32
     ⊢ isListSeg p p'' l'' x (xs ++ [v]) Tint32.
   Proof. iIntros (??) "?". iApply lseg_snoc'=>//. Qed.
-  
+
   Lemma lseg_unsnoc: ∀ xs p (p': addr) x,
     isListSeg p p' null x xs Tint32 ⊢
     (∃ (x': val) xs' p'', isListSeg p p'' p' x xs' Tint32 ∗
@@ -140,7 +140,7 @@ Section proof.
       iDestruct (IHxs' with "~") as "?".
       iExists _, _. iFrame. iSplit=>//.
   Qed.
-  
+
   Lemma enq_spec' lx (p: addr) Φ x xs: ∀ xs2 xs1 pt pt' (p': addr) l',
     typeof l' Tlist → typeof p Tlist →
     lx ↦ p @ Tlist ∗ pt ↦ p' @ Tlist ∗ pt' ↦ l' @ Tlist ∗
@@ -164,7 +164,7 @@ Section proof.
       { iApply lseg_snoc=>//. iFrame. }
       { by rewrite -assoc. }
   Qed.
-  
+
   Definition enq_list (lx: val) (v: val) : expr :=
     let: t ::: Tlist := Ealloc Tlist (!lx@Tlist) in
     Eif (t != null) (
@@ -275,7 +275,7 @@ Section proof.
    Proof.
     iIntros (???) "(Hf & Hlx & Hly & Hs & HΦ)". unfold rev_list.
     iApply (wp_call [] [lx; ly]); last iFrame; first by simpl.
-    iNext. iIntros "Hs'". 
+    iNext. iIntros "Hs'".
     iDestruct (isList_ptr with "Hly") as "%".
     iDestruct (isList_ptr' with "Hlx") as "%".
     wp_alloc px as "Hpx". wp_let.

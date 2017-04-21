@@ -36,5 +36,5 @@ Section example.
     iNext. iIntros "Hl". iMod ("Hclose" with "[]") as "?"=>//.
     iNext. done.
   Qed.
-  
+
 End example.

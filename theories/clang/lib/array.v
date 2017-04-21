@@ -27,7 +27,7 @@ Section array.
       { inversion H'. }
       simpl. f_equal. apply IHn'. inversion H'. simplify_eq. done.
   Qed.
-  
+
   (* e should be a Tptr to some tyarray t n, which gives us some flexibility *)
   Definition index (t: type) (p: addr) (ei: expr) : expr := p + (Int.repr (sizeof t) <*> ei).
 
@@ -86,7 +86,7 @@ Section array.
   Proof.
     simpl. iSplit.
     - by iIntros "[? _]".
-    - iIntros "?"; by iSplit. 
+    - iIntros "?"; by iSplit.
   Qed.
 
   Lemma slice_move q t b:
@@ -108,7 +108,7 @@ Section array.
         { omega. }
         { rewrite Nat.mul_add_distr_l -assoc Nat.mul_1_r. omega. }
   Qed. (* FIXME: verbose *)
-  
+
   Definition array_slice q t: ∀ n vs b o i,
     (b, o + sizeof_type t * i) ↦{q} varray vs @ tyarray t n ⊣⊢ slice q t b o i n vs.
   Proof.
@@ -145,7 +145,7 @@ Section array.
   Lemma array_slice' q t n vs b o:
     (b, o) ↦{q} varray vs @ tyarray t n ⊣⊢ slice q t b o 0 n vs.
   Proof. Admitted.
-  
+
   Lemma index_spec q t p i n vs Φ:
     i < n →
     p ↦{q} varray vs @ tyarray t n ∗ (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
@@ -183,5 +183,5 @@ Section array.
       wp_load. iApply wp_value=>//.
       iApply ("HΦ" with "[-]").
   Admitted.
-                 
+
 End array.
