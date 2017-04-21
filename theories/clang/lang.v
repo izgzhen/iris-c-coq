@@ -299,7 +299,7 @@ Fixpoint resolve_lhs_inner (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) :
       (e'' ← resolve_lhs_inner ev x vx tx e';
        match type_infer ev e'' with
          | Some (Tptr (Tprod t1 _)) =>
-           Some (Ebinop oplus e'' (Evalue (Vint8 (Byte.repr (sizeof t1)))))
+           Some (Ebinop oplus e'' (Evalue (Vint8 $ Byte.repr (sizeof t1))))
          | _ => None
        end)
     | Ebinop op e1 e2 =>
@@ -1171,8 +1171,8 @@ Fixpoint default_val (t: type) :=
   match t with
     | Tvoid => Vvoid
     | Tnull => Vnull
-    | Tint8 => Vint8 (Byte.repr 0)
-    | Tint32 => Vint32 (Int.repr 0)
+    | Tint8 => Vint8 $ Byte.repr 0
+    | Tint32 => Vint32 $ Int.repr 0
     | Tptr _ => Vnull
     | Tprod t1 t2 => Vpair (default_val t1) (default_val t2)
   end.

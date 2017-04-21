@@ -2,7 +2,7 @@
 
 From iris.base_logic.lib Require Export wsat.
 From iris_c.clang Require Import logic tactics notations.
-Require Import lib.gmap_solve.
+From iris_c.lib Require Import gmap_solve int.
 
 Section proof.
   Context `{clangG Σ}.
@@ -203,7 +203,7 @@ Section proof.
       iSplit=>//. iIntros (?) "? ? ? ?".
       wp_skip. destruct a. wp_load. wp_op.
       rewrite /offset_by_byte.
-      replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
+      replace (Z.to_nat (Byte.intval $ Byte.repr 4)) with 4%nat; last done.
       iDestruct (lseg_unsnoc with "~2") as "[H|[% Hp]]".
       + iDestruct "H" as (???) "[Hl [Hp %]]". destruct_ands. subst.
         iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
@@ -236,7 +236,7 @@ Section proof.
       pt ↦ - @ Tptr Tlist
       ⊢ WP while [! px @ Tlist != null](! px @ Tlist != null) <{
              pt <- snd ! ! px @ Tlist @ (tcell Tint32) ;;
-             ! px @ Tlist + Byte.repr 4 <- ! py @ (Tptr Tvoid) ;;
+             ! px @ Tlist + (Byte.repr 4) <- ! py @ (Tptr Tvoid) ;;
              py <- ! px @ Tlist ;;
              px <- ! pt @ (Tptr Tlist) }> {{ v, Φ v }}.
   Proof.
@@ -251,7 +251,7 @@ Section proof.
       wp_run. iDestruct "Hpt" as (?) "Hpt".
       wp_assign. wp_load. destruct p as [pb po]. wp_op.
       rewrite /offset_by_byte.
-      replace (Z.to_nat (Byte.intval (Byte.repr 4))) with 4%nat; last done.
+      replace (Z.to_nat (Byte.intval $ Byte.repr 4)) with 4%nat; last done.
       wp_load.
       iDestruct (isList_ptr with "Hly") as "%". unfold tcell.
       iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.

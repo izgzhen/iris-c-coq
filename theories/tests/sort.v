@@ -10,9 +10,7 @@ Section sort.
   Definition k: ident := 4.
   Definition t: ident := 3.
 
-  Coercion Int.repr : Z >-> int32.
-
-  Definition coerce_nat_to_expr (i: nat) := Evalue (Vint32 (Int.repr i)).
+  Definition coerce_nat_to_expr (i: nat) := Evalue i.
   Coercion coerce_nat_to_expr: nat >-> expr.
 
   Definition shift: expr :=

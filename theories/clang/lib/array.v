@@ -1,5 +1,5 @@
 From iris_c.clang Require Import logic tactics notations.
-
+From iris_c.lib Require Import int.
 (* Kinda funky -- but really extensible *)
 
 Section array.
@@ -29,7 +29,7 @@ Section array.
   Qed.
 
   (* e should be a Tptr to some tyarray t n, which gives us some flexibility *)
-  Definition index (t: type) (p: addr) (ei: expr) : expr := p + (Int.repr (sizeof t) <*> ei).
+  Definition index (t: type) (p: addr) (ei: expr) : expr := p + (Int.repr (sizeof t) * ei).
 
   Fixpoint slice q t b o (i l: nat) vs : iProp Σ :=
     (match l, vs with
@@ -38,19 +38,6 @@ Section array.
        | _, _ => False%I
      end)%I.
 
-  Lemma comm_assoc_s x y: x + S y = S x + y. Proof. omega. Qed.
-  Lemma assoc_s x y: S (x + y) = S x + y. Proof. omega. Qed.
-  Lemma distri_one x i: x + x * i = x * (i + 1).
-  Proof.
-    rewrite Nat.mul_add_distr_l Nat.mul_1_r. omega.
-  Qed.
-
-  Ltac assoc_nat :=
-    match goal with
-      | |- context [ ?E + (?E1 + ?E2) ] => replace (E + (E1 + E2)) with (E + E1 + E2); last omega
-      | |- context [ ?E + ?E1 + ?E2 ] => replace (E + E1 + E2) with (E + (E1 + E2)); last omega
-    end.
-  
   Lemma split_slice q t b o:
     ∀ l1 i l2 vs1 vs2,
       slice q t b o i l1 vs1 ∗ slice q t b o (i + l1) l2 vs2 ⊣⊢
@@ -85,7 +72,7 @@ Section array.
     slice q t b o i l1 vs1 ∗ slice q t b o (i + l1) l2 vs2 ⊢
     slice q t b o i (l1 + l2) (vs1 ++ vs2).
   Proof. iIntros "~". by iDestruct (split_slice with "~") as "[_ ?]". Qed.
-  
+
   Lemma split_slice' q t b o k n vs:
     k < n → length vs = n →
     slice q t b o 0 k (take k vs) ∗ slice q t b o k (n - k) (drop k vs) ⊣⊢
@@ -102,7 +89,7 @@ Section array.
     - iIntros "?". iApply split_slice. iFrame.
       iPureIntro. apply take_length_le. rewrite H1. omega.
   Qed.
-  
+
   Definition slice' q p t i l vs := let '(b, o) := p in slice q t b o i l vs.
 
   Definition single_slice q b o t i v:
@@ -175,20 +162,11 @@ Section array.
     iDestruct (mapsto_typeof with "~") as "%".
     iPureIntro. by eapply len_varray.
   Qed.
-    
-  Definition op_safe op (i j: nat) : Prop :=
-    Z.to_nat (Int.intval (op (Int.repr i) (Int.repr j))) = i * j.
 
-  Definition mul_safe := op_safe Int.mul.
-
-  Lemma app_cons {A} (x: A) (y: list A):
-    [x] ++ y = x::y.
-  Proof. induction y; crush. Qed.
-  
   Lemma index_spec q t p (i n: nat) vs Φ:
     i < n → mul_safe (sizeof_type t) i →
     p ↦{q} varray vs @ tyarray t n ∗ (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
-    ⊢ WP !(index t p (Int.repr i))@t {{ Φ }}.
+    ⊢ WP !(index t p i)@t {{ Φ }}.
   Proof.
     iIntros (??) "[Hp HΦ]". destruct p.
     iDestruct (array_slice' with "Hp") as "Hs".

@@ -1,5 +1,5 @@
 (** Definition of the physical memory model **)
-Require Export lib.Coqlib.
+From iris_c.lib Require Import Coqlib.
 Require Export Integers.
 Require Export iris.base_logic.base_logic.
 
@@ -56,8 +56,8 @@ Instance sizeof_val: Sizeof val :=
     | Vpair v1 v2 => (go v1 + go v2)%nat
   end.
 
-Definition vtrue := Vint8 (Byte.repr 1).
-Definition vfalse := Vint8 (Byte.repr 0).
+Definition vtrue := Vint8 $ Byte.repr 1.
+Definition vfalse := Vint8 $ Byte.repr 0.
 
 Definition b_to_v (b: bool) := if b then vtrue else vfalse.
 

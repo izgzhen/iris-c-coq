@@ -97,3 +97,22 @@ Ltac destruct_ands :=
   repeat (match goal with
             | [H: context [?H1 ∧ ?H2] |- _ ] => destruct H
           end).
+
+Require Import Coq.Arith.PeanoNat.
+
+Lemma comm_assoc_s x y: x + S y = S x + y. Proof. omega. Qed.
+Lemma assoc_s x y: S (x + y) = S x + y. Proof. omega. Qed.
+Lemma distri_one x i: x + x * i = x * (i + 1).
+Proof.
+  rewrite Nat.mul_add_distr_l. rewrite Nat.mul_1_r. omega.
+Qed.
+
+Ltac assoc_nat :=
+  match goal with
+    | |- context [ ?E + (?E1 + ?E2) ] => replace (E + (E1 + E2)) with (E + E1 + E2); [| omega]
+    | |- context [ ?E + ?E1 + ?E2 ] => replace (E + E1 + E2) with (E + (E1 + E2)); [| omega]
+  end.
+
+Lemma app_cons {A} (x: A) (y: list A):
+  [x] ++ y = x::y.
+Proof. induction y; crush. Qed.

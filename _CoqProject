@@ -1,5 +1,6 @@
 -R theories iris_c
 theories/lib/Integers.v
+theories/lib/int.v
 theories/lib/Coqlib.v
 theories/lib/gmap_solve.v
 theories/lib/smap.v

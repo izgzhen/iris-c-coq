@@ -314,5 +314,5 @@ Section wp_ret.
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
   Proof. iIntros (?) "?". iApply wpr_head=>//; auto. iApply wp_op=>//. Qed.
- 
+
 End wp_ret.
