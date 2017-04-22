@@ -57,7 +57,7 @@ such $e$ is \emph{well-formed}.
 In the following lemmas, we assume all involved $e$ to be \emph{well-formed}.
 
 \begin{lemma}
-$\All e: \Expr, k: \Cont . \isenf(e) \ra \unfill(k(e)) = (k, e)$
+$\All e: \Expr, k: \Cont . \isenf(e) \Ra \unfill(k(e)) = (k, e)$
 \end{lemma}
 \begin{proof}
 
@@ -68,7 +68,7 @@ And inductively, since fill and unfill should cancel out, the final conclusion i
 \end{proof}
 
 \begin{lemma}
-  $\All e, e_h, k. \unfill(e) = (k, e_h) \ra \isenf(e_h) \land e = k(e_h)$
+  $\All e, e_h, k. \unfill(e) = (k, e_h) \Ra \isenf(e_h) \land e = k(e_h)$
 \end{lemma}
 \begin{proof}
     First, $e$ can't be a value, so we just need to consider $e$ in each legal case, which basically
@@ -85,9 +85,9 @@ And inductively, since fill and unfill should cancel out, the final conclusion i
 Induction scheme I for $\Expr$:
 \begin{align*}
 \All P: \Expr \ra \Prop.
-  &(\All e. \isenf(e) \ra P(e)) \ra \\
-  &(\All e, k: \Cont . \toval(e) = \bot \ra P(e) \ra P(k(e))) \ra\\
-  &(\All e. \toval(e) = \bot \ra P(e))
+  &(\All e. \isenf(e) \Ra P(e)) \Ra \\
+  &(\All e, k: \Cont . \toval(e) = \bot \Ra P(e) \Ra P(k(e))) \Ra\\
+  &(\All e. \toval(e) = \bot \Ra P(e))
 \end{align*}
 \end{lemma}
 \begin{proof}
@@ -104,8 +104,8 @@ assumption, we know that any well-formed $e$ must satisfy $P$.
   Induction scheme for $\Cont$:
   \begin{align*}
     \All P: \Cont \ra \Prop.
-      &(P(\emptyset)) \ra \\
-      &(\All k. (\All. k', |k'| < |k| \ra P(k')) \ra P(k)) \ra \\
+      &(P(\emptyset)) \Ra \\
+      &(\All k. (\All. k', |k'| < |k| \Ra P(k')) \Ra P(k)) \Ra \\
       &(\All k. P(k))
   \end{align*}
 \end{lemma}
@@ -121,9 +121,9 @@ assumption, we know that any well-formed $e$ must satisfy $P$.
 Induction scheme II for $\Expr$:
 \begin{align*}
 \All P: \Expr \ra \Prop.
-  &(\All e. \isenf(e) \ra P(e)) \ra \\
-  &(\All e, k: \Cont . \isenf(e) \ra (\All k'. |k'| < |k| \ra P (k'(e))) \ra P(k(e))) \ra\\
-  &(\All e. \toval(e) = \bot \ra P(e))
+  &(\All e. \isenf(e) \Ra P(e)) \Ra \\
+  &(\All e, k: \Cont . \isenf(e) \Ra (\All k'. |k'| < |k| \Ra P (k'(e))) \Ra P(k(e))) \Ra\\
+  &(\All e. \toval(e) = \bot \Ra P(e))
 \end{align*}
 \end{lemma}
 \begin{proof}

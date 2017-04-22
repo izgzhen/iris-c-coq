@@ -177,9 +177,9 @@ The soundness of WP-style program is proven by showing that it is \emph{adequate
 \begin{lemma}
 For all $e, \sigma, \pred: \Val \ra \Prop$,
 \begin{align*}
-&\TRUE \proves \wpre{e}[\top]{\pred} \ra \\
-&\quad (\All v, \sigma'. \cstep{e}{\sigma}{v}{\sigma'} \ra \pred(v)) \land \\
-&\quad (\All e', \sigma'. \cstep{e}{\sigma}{e'}{\sigma'} \ra (\Exists v. e' = v) \lor \red(e', \sigma'))
+&\TRUE \proves \wpre{e}[\top]{\pred} \Ra \\
+&\quad (\All v, \sigma'. \cstep{e}{\sigma}{v}{\sigma'} \Ra \pred(v)) \land \\
+&\quad (\All e', \sigma'. \cstep{e}{\sigma}{e'}{\sigma'} \Ra (\Exists v. e' = v) \lor \red(e', \sigma'))
 \end{align*}
 \end{lemma}
 
