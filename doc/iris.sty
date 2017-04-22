@@ -406,9 +406,10 @@
 
 \newcommand{\tyvoid}{\tau_\texttt{void}}
 \newcommand{\tynull}{\tau_\texttt{null}}
+\newcommand{\tybool}{\tau_\texttt{bool}}
 \newcommand{\tybyte}{\tau_\texttt{int8}}
 \newcommand{\tyword}{\tau_\texttt{int32}}
-\newcommand{\typtr}[1]{*{#1}}
+\newcommand{\typtr}[1]{\mathrm{Ptr}(#1)}
 
 % values
 
@@ -426,6 +427,7 @@
 \newcommand{\esnd}[1]{{#1}.2}
 \newcommand{\eif}[3]{\texttt{if}({#1})\,\{{#2}\}\,\texttt{else}\,\{{#3}\}}
 \newcommand{\ewhile}[3]{\texttt{while}_{#1}({#2})\,\{{#3}\}}
+\newcommand{\ewhilenoc}[2]{\texttt{while}\,({#1})\,\{{#2}\}}
 \newcommand{\erete}[1]{\texttt{return}\,{#1}}
 \newcommand{\ealloc}[2]{\texttt{alloc}_{#1}(#2)}
 \newcommand{\elet}[4]{\texttt{let}\,{#2} : {#1} \vcentcolon= {#3} \,\texttt{in} \, {#4}}
@@ -456,7 +458,7 @@
 \newcommand{\emptyctx}{\bullet}
 
 % Misc
-\newcommand{\tychk}[2]{\vdash_{\text{typeof}} {#1} : {#2}}
+\newcommand{\tychk}[2]{\vdash_{\text{typeof}} {#1} : {#2}\,}
 \newcommand{\tyinf}[2]{\vdash_{\text{tyinf}} {#1} : {#2}}
 
 \newcommand{\estep}[4]{({#1}, {#2}) \ra_{local} ({#3}, {#4})}
