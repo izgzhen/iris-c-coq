@@ -15,7 +15,7 @@ Section wp_ret.
      ((⌜ is_jmp eh = false ⌝ ∗ WP eh @ E {{ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret }}) ∨
       (∃ v, ⌜ eh = Erete (Evalue v) ⌝ ∗ ▷ Φret v) ∨
       (∃ f vs e e' params retty,
-         ⌜ eh = Ecall_typed retty f (map Evalue vs) ∧
+         ⌜ eh = Ecall retty f (map Evalue vs) ∧
            let_params vs params e = Some e' ⌝ ∗
          text_interp f (Function retty params e) ∗
          (▷ wpr E e' (λ _, False)%I (λ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret))))
@@ -132,14 +132,14 @@ Section wp_ret.
     let_params vs params e = Some e' →
     text_interp f (Function retty params e) ∗
     ▷ wpr E e' (fun _ => False%I) Φ
-    ⊢ wpr E (Ecall_typed retty f (map Evalue vs)) Φ Φret.
+    ⊢ wpr E (Ecall retty f (map Evalue vs)) Φ Φret.
   Proof.
     iIntros (?) "[? ?]".
     iApply wpr_unfold. rewrite /wpr_pre.
     iRight.
     iSplit.
     { iPureIntro. split=>//. }
-    iExists (Ecall_typed retty f _), [].
+    iExists (Ecall retty f _), [].
     iSplit.
     { iPureIntro. simpl. by rewrite forall_is_val. }
     iRight. iRight. iExists _, _, _, _, _, _. iFrame.
@@ -189,7 +189,7 @@ Section wp_ret.
     let_params vs params e = Some e' →
     text_interp f (Function retty params e) ∗ own_stack ks ∗
     ▷ wpr E e' (fun _ => False%I) (λ v, own_stack ks -∗ WP (fill_ectxs (Evalue v) k) @ E {{ Φ }})
-    ⊢ wp E (fill_ectxs (Ecall_typed retty f (map Evalue vs)) k) Φ.
+    ⊢ wp E (fill_ectxs (Ecall retty f (map Evalue vs)) k) Φ.
   Proof.
     iIntros (?) "(?&?&?)".
     iApply (wp_call k)=>//.

@@ -42,7 +42,7 @@ Section example.
     own_scode (SCrel (f_rel vx)) ∗
     (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ own_stack ks -∗
           WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
-    ⊢ WP fill_ectxs (Ecall_typed Tint32 f [Evalue vx]) k {{ _, Φ }}.
+    ⊢ WP fill_ectxs (Ecall Tint32 f [Evalue vx]) k {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hs & Hsc & HΦ)".
     iApply (wp_call _ [Vint32 vx] [(x, Tint32)] f_body)=>//.

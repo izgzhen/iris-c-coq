@@ -10,11 +10,9 @@ Class lockG Σ := LockG { lock_tokG :> inG Σ (exclR unitC) }.
 Definition lockΣ : gFunctors := #[GFunctor (exclR unitC)].
 
 Section spin_lock.
-
+  
   Definition acquire (lk: expr) : expr :=
-    while [ECAS_typed tybool lk vfalse vtrue == vfalse]
-          (ECAS_typed tybool lk vfalse vtrue == vfalse )
-    <{ void }> ;;
+    while: (ECAS tybool lk vfalse vtrue == vfalse ) ( void ) ;;
     return: void.
 
   Definition newlock : expr :=
@@ -75,7 +73,7 @@ Section spin_lock.
   Lemma newlock_spec (R: iProp Σ) f Φ k ks:
     text_interp f (Function (Tptr tybool) [] newlock) ∗
     R ∗ own_stack ks ∗ (∀ γ lk, own_stack ks -∗ is_lock γ lk R -∗ WP fill_ectxs lk k {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall_typed (Tptr tybool) f []) k {{ Φ }}.
+    ⊢ WP fill_ectxs (Ecall (Tptr tybool) f []) k {{ Φ }}.
   Proof.
     iIntros "(Hf & HR & Hs & HΦ)".
     iApply (wp_call k []); last iFrame; first done.
@@ -87,7 +85,7 @@ Section spin_lock.
   Lemma acquire_spec γ R Φ k ks (lk: val) f:
     own_stack ks ∗ text_interp f (Function Tvoid [(lkx, tylock)] (acquire lkx)) ∗
     is_lock γ lk R ∗ (locked γ -∗ R -∗ own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall_typed Tvoid f [Evalue lk]) k {{ Φ }}.
+    ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
   Proof.
     iIntros "(Hs & Hf & #Hlk & HΦ)".
     iApply (wp_call k [lk]); last iFrame; first done.
@@ -96,7 +94,7 @@ Section spin_lock.
     iLöb as "IH".
     unfold acquire.
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands. subst.
-    wp_bind (ECAS_typed _ _ _ _).
+    wp_bind (ECAS _ _ _ _).
     iApply wp_atomic.
     { by apply atomic_enf. }
     iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro.

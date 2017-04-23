@@ -39,13 +39,13 @@ Ltac reshape_expr e tac :=
     go (EKrete :: K) e
   | Ewhile ?c ?e ?s =>
     go (EKwhile c s :: K) e
-  | ECAS_typed ?t (Evalue (Vptr ?l)) (Evalue ?v1) ?e2 =>
+  | ECAS ?t (Evalue (Vptr ?l)) (Evalue ?v1) ?e2 =>
     go (EKCASr t l v1 :: K) e2
-  | ECAS_typed ?t (Evalue (Vptr ?l)) ?e1 ?e2 =>
+  | ECAS ?t (Evalue (Vptr ?l)) ?e1 ?e2 =>
     go (EKCASm t l e2 :: K) e1
-  | ECAS_typed ?t ?e0 ?e1 ?e2 =>
+  | ECAS ?t ?e0 ?e1 ?e2 =>
     go (EKCASl t e1 e2 :: K) e0
-  | Elet_typed ?t ?x ?ex ?ebody =>
+  | Elet ?t ?x ?ex ?ebody =>
     go (EKlet t x ebody :: K) ex
   | Eif ?e ?e1 ?e2 => go (EKif e1 e2 :: K) e
   | Ealloc ?t ?e => go (EKalloc t :: K) e
@@ -233,7 +233,7 @@ Ltac wp_step :=
    | |- _ ⊢ wp _ (Eif (Evalue vtrue) _ _) _ => iApply wp_if_true
    | |- _ ⊢ wp _ (Erete _) _ => wp_ret
    | |- _ ⊢ ▷ _ => iNext
-   | |- _ ⊢ wp _ (Elet_typed _ _ _ _) _ => wp_let
+   | |- _ ⊢ wp _ (Elet _ _ _ _) _ => wp_let
    | _ => wp_snd || wp_fst || wp_load || wp_op
   end.
 

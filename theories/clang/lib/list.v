@@ -54,19 +54,19 @@ Section proof.
   Notation "'Tlist'" := (Tptr (tcell Tint32)).
 
   Definition rev_list : expr :=
-    Edecl (Tptr Tlist) t (
-    while [ x != null ] ( x != null ) <{
+    let: t ::: Tptr Tlist in
+    while: ( x != null ) (
       t <- snd (!?x) ;;
       snd (!?x) <- y ;;
       y <- x ;;
       x <- t
-    }>).
+    ).
 
   Definition ps :=
     [ (x, Tlist); (y, Tptr Tvoid) ].
 
   Definition traverse_list (lx: val) : expr :=
-    while [ !lx@Tlist != null ] (!lx@Tlist != null) <{ lx <- snd (!(!lx@Tlist)@(tcell Tint32)) }>.
+    while: (!lx@Tlist != null) ( lx <- snd (!(!lx@Tlist)@(tcell Tint32)) ).
 
   Lemma traverse_spec Φ lx xs: ∀ l,
     lx ↦ l @ Tlist ∗ isList l xs Tint32 ∗ (isList l xs Tint32 -∗ Φ void)
@@ -145,9 +145,9 @@ Section proof.
     isListSeg p p' l' x xs1 Tint32 ∗ isList l' xs2 Tint32 ∗ ⌜ xs = xs1 ++ xs2 ⌝ ∗
     (∀ p': addr, lx ↦ p @ Tlist -∗ pt ↦ p' @ Tlist -∗ isListSeg p p' null x xs Tint32 -∗
                  pt' ↦ null @ Tlist -∗ Φ void)
-    ⊢ WP (while [! pt' @ Tlist != null](! pt' @ Tlist != null)<{
+    ⊢ WP (while: (! pt' @ Tlist != null) (
             pt <- ! pt' @ Tlist ;; pt' <- snd ! ! pt' @ Tlist @ (tcell Tint32)
-          }>) {{ Φ }}.
+          )) {{ Φ }}.
   Proof.
     induction xs2 as [|x' xs2' IHxs']; iIntros (???????) "(Hlx&Hpt&Hpt'&Hxs1&Hxs2&%&HΦ)".
     - iDestruct "Hxs2" as "%". subst.
@@ -163,14 +163,14 @@ Section proof.
 
   Definition enq_list (lx: val) (v: val) : expr :=
     let: t ::: Tlist := Ealloc Tlist (!lx@Tlist) in
-    Eif (t != null) (
+    if: (t != null) then: (
       let: t' ::: Tlist := Ealloc Tlist (snd (!?t)) in
-      while [ t' != null ] (t' != null) <{
+      while: (t' != null) (
         t <- t';;
         t' <- snd (!?t')
-      }> ;;
+      ) ;;
       snd !?t <- Ealloc (tcell Tint32) (Vpair v null)
-    ) (* else *) (
+    ) else: (
       lx <- Ealloc (tcell Tint32) (Vpair v null)
     ).
   
@@ -180,7 +180,7 @@ Section proof.
     ⊢ WP enq_list lx v {{ v, Φ v }}.
   Proof.
     intros ?. rewrite /enq_list. subst.
-    unfold Edecl. iIntros (l) "[Hlx [Hl HΦ]]".
+    iIntros (l) "[Hlx [Hl HΦ]]".
     iDestruct (mapsto_typeof with "Hlx") as "%".
     wp_load. wp_alloc pt as "Ht". wp_let. destruct xs as [|x xs'] eqn:?; subst; simpl.
     - iDestruct "Hl" as "%". subst. wp_run. wp_alloc p as "Hp"=>//.
@@ -225,11 +225,11 @@ Section proof.
       px ↦ lx @ Tlist ∗
       py ↦ ly @ Tptr Tvoid ∗
       pt ↦ - @ Tptr Tlist
-      ⊢ WP while [! px @ Tlist != null](! px @ Tlist != null) <{
+      ⊢ WP while: (! px @ Tlist != null) (
              pt <- snd ! ! px @ Tlist @ (tcell Tint32) ;;
              ! px @ Tlist + (Byte.repr 4) <- ! py @ (Tptr Tvoid) ;;
              py <- ! px @ Tlist ;;
-             px <- ! pt @ (Tptr Tlist) }> {{ v, Φ v }}.
+             px <- ! pt @ (Tptr Tlist) ) {{ v, Φ v }}.
   Proof.
     induction xs as [|x xs' IHxs']; intros ??? ; subst.
     - iIntros "(Hlx & Hly & HΦ & Hs & Hpx & Hpy & Hpt)".
@@ -259,7 +259,7 @@ Section proof.
       text_interp f (Function Tvoid ps rev_list) ∗
       isList lx xs Tint32 ∗ isList ly ys Tint32 ∗ own_stack ks ∗
       (∀ ly', isList ly' (rev xs ++ ys) Tint32 -∗ own_stack ([]::ks) -∗ Φ Vvoid)
-      ⊢ WP Ecall_typed Tvoid f [Evalue lx ; Evalue ly] {{ Φ }}.
+      ⊢ WP Ecall Tvoid f [Evalue lx ; Evalue ly] {{ Φ }}.
    Proof.
     iIntros (???) "(Hf & Hlx & Hly & Hs & HΦ)". unfold rev_list.
     iApply (wp_call [] [lx; ly]); last iFrame; first by simpl.

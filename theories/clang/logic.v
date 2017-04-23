@@ -367,7 +367,7 @@ Section rules.
   Lemma wp_cas_fail Φ E l t q v' v1 v2 :
     v' ≠ v1 → typeof v1 t → typeof v2 t → (* too strong, should mimick wp_assign *)
     ▷ l ↦{q} v' @ t ∗ ▷ (l ↦{q} v' @ t -∗ Φ vfalse)
-    ⊢ WP ECAS_typed t (Evalue (Vptr l)) (Evalue v1) (Evalue v2) @ E {{ Φ }}.
+    ⊢ WP ECAS t (Evalue (Vptr l)) (Evalue v1) (Evalue v2) @ E {{ Φ }}.
   Proof.
     iIntros (???) "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
@@ -392,7 +392,7 @@ Section rules.
   Lemma wp_cas_suc Φ E l t v v2 :
     typeof v t → typeof v2 t → (* too strong, should mimick wp_assign *)
     ▷ l ↦ v @ t ∗ ▷ (l ↦ v2 @ t -∗ Φ vtrue)
-    ⊢ WP ECAS_typed t (Evalue (Vptr l)) (Evalue v) (Evalue v2) @ E {{ Φ }}.
+    ⊢ WP ECAS t (Evalue (Vptr l)) (Evalue v) (Evalue v2) @ E {{ Φ }}.
   Proof.
     iIntros (??) "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
@@ -561,7 +561,7 @@ Section rules.
   Lemma wp_let E x t v e e' Φ:
     instantiate_let x v t e = Some e' →
     ▷ WP e' @ E {{ Φ }}
-    ⊢ WP Elet_typed t x (Evalue v) e @ E {{ Φ }}.
+    ⊢ WP Elet t x (Evalue v) e @ E {{ Φ }}.
   Proof.
     iIntros (?) "HΦ".
     iApply wp_lift_pure_step; first eauto.
@@ -578,9 +578,6 @@ Section rules.
         escape_false.
       + absurd_jstep Hjs.
   Qed.
-
-  Definition Edecl (t: type) (x: ident) e : expr :=
-    Elet_typed t x (Ealloc t (Evalue (default_val t))) e.
 
   (* Call *)
 
@@ -615,7 +612,7 @@ Section rules.
     text_interp f (Function retty params e) ∗
     own_stack ks ∗
     ▷ (own_stack (k::ks) -∗ WP e' @ E {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall_typed retty f (map Evalue vs)) k @ E {{ Φ }}.
+    ⊢ WP fill_ectxs (Ecall retty f (map Evalue vs)) k @ E {{ Φ }}.
   Proof.
     iIntros (Hls) "[Hf [Hstk HΦ]]".
     iApply wp_lift_step=>//.

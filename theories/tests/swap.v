@@ -7,12 +7,11 @@ Section example.
   Definition a1: ident := 2.
   Definition a2: ident := 3.
 
-  Definition swap (t: type) :=
-    Edecl t x (
+  Definition swap (t: type) : expr :=
+    let: x ::: t in
     x <- a1 ;;
     a1 <- a2 ;;
-    a2 <- x
-    ).
+    a2 <- x.
 
   (* Instantiate the variables *)
   Definition swap' t  (l1 l2: addr) :=
