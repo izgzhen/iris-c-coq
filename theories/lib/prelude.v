@@ -2,6 +2,7 @@
 
 From iris_c.lib Require Export CpdtTactics Integers.
 From iris.prelude Require Import prelude countable.
+From mathcomp Require Import ssreflect.
 Open Scope Z_scope.
 
 Definition ident : Set := Z.
@@ -71,7 +72,7 @@ Proof.
   intros Hxy Hyz.
   apply Nat.leb_le in Hxy. apply Nat.leb_le in Hyz.
   apply Nat.leb_le.
-  by eapply le_trans.
+  eapply le_trans; [ apply Hxy | apply Hyz ].
 Qed.
 
 Lemma gtb_trans (x y z: nat):
@@ -82,7 +83,7 @@ Proof.
   intros Hxy Hyz.
   apply Nat.leb_gt in Hxy.
   apply Nat.leb_gt in Hyz. apply Nat.leb_gt.
-  by eapply lt_trans.
+  eapply lt_trans; [apply Hyz | apply Hxy ].
 Qed.
 
 Lemma leb_cancel_false {A: Type} (c: A) (l1 l2: list A):
@@ -96,7 +97,7 @@ Proof. rewrite Nat.leb_le. simpl. rewrite app_length. omega. Qed.
 Ltac destruct_ands :=
   repeat (match goal with
             | [H: context [?H1 ∧ ?H2] |- _ ] => destruct H
-          end).
+          end); subst.
 
 Require Import Coq.Arith.PeanoNat.
 
@@ -124,3 +125,11 @@ Ltac rewrite_nat :=
             | |- context [?X * 1] => rewrite Nat.mul_1_r
             | |- context [?X + O] => rewrite Nat.add_0_r
           end).
+
+Ltac inversion_eq :=
+    match goal with
+      | [ H1: ?x = ?y1, H2 : ?x = ?y2 |- _ ] => rewrite H1 in H2; inversion H2
+      | [ H1: ?x = ?y1, H2 : ?y2 = ?x |- _ ] => rewrite H1 in H2; inversion H2
+      | [ H1: ?y1 = ?x, H2 : ?y2 = ?x |- _ ] => rewrite -H1 in H2; inversion H2
+      | [ H1: ?y1 = ?x, H2 : ?x = ?y2 |- _ ] => rewrite -H1 in H2; inversion H2
+    end.

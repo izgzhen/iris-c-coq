@@ -33,7 +33,7 @@ Section proof.
     - iIntros "%". iPureIntro. by subst.
     - simpl. iIntros "H".
       iDestruct "H" as (??) "(% & ? & _)".
-      destruct_ands. by subst.
+      by destruct_ands.
   Qed.
 
   Lemma isList_ptr' (l: val) (xs: list val) (t: type) :
@@ -43,7 +43,7 @@ Section proof.
     - iIntros "%". iPureIntro. by subst.
     - simpl. iIntros "H".
       iDestruct "H" as (??) "(% & ? & _)".
-      destruct_ands. by subst.
+      by destruct_ands.
   Qed.
 
   Definition x: ident := 1.
@@ -78,7 +78,7 @@ Section proof.
       repeat wp_step. by iApply "HΦ".
     - iIntros (l) "[Hlx [Hl HΦ]]".
       simpl. iDestruct "Hl" as (p l') "[% [Hp Hl']]".
-      destruct_ands. subst.
+      destruct_ands.
       rewrite /traverse_list. do 9 wp_step.
       iApply IHxs'. iFrame. iIntros "?".
       iApply "HΦ". iExists _, _. by iFrame.
@@ -93,10 +93,10 @@ Section proof.
   Proof.
     intros ?.
     induction xs as [|x' xs' IHxs']; iIntros (x p p' p'' l'' ?) "[Hl Hv]"; simpl.
-    - iDestruct "Hl" as (p''') "[% ?]". destruct_ands. subst.
+    - iDestruct "Hl" as (p''') "[% ?]". destruct_ands.
       iExists p''', p''. iSplit=>//. iFrame.
       iExists _. iFrame. done.
-    - iDestruct "Hl" as (p''' l') "[% [? ?]]". destruct_ands. subst.
+    - iDestruct "Hl" as (p''' l') "[% [? ?]]". destruct_ands.
       specialize (IHxs' x' l' p' p'' l'').
       iDestruct (IHxs' with "[~1 Hv]") as "?"=>//; first iFrame.
       iExists _, _. iFrame. done.
@@ -115,15 +115,15 @@ Section proof.
     (⌜ p = p' ∧ xs = [] ⌝ ∗ p' ↦ Vpair x null @ tcell Tint32).
   Proof.
     induction xs as [|x' xs' IHxs'].
-    - iIntros (???) "H". simpl. iDestruct "H" as (?) "[% ?]". destruct_ands. simplify_eq.
-      iRight. by iFrame.
-    - iIntros (???) "H". simpl. iDestruct "H" as (??) "[% [? ?]]". destruct_ands. simplify_eq.
+    - iIntros (???) "H". simpl. iDestruct "H" as (?) "[% ?]". destruct_ands.
+      iRight. simplify_eq. by iFrame.
+    - iIntros (???) "H". simpl. iDestruct "H" as (??) "[% [? ?]]". destruct_ands.
       iDestruct (IHxs' with "~1") as "[?|[% ?]]".
       + iLeft. iDestruct "~2" as (???) "[? [? %]]". iExists H2. iFrame.
         subst. iExists (x'::H5). iExists _.
         iSplit=>//. simpl. iExists _, _.
         iFrame. done.
-      + destruct_ands. subst. iLeft. iExists x'. iFrame.
+      + destruct_ands. iLeft. iExists x'. iFrame.
         iExists [], H0. iSplit=>//. simpl. iExists _.
         iSplit=>//.
   Qed.
@@ -132,9 +132,9 @@ Section proof.
     isListSeg p p' null x xs Tint32 ⊢ isList p (x::xs) Tint32.
   Proof.
     induction xs as [|x' xs' IHxs'].
-    - iDestruct 1 as (?) "[% ?]". destruct_ands. subst.
+    - iDestruct 1 as (?) "[% ?]". destruct_ands.
       iExists _, _. iFrame. iSplit=>//.
-    - simpl. iDestruct 1 as (??) "[% [? ?]]". destruct_ands. subst.
+    - simpl. iDestruct 1 as (??) "[% [? ?]]". destruct_ands.
       iDestruct (IHxs' with "~") as "?".
       iExists _, _. iFrame. iSplit=>//.
   Qed.
@@ -153,7 +153,7 @@ Section proof.
     - iDestruct "Hxs2" as "%". subst.
       repeat wp_step. rewrite (right_id_L _ (++)).
       by iSpecialize ("HΦ" $! p' with "Hlx Hpt Hxs1 Hpt'").
-    - simpl. iDestruct "Hxs2" as (p'' l'') "[% [? ?]]". destruct_ands. subst.
+    - simpl. iDestruct "Hxs2" as (p'' l'') "[% [? ?]]". destruct_ands.
       do 11 wp_step.
       iApply (IHxs' (xs1 ++ [x'])); last iFrame; auto.
       iSplitL.
@@ -187,7 +187,7 @@ Section proof.
       wp_assign. iApply ("HΦ" with "[-Hp]")=>//.
       iExists _, _. iFrame. iSplit=>//.
     - simpl. iDestruct "Hl" as (p l') "[% [? ?]]".
-      destruct_ands. subst. wp_run.
+      destruct_ands. wp_run.
       wp_alloc pt' as "Hpt'". wp_let.
       iApply wp_seq=>//.
       iApply (enq_spec' lx p _ x _ _ [] pt pt' p l'); last iFrame; auto.
@@ -196,7 +196,7 @@ Section proof.
       iSplit=>//. iIntros (?) "? ? ? ?". destruct a.
       wp_run. rewrite_byte. replace (Z.to_nat 4) with 4%nat; last done.
       iDestruct (lseg_unsnoc with "~2") as "[H|[% Hp]]".
-      + iDestruct "H" as (???) "[Hl [Hp %]]". destruct_ands. subst.
+      + iDestruct "H" as (???) "[Hl [Hp %]]". destruct_ands.
         iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
         wp_alloc lp' as "Hlp'"=>//. wp_assign.
         iApply ("HΦ" with "~").
@@ -205,9 +205,9 @@ Section proof.
         iDestruct (lseg_snoc with "[Hl Hp]") as "Hl'"; try iFrame; auto.
         iDestruct (lseg_snoc with "[Hl' Hlp']") as "Hl''"; try iFrame; auto.
         iDestruct (lseg_to_list with "Hl''") as "Hl''".
-        simpl. iDestruct "Hl''" as (??) "[% [? ?]]". destruct_ands. simplify_eq.
+        simpl. iDestruct "Hl''" as (??) "[% [? ?]]". destruct_ands.
         iExists _, _. iFrame. done.
-      + destruct_ands. subst.
+      + destruct_ands.
         iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
         wp_alloc lp' as "Hlp'"=>//. wp_assign.
         iApply ("HΦ" with "~").
@@ -240,7 +240,7 @@ Section proof.
       destruct H0 as [? [? ?]]. subst.
       iDestruct "Hpt" as (?) "Hpt".
       destruct p as [pb po].
-      iDestruct (isList_ptr with "Hly") as "%". unfold tcell.
+      iDestruct (isList_ptr with "Hly") as "%".
       wp_run. rewrite_byte. replace (Z.to_nat 4) with 4%nat; last done.
       iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
       do 5 wp_step.
@@ -261,7 +261,7 @@ Section proof.
       (∀ ly', isList ly' (rev xs ++ ys) Tint32 -∗ own_stack ([]::ks) -∗ Φ Vvoid)
       ⊢ WP Ecall Tvoid f [Evalue lx ; Evalue ly] {{ Φ }}.
    Proof.
-    iIntros (???) "(Hf & Hlx & Hly & Hs & HΦ)". unfold rev_list.
+    iIntros (???) "(Hf & Hlx & Hly & Hs & HΦ)".
     iApply (wp_call [] [lx; ly]); last iFrame; first by simpl.
     iNext. iIntros "Hs'".
     iDestruct (isList_ptr with "Hly") as "%".

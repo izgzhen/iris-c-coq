@@ -3,6 +3,8 @@ Iris C
 
 C verification framework based on the Iris program logic.
 
+[Example](theories/tests/swap.v)
+
 [Documentation](doc/iris-c.pdf)
 
 ## Dependencies

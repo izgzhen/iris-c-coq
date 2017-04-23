@@ -92,11 +92,9 @@ Section spin_lock.
     iNext. iIntros "Hs'". iDestruct (is_lock_tylock with "Hlk") as "%".
     wp_alloc lkx as "Hlkx". wp_let. wp_load.
     iLöb as "IH".
-    unfold acquire.
-    iDestruct "Hlk" as (l) "[% ?]". destruct_ands. subst.
+    iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
     wp_bind (ECAS _ _ _ _).
-    iApply wp_atomic.
-    { by apply atomic_enf. }
+    wp_atomic.
     iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro.
     - wp_cas_fail.
       iIntros "Hl".
@@ -118,16 +116,12 @@ Section spin_lock.
     ⊢ WP release lk {{ Φ }}.
   Proof.
     iIntros "(#Hlk & Hlked & HR & HΦ)".
-    unfold release.
-    iDestruct "Hlk" as (l) "[% ?]". destruct_ands. subst.
-    iApply wp_atomic.
-    { by apply atomic_enf. }
+    iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
+    wp_atomic.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
-    - simpl. iApply wp_assign; last iFrame.
-      { apply typeof_int8. }
-      { constructor. }
-      iNext. iIntros "Hl". iMod ("Hclose" with "[-]")=>//.
-      iNext. iExists false. iFrame.
+    - simpl. iApply wp_assign; last iFrame; try by constructor.
+      iIntros "!> Hl". iMod ("Hclose" with "[-]")=>//.
+      iExists false. iFrame.
     - iDestruct "HR'" as "[>Ho' HR']".
       by iDestruct (locked_exclusive with "Hlked Ho'") as "%".
   Qed.

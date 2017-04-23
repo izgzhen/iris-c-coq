@@ -223,6 +223,9 @@ Tactic Notation "wp_ret" := iApply (wp_ret []).
 
 Tactic Notation "wp_let" := iApply wp_let=>//; iNext.
 
+Tactic Notation "wp_atomic" :=
+  iApply wp_atomic; first by apply atomic_enf.
+
 Ltac wp_step :=
   match goal with
    | |- _ ⊢ wp _ (Eassign _ _) _ => wp_assign

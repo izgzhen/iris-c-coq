@@ -1050,18 +1050,13 @@ Proof.
   induction t;
     intros v v' p Htv Htv';
     inversion Htv; inversion Htv'=>//; subst;
-    intros Hv1 Hv2; subst; destruct p; simpl in Hv1, Hv2.
+    intros Hv1 Hv2; subst; destruct p; simpl in Hv1, Hv2; try by (destruct_ands; inversion_eq).
   - rewrite Byte.repr_unsigned in Hv2, Hv1.
-    destruct_ands. rewrite H in H1.
-    inversion H1. by rewrite Byte.repr_unsigned.
+    destruct_ands.
+    inversion_eq.
+    by rewrite Byte.repr_unsigned.
   - destruct_ands.
     admit.
-  - destruct_ands.
-    by rewrite H in H4.
-  - destruct_ands.
-    by rewrite H in H4.
-  - destruct_ands.
-    rewrite H in H4. by inversion H4.
   - f_equal.
     + eapply IHt1=>//; by eapply readbytes_segment.
     + eapply IHt2=>//.

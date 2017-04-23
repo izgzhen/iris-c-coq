@@ -104,7 +104,7 @@ Section wp_ret.
       + iDestruct "H" as (??????) "[% [? ?]]". destruct_ands.
         iRight.
         iSplit=>//; first by iPureIntro; apply fill_ectxs_not_val.
-        iExists eh, (kes ++ K).
+        iExists _, (kes ++ K).
         iSplit; first by iPureIntro; apply unfill_app.
         iRight. iRight. iExists _, _, _, _, _, _.
         iSplitL ""=>//.
@@ -167,7 +167,7 @@ Section wp_ret.
     match goal with
       | [ H : unfill_expr _ _ = Some _ |- _ ] =>
         let H' := fresh "H'" in
-        move: (cont_uninj' H) => H'; clear H; destruct_ands; subst
+        move: (cont_uninj' H) => H'; clear H; destruct_ands
     end.
 
   Tactic Notation "enf_not_val" :=
@@ -254,7 +254,7 @@ Section wp_ret.
            inversion Heq. subst.
            iDestruct "Hσ1" as "(H1&H2&H3)".
            iMod (stack_pop with "[H H3]") as "(Hstk & Hs & %)"; first iFrame.
-           destruct_ands; subst.
+           destruct_ands.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
            { simpl. by iApply "H'". }
