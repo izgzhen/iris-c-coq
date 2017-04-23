@@ -68,10 +68,11 @@ Section array.
         iSplit=>//.
   Qed.
 
-  Lemma split_slice_join q t b o l1 i l2 vs1 vs2:
-    slice q t b o i l1 vs1 ∗ slice q t b o (i + l1) l2 vs2 ⊢
+  Lemma split_slice_join q t b o l1 i i' l2 vs1 vs2:
+    i + l1 = i' →
+    slice q t b o i l1 vs1 ∗ slice q t b o i' l2 vs2 ⊢
     slice q t b o i (l1 + l2) (vs1 ++ vs2).
-  Proof. iIntros "~". by iDestruct (split_slice with "~") as "[_ ?]". Qed.
+  Proof. iIntros (?) "~". rewrite -H0. by iDestruct (split_slice with "~") as "[_ ?]". Qed.
 
   Lemma split_slice' q t b o k n vs:
     k < n → length vs = n →
@@ -163,6 +164,22 @@ Section array.
     iPureIntro. by eapply len_varray.
   Qed.
 
+  Ltac rewrite_int :=
+    match goal with
+      | |- context [ Int.mul _ (Int.repr Z0) ] => rewrite Int.mul_zero
+      | |- context [ offset_by_int32 ?off Int.zero ] =>
+        rewrite /offset_by_int32;
+          replace (Z.to_nat (Int.intval Int.zero)) with O; last done;
+          replace (off + O) with off; last done
+    end.
+
+  Ltac rewrite_nat :=
+    repeat (match goal with
+              | |- context [?X * O] => rewrite Nat.mul_0_r
+              | |- context [?X * 1] => rewrite Nat.mul_1_r
+              | |- context [?X + O] => rewrite Nat.add_0_r
+            end).
+  
   Lemma index_spec q t p (i n: nat) vs Φ:
     i < n → mul_safe (sizeof_type t) i →
     p ↦{q} varray vs @ tyarray t n ∗ (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
@@ -171,19 +188,17 @@ Section array.
     iIntros (??) "[Hp HΦ]". destruct p.
     iDestruct (array_slice' with "Hp") as "Hs".
     destruct i.
-    - unfold index. wp_op.
-      rewrite Int.mul_zero. wp_op.
-      rewrite /offset_by_int32.
-      replace (Z.to_nat (Int.intval Int.zero)) with 0%nat; last done.
-      replace (o + 0) with o=>//.
+    - unfold index. wp_op. rewrite_int.
+      wp_op. rewrite_int.
       destruct n.
       { inversion H0. }
       destruct vs=>//; first by iDestruct "Hs" as "%".
-      simpl. rewrite Nat.mul_0_r Nat.add_0_r. iDestruct "Hs" as "[? ?]".
-      wp_load. iApply wp_value=>//. iApply ("HΦ" with "[-]")=>//.
+      simpl.  iDestruct "Hs" as "[? ?]".
+      rewrite_nat.  wp_load.
+      iApply wp_value=>//. iApply ("HΦ" with "[-]")=>//.
       iApply mapstoval_join. iFrame.
       simpl. iDestruct (array_slice with "~") as "?".
-      rewrite Nat.mul_1_r. done.
+      by rewrite_nat.
     - unfold index. wp_op.
       wp_op. rewrite /offset_by_int32. rewrite H1.
       iDestruct (len_slice with "Hs") as "%".
@@ -205,17 +220,10 @@ Section array.
         { by iDestruct "~" as "%". }
         iDestruct "~" as "[H1 H2]".
         iDestruct (single_slice with "H1") as "H0".
-        (* XX: I should really write a super awesome framing tactic ... *)
-        assert (1 = 0 + 1) as Hi; first omega.
-        rewrite {1}Hi.
-        iDestruct (split_slice_join with "[H2 H0]") as "?"; first iFrame.
-        replace (1 + i) with (S i); last omega.
-        assert (S i = 0 + S i); first omega.
-        rewrite {2}H3.
-        iDestruct (split_slice_join with "[Hm ~]") as "?"; first iFrame.
-        replace (S (S i)) with (0 + (S i + 1)); last omega.
-        iDestruct (split_slice_join with "[-]") as "?"; first iFrame.
-        replace (S i + 1 + n0) with n; last omega.
+        iDestruct (split_slice_join with "[H2 H0]") as "?"; [|iFrame|]; first omega.
+        iDestruct (split_slice_join with "[Hm ~]") as "?"; [|iFrame|]; first omega.
+        iDestruct (split_slice_join with "[~2 ~1]") as "?"; [|iFrame|]; first omega.
+        replace (1 + i + 1 + n0) with n; last omega.
         replace ((([v0] ++ l0) ++ [v]) ++ l) with vs=>//.
         rewrite -assoc.
         rewrite !app_cons. rewrite -Heql -Heql0.
