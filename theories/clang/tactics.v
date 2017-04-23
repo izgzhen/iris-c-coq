@@ -223,19 +223,31 @@ Tactic Notation "wp_ret" := iApply (wp_ret []).
 
 Tactic Notation "wp_let" := iApply wp_let=>//; iNext.
 
-Ltac wp_run :=
-  (match goal with
-   | |- _ ⊢ wp ?E (Eassign _ _) ?P => wp_assign
-   | |- _ ⊢ wp ?E (Eseq _ _) ?P => wp_skip
-   | |- _ ⊢ wp ?E (Ewhile _ (Evalue vfalse) _) ?P => iApply wp_while_false
-   | |- _ ⊢ wp ?E (Ewhile _ (Evalue vtrue) _) ?P => iApply wp_while_true
-   | |- _ => wp_snd
-   | |- _ => wp_fst
-   | |- _ => wp_load
-   | |- _ => wp_ret
-   | |- _ => wp_op
+Ltac wp_step :=
+  match goal with
+   | |- _ ⊢ wp _ (Eassign _ _) _ => wp_assign
+   | |- _ ⊢ wp _ (Eseq _ _) _ => wp_skip
+   | |- _ ⊢ wp _ (Ewhile _ (Evalue vfalse) _) _ => iApply wp_while_false
+   | |- _ ⊢ wp _ (Ewhile _ (Evalue vtrue) _) _ => iApply wp_while_true
+   | |- _ ⊢ wp _ (Eif (Evalue vfalse) _ _) _ => iApply wp_if_false
+   | |- _ ⊢ wp _ (Eif (Evalue vtrue) _ _) _ => iApply wp_if_true
+   | |- _ ⊢ wp _ (Erete _) _ => wp_ret
    | |- _ ⊢ ▷ _ => iNext
-  end; wp_run) || idtac.
+   | |- _ ⊢ wp _ (Elet_typed _ _ _ _) _ => wp_let
+   | _ => wp_snd || wp_fst || wp_load || wp_op
+  end.
+
+Ltac wp_run := repeat wp_step.
 
 Ltac unfold_f_inst :=
   rewrite /instantiate_let /resolve_rhs; repeat gmap_simplify.
+
+Ltac extract_types :=
+  repeat (iMatchHyp
+            (fun H P =>
+               match P with (_ ↦{_} ?v @ ?t)%I =>
+                            match goal with
+                              | [ _ : typeof v t |- _] => fail 2
+                              | _ => iDestruct (mapsto_typeof with H) as "%"
+                            end
+               end)).

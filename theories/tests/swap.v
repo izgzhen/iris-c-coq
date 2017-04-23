@@ -22,11 +22,8 @@ Section example.
     swap' t l1 l2 = Some swap_e →
     {{{ l1 ↦ v1 @ t ∗ l2 ↦ v2 @ t }}} swap_e {{{ RET void ; l1 ↦ v2 @ t ∗ l2 ↦ v1 @ t }}}.
   Proof.
-    iIntros (??) "[Hl1 Hl2] HΦ". inversion H0.
-    iDestruct (mapsto_typeof with "Hl1") as "%".
-    iDestruct (mapsto_typeof with "Hl2") as "%".
-    wp_alloc lx as "Hlx". wp_let.
-    wp_run. iApply ("HΦ" with "[Hl1 Hl2]"). iFrame.
+    iIntros (H0 ?) "[??] HΦ". inversion H0. extract_types.
+    wp_alloc lx as "Hlx". wp_run. iApply ("HΦ" with "[-]"). iFrame.
   Qed.
 
 End example.

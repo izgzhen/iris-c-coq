@@ -116,3 +116,11 @@ Ltac assoc_nat :=
 Lemma app_cons {A} (x: A) (y: list A):
   [x] ++ y = x::y.
 Proof. induction y; crush. Qed.
+
+
+Ltac rewrite_nat :=
+  repeat (match goal with
+            | |- context [?X * O] => rewrite Nat.mul_0_r
+            | |- context [?X * 1] => rewrite Nat.mul_1_r
+            | |- context [?X + O] => rewrite Nat.add_0_r
+          end).

@@ -163,22 +163,6 @@ Section array.
     iDestruct (mapsto_typeof with "~") as "%".
     iPureIntro. by eapply len_varray.
   Qed.
-
-  Ltac rewrite_int :=
-    match goal with
-      | |- context [ Int.mul _ (Int.repr Z0) ] => rewrite Int.mul_zero
-      | |- context [ offset_by_int32 ?off Int.zero ] =>
-        rewrite /offset_by_int32;
-          replace (Z.to_nat (Int.intval Int.zero)) with O; last done;
-          replace (off + O) with off; last done
-    end.
-
-  Ltac rewrite_nat :=
-    repeat (match goal with
-              | |- context [?X * O] => rewrite Nat.mul_0_r
-              | |- context [?X * 1] => rewrite Nat.mul_1_r
-              | |- context [?X + O] => rewrite Nat.add_0_r
-            end).
   
   Lemma index_spec q t p (i n: nat) vs Φ:
     i < n → mul_safe (sizeof_type t) i →
