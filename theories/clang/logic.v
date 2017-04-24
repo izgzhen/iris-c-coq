@@ -603,24 +603,27 @@ Section rules.
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
  
-  Lemma wp_fork E f e Φ :
-    text_interp f (Function Tvoid [] e) ∗ ▷ Φ Vvoid ∗ ▷ WP e {{ _, True }}
-    ⊢ WP Efork f @ E {{ Φ }}.
+  Lemma wp_fork E t f vs params e e' Φ :
+    let_params vs params e = Some e' →
+    text_interp f (Function t params e) ∗ ▷ Φ Vvoid ∗ ▷ WP e' {{ _, True }}
+    ⊢ WP Efork t f (map Evalue vs) @ E {{ Φ }}.
   Proof.
-    iIntros "(Hf & HΦ & He)".
+    iIntros (?) "(Hf & HΦ & He)".
     iApply wp_lift_step=>//.
     iIntros ((σ1&Γ) ks1) "[Hσ1 [HΓ Hs]]".
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
     simpl in *. iModIntro. iSplit.
-    { iPureIntro. eexists (Evalue Vvoid), _, [e]. simpl.
-      destruct σ1. apply CSestep. by constructor. }
+    { iPureIntro. eexists (Evalue Vvoid), _, [e']. simpl.
+      destruct σ1. apply CSestep. by econstructor. }
     iNext. iIntros (????Hcs).
     iMod "Hclose". inversion_cstep_as Hes Hjs.
     - iModIntro. iFrame. simpl in *.
       inversion Hes=>//; subst.
       + iFrame. iSplitR "He".
         { iApply wp_value=>//. }
+        assert (vs0 = vs).
+        { eapply map_inj=>//. simpl. by inversion 1. }
         simplify_eq. by rewrite big_sepL_singleton.
       + exfalso. escape_false.
     - absurd_jstep Hjs.

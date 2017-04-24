@@ -40,7 +40,7 @@ Inductive expr :=
 | Ewhile (cond: expr) (curcond: expr) (s: expr)
 | Erete (e: expr)
 | Eseq (s1 s2: expr)
-| Efork (fid: ident).
+| Efork (t: type) (fid: ident) (args: list expr).
 
 Record function :=
   Function {
@@ -63,6 +63,7 @@ Inductive exprctx :=
 | EKfst
 | EKsnd
 | EKcall (t: type) (fid: ident) (vargs: list val) (args: list expr)
+| EKfork (t: type) (fid: ident) (vargs: list val) (args: list expr)
 | EKalloc (t: type)
 | EKassignr (rhs: expr)
 | EKassignl (lhs: addr)
@@ -99,7 +100,12 @@ Fixpoint type_infer (ev: env) (e: expr) : option type :=
        end)
     | Ecall t f args => Some t
     | Ealloc t _ => Some (Tptr t)
-    | _ => Some Tvoid
+    | Efork _ _ _ => Some Tvoid
+    | Eassign _ _ => Some Tvoid
+    | Eif _ _ _ => Some Tvoid
+    | Ewhile _ _ _ => Some Tvoid
+    | Erete _ => Some Tvoid
+    | Eseq _ e2 => type_infer ev e2
   end.
 
 Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
@@ -114,6 +120,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKfst => Efst e
     | EKsnd => Esnd e
     | EKcall t f vargs args => Ecall t f (map Evalue vargs ++ e :: args)
+    | EKfork t f vargs args => Efork t f (map Evalue vargs ++ e :: args)
     | EKalloc t => Ealloc t e
     | EKassignr rhs => Eassign e rhs
     | EKassignl lhs => Eassign (Evalue (Vptr lhs)) e
@@ -235,7 +242,6 @@ Qed.
 Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
   match e with
     | Evalue v => Some e
-    | Efork f => Some e
     | Ederef_typed t e => Ederef_typed t <$> resolve_rhs ev x vx tx e
     | Ealloc t e => Ealloc t <$> resolve_rhs ev x vx tx e
     | Evar x' => (* closed-ness? *)
@@ -256,6 +262,7 @@ Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : optio
     | Efst e => Efst <$> resolve_rhs ev x vx tx e
     | Esnd e => Esnd <$> resolve_rhs ev x vx tx e
     | Ecall t f args => Ecall t f <$> lift_list_option (map (resolve_rhs ev x vx tx) args)
+    | Efork t f args => Efork t f <$> lift_list_option (map (resolve_rhs ev x vx tx) args)
     | Eassign e1 e2 => Eassign e1 <$> resolve_rhs ev x vx tx e2
     | Eif e s1 s2 =>
       match resolve_rhs ev x vx tx e, resolve_rhs ev x vx tx s1, resolve_rhs ev x vx tx s2 with
@@ -338,8 +345,8 @@ Definition instantiate_let (x: ident) (vx: val) (tx: type) (s: expr) : option ex
 
 Fixpoint is_jmp (e: expr) :=
   match e with
-    | Ecall _ _ es => true
-    | Erete e => true
+    | Ecall _ _ _ => true
+    | Erete _ => true
     | Ebinop _ e1 e2 => is_jmp e1 || is_jmp e2
     | Ederef e => is_jmp e
     | Ederef_typed _ e => is_jmp e
@@ -353,6 +360,7 @@ Fixpoint is_jmp (e: expr) :=
     | Ewhile c e e2 => is_jmp e || is_jmp c || is_jmp e2
     | ECAS t e1 e2 e3 => is_jmp e1 || is_jmp e2 || is_jmp e3
     | Elet t x ex ebody => is_jmp ex || is_jmp ebody
+    | Efork t f es => existsb is_jmp es
     | _ => false
   end.
 
@@ -373,9 +381,17 @@ Ltac solve_is_jmp_false :=
       end);
   auto.
 
+Lemma exists_is_jmp_false vs:
+  existsb is_jmp (map Evalue vs) = false.
+Proof. induction vs; crush. Qed.
+
 Lemma is_jmp_rec' e K:
   is_jmp (fill_expr e K) = false → is_jmp e = false.
-Proof. induction K=>//; simpl; intros; solve_is_jmp_false. Qed.
+Proof.
+  induction K=>//; simpl; intros; try solve_is_jmp_false.
+  rewrite existsb_app exists_is_jmp_false in H.
+  simpl in H. solve_is_jmp_false.
+Qed.
 
 Lemma is_jmp_rec e ks:
   is_jmp (fill_ectxs e ks) = false → is_jmp e = false.
@@ -385,7 +401,12 @@ Lemma is_jmp_out' e e' K:
   is_jmp e' = false →
   is_jmp (fill_expr e K) = false →
   is_jmp (fill_expr e' K) = false.
-Proof. induction K=>//; simpl; intros; solve_is_jmp_false. Qed.
+Proof.
+  induction K=>//; simpl; intros; try by solve_is_jmp_false=>//.
+  rewrite existsb_app exists_is_jmp_false in H0. simpl in H0.
+  rewrite existsb_app exists_is_jmp_false.
+  simpl. rewrite H. simpl. destruct (is_jmp e); destruct (existsb is_jmp args)=>//.
+Qed.
 
 Lemma is_jmp_out e e' K:
   is_jmp e' = false →
@@ -395,6 +416,13 @@ Proof.
   induction K=>//. simpl. intros. eapply is_jmp_out'=>//.
   apply IHK=>//. eapply is_jmp_rec'=>//.
 Qed.
+
+Fixpoint let_params (vs: list val) (params: decls) e : option expr :=
+  match vs, params with
+    | v::vs', (x, tx)::ps' => Elet tx x (Ealloc tx (Evalue v)) <$> let_params vs' ps' e
+    | [], [] => Some e
+    | _, _ => None
+  end.
 
 Inductive estep : text → expr → heap → expr → heap → list expr → Prop :=
 | ESbinop: ∀ Γ lv rv op σ v',
@@ -452,9 +480,10 @@ Inductive estep : text → expr → heap → expr → heap → list expr → Pro
 | ESifFalse e1 e2 σ Γ:
     estep Γ (Eif (Evalue vfalse) e1 e2) σ e2 σ []
 | ESfork:
-    ∀ Γ σ f e,
-      Γ !! f = Some (Function Tvoid [] e) →
-      estep Γ (Efork f) σ (Evalue Vvoid) σ [e]
+    ∀ Γ σ f e e' vs retty params,
+      Γ !! f = Some (Function retty params e) →
+      let_params vs params e = Some e' →
+      estep Γ (Efork retty f $ map Evalue vs) σ (Evalue Vvoid) σ [e']
 | ESbind':
     ∀ e e' σ σ' k kes efs Γ,
       is_jmp e = false →
@@ -567,7 +596,7 @@ Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
         | Evalue _ => Some (ks, e)
         | _ => unfill_expr ex (EKlet t x ebody :: ks)
       end
-    | Efork _ => None
+    | Efork _ _ _ => None
     | Ederef _ => None
   end.
 
@@ -585,7 +614,7 @@ Inductive lnf: expr → Prop :=
   | LNFwhile: ∀ c v s, lnf (Ewhile c (Evalue v) s)
   | LNFCAS: ∀ l t v1 v2, lnf (ECAS t (Evalue (Vptr l)) (Evalue v1) (Evalue v2))
   | LNFlet: ∀ t x v e2, lnf (Elet t x (Evalue v) e2)
-  | LNFfork: ∀ f, lnf (Efork f).
+  | LNFfork: ∀ f t es, lnf (Efork f t $ map Evalue es).
 
 Inductive enf: expr → Prop :=
 | jnf_enf: ∀ e, jnf e → enf e
@@ -638,7 +667,15 @@ Proof. induction k=>//; simpl; intros H1 H2;
          replace (e::args) with ([e] ++ args) in Hcontra; last done.
          rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
            by rewrite andb_false_r in Hcontra.
-       - subst. done.
+       - inversion H2; first inversion H.
+         inversion H. subst.
+         assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
+         { subst. rewrite -H6. apply forall_is_val. }
+         rewrite forallb_app in Hcontra.
+         replace (e::args) with ([e] ++ args) in Hcontra; last done.
+         rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
+           by rewrite andb_false_r in Hcontra.
+       - by subst.
 Qed.
 
 Lemma escape_false {e a e' a2 kes k0 e'' G efs}:
@@ -850,13 +887,6 @@ Lemma cont_incl {e' kes kes' e}:
   ∃ kes'', e' = fill_ectxs e kes''.
 Proof. move: cont_incl' => /= H. intros. by eapply H. Qed.
 
-Fixpoint let_params (vs: list val) (params: decls) e : option expr :=
-  match vs, params with
-    | v::vs', (x, tx)::ps' => Elet tx x (Ealloc tx (Evalue v)) <$> let_params vs' ps' e
-    | [], [] => Some e
-    | _, _ => None
-  end.
-
 Inductive jstep: text → expr → stack → expr → stack → Prop :=
 | JSrete:
     ∀ t v k k' ks,
@@ -888,10 +918,18 @@ Ltac inversion_estep :=
 Global Hint Constructors estep jstep cstep.
 
 Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
-Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
+Proof.
+  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
+  rewrite existsb_app. simpl. rewrite IHk'. simpl.
+  by apply orb_true_r.
+Qed.
 
 Lemma is_jmp_call k' t f es: is_jmp (fill_ectxs (Ecall t f es) k') = true.
-Proof. induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto. Qed.
+Proof.
+  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
+  rewrite existsb_app. simpl. rewrite IHk'. simpl.
+  by apply orb_true_r.
+Qed.
 
 Lemma is_jmp_jstep_false {e e' σ} k {ks ks'}:
   to_val e = None →
