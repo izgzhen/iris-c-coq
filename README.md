@@ -1,6 +1,8 @@
 Iris C
 =======
 
+[![Build Status](https://travis-ci.org/izgzhen/iris-c-coq.svg?branch=master)](https://travis-ci.org/izgzhen/iris-c-coq)
+
 C verification framework based on the Iris program logic.
 
 [Example](theories/tests/swap.v)
