@@ -1,0 +1,21 @@
+language: c
+script:
+  - opam init --yes --no-setup
+  - eval $(opam config env)
+  - opam repo add coq-released https://coq.inria.fr/opam/released
+  - opam install coq.$COQ_VERSION coq-mathcomp-ssreflect.$SSREFLECT_VERSION coq-iris.$IRIS_VERSION ounit.2.0.0 uuidm.0.9.6 --yes --verbose
+  - coq_makefile -f _CoqProject -o Makefile.coq
+  - make -f Makefile.coq
+addons:
+  apt:
+    sources:
+      - avsm
+    packages:
+      - ocaml
+      - opam
+      - aspcud
+env:
+  global:
+    - COQ_VERSION=8.5.3
+    - SSREFLECT_VERSION=1.6.1
+    - IRIS_VERSION=3.0.0
