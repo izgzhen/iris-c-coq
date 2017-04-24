@@ -327,7 +327,14 @@ resolve_lhs_outer (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option e
       | Some s1', Some s2' => Some (Eif ex s1' s2')
       | _, _ => None
       end
-    | Ewhile c ex s => Ewhile c ex <$> resolve_lhs_outer ev x vx tx s
+    | Ewhile c ex s =>
+      match resolve_lhs_outer ev x vx tx c,
+            resolve_lhs_outer ev x vx tx ex,
+            resolve_lhs_outer ev x vx tx s with
+        | Some c', Some ex', Some s' =>
+          Some $ Ewhile c' ex' s'
+        | _, _, _ => None
+      end
     | Eseq s1 s2 =>
       match resolve_lhs_outer ev x vx tx s1, resolve_lhs_outer ev x vx tx s2 with
         | Some s1', Some s2' => Some (Eseq s1' s2')

@@ -25,7 +25,7 @@ theories/clang/lib/page_table.v
 theories/clang/lib/vmm.v
 theories/clang/lib/lock.v
 theories/clang/lib/array.v
-theories/clang/lib/spawn.v
+theories/tests/spawn.v
 theories/tests/add.v
 theories/tests/swap.v
 theories/tests/task.v

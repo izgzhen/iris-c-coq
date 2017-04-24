@@ -10,16 +10,19 @@ Class lockG Σ := LockG { lock_tokG :> inG Σ (exclR unitC) }.
 Definition lockΣ : gFunctors := #[GFunctor (exclR unitC)].
 
 Section spin_lock.
+
+  Definition x : ident := 1.
   
-  Definition acquire (lk: expr) : expr :=
-    while: (ECAS tybool lk vfalse vtrue == vfalse ) ( void ) ;;
+  Definition acquire : expr :=
+    while: (ECAS tybool x vfalse vtrue == vfalse ) ( void ) ;;
     return: void.
 
   Definition newlock : expr :=
     return: Ealloc tybool vfalse.
 
-  Definition release (lk: expr) : expr :=
-    lk <- vfalse.
+  Definition release : expr :=
+    !?x <- vfalse ;;
+    return: void.
 
   Context `{!clangG Σ, !lockG Σ} (N: namespace).
 
@@ -52,24 +55,6 @@ Section spin_lock.
   Lemma is_lock_tylock γ l R: is_lock γ l R ⊢ ⌜ typeof l tylock ⌝.
   Proof. iIntros "Hlk". iDestruct "Hlk" as (?) "[% ?]". by destruct H0. Qed.
 
-  Lemma newlock_spec' (R : iProp Σ) Φ k ks:
-    own_stack (k::ks) ∗
-    R ∗ (∀ γ lk, is_lock γ lk R -∗ own_stack ks -∗ WP fill_ectxs lk k {{ Φ }}) ⊢
-    WP newlock {{ Φ }}.
-  Proof.
-    iIntros "(HS & HR & HΦ)".
-    rewrite /newlock /=.
-    wp_alloc l as "Hl". iApply (wp_ret []).
-    iFrame. iIntros "Hs". iApply fupd_wp.
-    iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
-    iMod (inv_alloc N _ (lock_inv γ l R) with "[-Hs HΦ]") as "#?".
-    { iIntros "!>". iExists false. by iFrame. }
-    iModIntro. iApply ("HΦ" with "[-Hs]")=>//. iExists l. iSplit=>//.
-    iPureIntro. split=>//. constructor.
-  Qed.
-
-  Definition lkx: ident := 1.
-
   Lemma newlock_spec (R: iProp Σ) f Φ k ks:
     text_interp f (Function (Tptr tybool) [] newlock) ∗
     R ∗ own_stack ks ∗ (∀ γ lk, own_stack ks -∗ is_lock γ lk R -∗ WP fill_ectxs lk k {{ Φ }})
@@ -77,30 +62,41 @@ Section spin_lock.
   Proof.
     iIntros "(Hf & HR & Hs & HΦ)".
     iApply (wp_call k []); last iFrame; first done.
-    iNext. iIntros "Hs'". iApply (newlock_spec' R). iFrame.
-    iIntros (??) "Hlk". iIntros "Hs".
-    iApply ("HΦ" with "[-Hlk]")=>//.
+    iNext. iIntros "Hs'". rewrite /newlock /=.
+    wp_alloc l as "Hl". iApply (wp_ret []).
+    iFrame. iIntros "Hs". iApply fupd_wp.
+    iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
+    iMod (inv_alloc N _ (lock_inv γ l R) with "[-Hs HΦ]") as "#?".
+    { iIntros "!>". iExists false. by iFrame. }
+    iModIntro. iApply ("HΦ" with "[-]")=>//. iExists _. iSplit=>//.
+    iPureIntro. split=>//. constructor.
   Qed.
 
+  Definition fspec vs params t e P (Q: val → iProp Σ) : Prop :=
+    ∀ k ks f Φ,
+      P ∗ own_stack ks ∗ text_interp f (Function t params e) ∗
+      (∀ v, Q v -∗ own_stack ks -∗ WP fill_ectxs v k {{ Φ }})
+      ⊢ WP fill_ectxs (Ecall t f $ map Evalue vs) k {{ Φ }}.
+
   Lemma acquire_spec γ R Φ k ks (lk: val) f:
-    own_stack ks ∗ text_interp f (Function Tvoid [(lkx, tylock)] (acquire lkx)) ∗
+    own_stack ks ∗ text_interp f (Function Tvoid [(x, tylock)] acquire) ∗
     is_lock γ lk R ∗ (locked γ -∗ R -∗ own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
     ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
   Proof.
     iIntros "(Hs & Hf & #Hlk & HΦ)".
     iApply (wp_call k [lk]); last iFrame; first done.
     iNext. iIntros "Hs'". iDestruct (is_lock_tylock with "Hlk") as "%".
-    wp_alloc lkx as "Hlkx". wp_let. wp_load.
-    iLöb as "IH".
-    iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
+    wp_alloc lkx as "Hlkx". wp_let. iApply wp_seq=>//.
+    iLöb as "IH". iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
+    wp_load.
     wp_bind (ECAS _ _ _ _).
     wp_atomic.
-    iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro.
+    iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro; simpl.
     - wp_cas_fail.
       iIntros "Hl".
       iMod ("Hclose" with "[-Hs' Hlkx HΦ]").
-      { iNext. iExists _. iFrame. }
-      iModIntro. wp_run.
+      { iNext. iExists true. iFrame. }
+      iModIntro. do 4 wp_step.
       iApply ("IH" with "HΦ Hs' Hlkx").
     - wp_cas_suc.
       iIntros "Hl'".
@@ -111,17 +107,22 @@ Section spin_lock.
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
 
-  Lemma release_spec lk γ R Φ:
-    is_lock γ lk R ∗ locked γ ∗ R ∗ Φ void
-    ⊢ WP release lk {{ Φ }}.
+  Lemma release_spec lk γ R f Φ k ks:
+    text_interp f (Function Tvoid [(x, tylock)] release) ∗ own_stack ks ∗
+    is_lock γ lk R ∗ locked γ ∗ R ∗ (own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
+    ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
   Proof.
-    iIntros "(#Hlk & Hlked & HR & HΦ)".
+    iIntros "(Hf & Hs & #Hlk & Hlked & HR & HΦ)".
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
+    iApply (wp_call k [Vptr l]); last iFrame; auto.
+    iIntros "!> Hs'".
+    wp_alloc lkx as "Hlkx". wp_let. wp_bind (_ <- _)%E.
+    wp_load.
     wp_atomic.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
     - simpl. iApply wp_assign; last iFrame; try by constructor.
-      iIntros "!> Hl". iMod ("Hclose" with "[-]")=>//.
-      iExists false. iFrame.
+      iIntros "!> Hl". iMod ("Hclose" with "[-Hs' HΦ]")=>//.
+      iExists false. iFrame. iModIntro. wp_run. iFrame.
     - iDestruct "HR'" as "[>Ho' HR']".
       by iDestruct (locked_exclusive with "Hlked Ho'") as "%".
   Qed.
