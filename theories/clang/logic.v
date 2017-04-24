@@ -140,7 +140,7 @@ Section rules.
     destruct (Hs _ _ _ _ Hsp) as [? ?]. subst. iFrame.
     by iApply "H".
   Qed.
-
+  
   Lemma stack_pop k k' ks ks':
     own_stack (k::ks) ∗ own_stack (k'::ks') ==∗
     own_stack (ks) ∗ own_stack (ks') ∗ ⌜ k = k' ∧ ks = ks' ⌝.
@@ -427,7 +427,7 @@ Section rules.
       let Hcs := fresh "Hcs" in
       iIntros (?????Hcs);
       atomic_step Hcs; iSplitL; last by rewrite big_sepL_nil ].
-
+  
   Lemma wp_op E op v1 v2 v' Φ:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ WP Ebinop op (Evalue v1) (Evalue v2) @ E {{ Φ }}.
@@ -602,7 +602,30 @@ Section rules.
     by iDestruct (own_valid_2 with "HΓ Hf")
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
-
+ 
+  Lemma wp_fork E f e Φ :
+    text_interp f (Function Tvoid [] e) ∗ ▷ Φ Vvoid ∗ ▷ WP e {{ _, True }}
+    ⊢ WP Efork f @ E {{ Φ }}.
+  Proof.
+    iIntros "(Hf & HΦ & He)".
+    iApply wp_lift_step=>//.
+    iIntros ((σ1&Γ) ks1) "[Hσ1 [HΓ Hs]]".
+    iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
+    simpl in *. iModIntro. iSplit.
+    { iPureIntro. eexists (Evalue Vvoid), _, [e]. simpl.
+      destruct σ1. apply CSestep. by constructor. }
+    iNext. iIntros (????Hcs).
+    iMod "Hclose". inversion_cstep_as Hes Hjs.
+    - iModIntro. iFrame. simpl in *.
+      inversion Hes=>//; subst.
+      + iFrame. iSplitR "He".
+        { iApply wp_value=>//. }
+        simplify_eq. by rewrite big_sepL_singleton.
+      + exfalso. escape_false.
+    - absurd_jstep Hjs.
+  Qed.
+  
   Lemma wp_call {E ks} k vs params e e' f retty Φ:
     let_params vs params e = Some e' →
     text_interp f (Function retty params e) ∗
@@ -634,6 +657,5 @@ Section rules.
       iSplitL; first by iApply "HΦ".
       by rewrite big_sepL_nil.
   Qed.
-
 
 End rules.
