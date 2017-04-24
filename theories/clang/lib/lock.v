@@ -78,7 +78,7 @@ Section spin_lock.
       (∀ v, Q v -∗ own_stack ks -∗ WP fill_ectxs v k {{ Φ }})
       ⊢ WP fill_ectxs (Ecall t f $ map Evalue vs) k {{ Φ }}.
 
-  Lemma acquire_spec γ R Φ k ks (lk: val) f:
+  Lemma acquire_spec k lk {γ R Φ ks f}:
     own_stack ks ∗ text_interp f (Function Tvoid [(x, tylock)] acquire) ∗
     is_lock γ lk R ∗ (locked γ -∗ R -∗ own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
     ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
@@ -107,7 +107,7 @@ Section spin_lock.
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
 
-  Lemma release_spec lk γ R f Φ k ks:
+  Lemma release_spec k lk {γ R f Φ ks}:
     text_interp f (Function Tvoid [(x, tylock)] release) ∗ own_stack ks ∗
     is_lock γ lk R ∗ locked γ ∗ R ∗ (own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
     ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
@@ -128,3 +128,6 @@ Section spin_lock.
   Qed.
 
 End spin_lock.
+
+Arguments acquire_spec {_ _ _ _} _ _ {_ _ _ _ _}.
+Arguments release_spec {_ _ _ _} _ _ {_ _ _ _ _}.

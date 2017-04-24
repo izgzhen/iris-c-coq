@@ -52,6 +52,16 @@ Ltac reshape_expr e tac :=
   | Eseq ?e1 ?e2 => go (EKseq e2 :: K) e1
   end in go (@nil exprctx) e.
 
+Tactic Notation "wp_unfill" open_constr(efoc) :=
+  iStartProof;
+  lazymatch goal with
+    | |- _ ⊢ wp ?E ?s ?Q => reshape_expr s ltac:(fun Kes e' =>
+      match e' with
+        | efoc => unify e' efoc; replace s with (fill_ectxs e' Kes); last done
+      end)
+    | _ => fail "wp_unfill: not a 'wp'"
+  end.
+
 Ltac wp_bind_core Kes :=
   lazymatch eval hnf in Kes with
   | [] => etrans; [|fast_by apply (wp_bind [])]; simpl
