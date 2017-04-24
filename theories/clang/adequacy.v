@@ -1,5 +1,5 @@
 From iris_os.clang Require Export logic.
-From iris.program_logic Require Import weakestpre adequacy.
+From iris_c.program_logic Require Import weakestpre adequacy.
 
 Class clangPreG Σ := ClangPreG {
   clang_preG_iris :> invPreG Σ;

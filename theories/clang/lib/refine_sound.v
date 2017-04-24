@@ -16,28 +16,28 @@ Section sound.
   Inductive simulate: expr → spec.spec_code → Prop :=
   | SimVal: ∀ v, simulate (Evalue v) (SCdone (Some v))
   | SimStep:
-      ∀ σ σ' (Σ Σ': spec.spec_state) e c e' c' efs,
-        cstep e σ e' σ' efs →
+      ∀ σ σ' l l' (Σ Σ': spec.spec_state) e c e' c' efs,
+        cstep e l σ e' σ' l' efs →
         spec_step_star c Σ c' Σ →
         simulate e c.
 
   Local Hint Constructors simulate.
 
-  From iris.program_logic Require Import language adequacy.
+  From iris_c.program_logic Require Import language.
 
   Notation world σ := (wsat ∗ ownE ⊤ ∗ state_interp σ)%I.
   Notation wptp t := ([∗ list] ef ∈ t, WP ef {{ _, True }})%I.
 
-Lemma wp_step R e1 σ1 e2 σ2 efs Φ :
+Lemma wp_step R e1 l1 σ1 e2 l2 σ2 efs Φ :
   (R ⊢ |==> ▷ R) →
-  prim_step e1 σ1 e2 σ2 efs →
+  prim_step e1 l1 σ1 e2 l2 σ2 efs →
   world σ1 ∗ R ∗ WP e1 {{ Φ }} ==∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp efs).
 Proof.
   rewrite {1}wp_unfold /wp_pre.
   iIntros (HR Hstep) "[(Hw & HE & Hσ) [HR [H|[_ H]]]]".
   { iDestruct "H" as (v) "[% _]". apply val_stuck in Hstep; simplify_eq. }
   rewrite fupd_eq /fupd_def.
-  iMod ("H" $! σ1 with "Hσ [Hw HE]") as ">(Hw & HE & _ & H)"; first by iFrame.
+  iMod ("H" $! l1 σ1 with "[Hσ Hl] [Hw HE]") as ">(Hw & HE & _ & H)".
   iModIntro; iNext.
   iMod ("H" $! e2 σ2 efs with "[%] [$Hw $HE]") as ">($ & $ & $ & ? & $)"=>//.
   by iFrame.

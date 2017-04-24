@@ -3,7 +3,7 @@
 From iris.base_logic Require Export gen_heap big_op.
 From iris.algebra Require Import gmap.
 From iris_c.lib Require Export smap prelude.
-From iris.program_logic Require Export language.
+From iris_c.program_logic Require Export language.
 From iris_c.clang Require Export memory types.
 
 Open Scope Z_scope.
@@ -140,8 +140,7 @@ Definition stack := list cont.
 Record state :=
   State {
       s_heap : heap;
-      s_text : text;
-      s_stack : stack
+      s_text : text
     }.
 
 (* XXX: not precise *)
@@ -913,11 +912,13 @@ Delimit Scope val_scope with V.
 Bind Scope expr_scope with expr.
 Delimit Scope expr_scope with E.
 
-Inductive cstep: expr → state → expr → state → list expr → Prop :=
+Definition local_state := stack.
+
+Inductive cstep: expr → local_state → state → expr → local_state → state → list expr → Prop :=
 | CSestep:
-    ∀ s t e h e' h' efs, estep t e h e' h' efs → cstep e (State h t s) e' (State h' t s) efs
+    ∀ s t e h e' h' efs, estep t e h e' h' efs → cstep e s (State h t) e' s (State h' t) efs
 | CSjstep:
-    ∀ e e' h t s s' , jstep t e s e' s' → cstep e (State h t s) e' (State h t s') [].
+    ∀ e e' h t s s' , jstep t e s e' s' → cstep e s (State h t) e' s' (State h t) [].
 
 Ltac inversion_estep :=
   match goal with [ H : estep _ _ _ _ _ _ |- _ ] => inversion H end.
@@ -950,11 +951,9 @@ Proof.
       symmetry in H;
       apply unfill_segment in H=>//;
       destruct H as [? [? ?]]; subst
-    end.
+    end; auto.
   - by rewrite is_jmp_ret in Hnj.
-  - auto.
   - by rewrite is_jmp_call in Hnj.
-  - auto.
 Qed.
 
 Ltac inversion_jstep_as Heq :=
@@ -967,18 +966,18 @@ Ltac inversion_jstep_as Heq :=
     end
   end.
 
-Lemma cstep_not_val {e σ e' σ' efs}:
-  cstep e σ e' σ' efs → to_val e = None.
+Lemma cstep_not_val {e σ s e' σ' s' efs}:
+  cstep e σ s e' σ' s' efs → to_val e = None.
 Proof.
   inversion 1; subst=>//.
   - by eapply estep_not_val.
   - inversion_jstep_as Heq; by apply fill_ectxs_not_val.
 Qed.
 
-Lemma CSbind' e e' σ σ' efs k kes:
+Lemma CSbind' e e' σ σ' s s' efs k kes:
   is_jmp e = false →
-  cstep e σ e' σ' efs →
-  cstep (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ' efs.
+  cstep e s σ e' s' σ' efs →
+  cstep (fill_ectxs e (k::kes)) s σ (fill_ectxs e' (k::kes)) s' σ' efs.
 Proof.
   intros Hnj Hcs. inversion Hcs; subst.
   - apply CSestep. apply ESbind=>//.
@@ -987,30 +986,30 @@ Proof.
 Qed.
 
 Lemma CSbind:
-    ∀ e e' σ σ' kes efs,
+    ∀ e e' σ σ' s s' kes efs,
       is_jmp e = false →
-      cstep e σ e' σ' efs →
-      cstep (fill_ectxs e kes) σ (fill_ectxs e' kes) σ' efs.
+      cstep e s σ e' s' σ' efs →
+      cstep (fill_ectxs e kes) s σ (fill_ectxs e' kes) s' σ' efs.
 Proof. induction kes=>//. intros. apply CSbind'=>//. Qed.
 
-Instance state_inhabited: Inhabited state := populate (State ∅ ∅ []).
+Instance state_inhabited: Inhabited state := populate (State ∅ ∅).
 
-Lemma not_jmp_preserves k e e' σ σ' efs:
+Lemma not_jmp_preserves k e e' σ σ' s s' efs:
   to_val e = None →
   is_jmp e = false →
-  cstep (fill_ectxs e k) σ e' σ' efs →
-  s_stack σ = s_stack σ' ∧ s_text σ = s_text σ' ∧
+  cstep (fill_ectxs e k) s σ e' s' σ' efs →
+  s = s' ∧ s_text σ = s_text σ' ∧
   estep (s_text σ) (fill_ectxs e k) (s_heap σ) e' (s_heap σ') efs.
 Proof.
   intros Hnv Hnj Hcs. inversion Hcs; subst=>//.
   exfalso. eapply (is_jmp_jstep_false k)=>//.
 Qed.
 
-Lemma fill_step_inv e1' σ1 e2 σ2 K efs:
+Lemma fill_step_inv e1' σ1 e2 σ2 s1 s2 K efs:
   to_val e1' = None →
   is_jmp e1' = false →
-  cstep (fill_ectxs e1' K) σ1 e2 σ2 efs →
-  ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1' σ1 e2' σ2 efs ∧ s_stack σ1 = s_stack σ2.
+  cstep (fill_ectxs e1' K) s1 σ1 e2 s2 σ2 efs →
+  ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1'  s1 σ1 e2' s2 σ2 efs ∧ s1 = s2.
 Proof.
   intros Hnv Hnj.
   inversion 1; subst.
@@ -1021,11 +1020,9 @@ Proof.
     end; exists e2'; split; [| split ]; auto.
   - inversion_jstep_as Heq;
     eapply cont_incl in Heq=>//;
-    destruct Heq as (?&?); subst.
+    destruct Heq as (?&?); subst; auto.
     + by rewrite is_jmp_ret in Hnj.
-    + auto.
     + by rewrite is_jmp_call in Hnj.
-    + auto.
 Qed.
 
 Lemma instantiate_let_preserves_not_jmp x xv xt e e':
@@ -1075,8 +1072,8 @@ Proof.
   - by apply estep_preserves_not_jmp''.
 Qed.
 
-Lemma cstep_preserves_not_jmp e σ1 e2' σ2 efs:
-  is_jmp e = false → cstep e σ1 e2' σ2 efs → is_jmp e2' = false.
+Lemma cstep_preserves_not_jmp e s1 σ1 e2' s2 σ2 efs:
+  is_jmp e = false → cstep e s1 σ1 e2' s2 σ2 efs → is_jmp e2' = false.
 Proof.
   inversion 2; subst.
   - inversion_estep; subst=>//; try by (simpl in *; solve_is_jmp_false).
@@ -1114,12 +1111,13 @@ Proof.
           rewrite -(typeof_preserves_size v1 t1)=>//. }
 Admitted. (* Hairy arithmetic -- should be right. Documented *)
 
-Lemma cstep_not_val' e σ e' σ' efs:
-  cstep e σ e' σ' efs → to_val e = None.
+Lemma cstep_not_val' e s σ e' s' σ' efs:
+  cstep e s σ e' s' σ' efs → to_val e = None.
 Proof. by eapply cstep_not_val. Qed.
 
 Definition clang_lang :=
-  Language expr val state Evalue to_val cstep to_of_val of_to_val cstep_not_val'.
+  Language expr val local_state state Evalue to_val
+           [] cstep to_of_val of_to_val cstep_not_val'.
 
 Ltac absurd_jstep' :=
   match goal with
@@ -1129,12 +1127,11 @@ Ltac absurd_jstep' :=
   end.
 
 Ltac absurd_jstep Hjs :=
-  inversion Hjs; simplify_eq;
-  [ match goal with
-    | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-        by rewrite /unfill HF /= in HU
-    end
-  | absurd_jstep' ].
+  inversion Hjs; simplify_eq; last absurd_jstep';
+  match goal with
+  | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
+      by rewrite /unfill HF /= in HU
+  end.
 
 Ltac atomic_step H :=
   inversion H; subst;
@@ -1159,14 +1156,14 @@ Definition clang_atomic (e: expr) :=
 
 Ltac inversion_cstep_as Hes Hjs :=
   match goal with
-    | [ Hcs : cstep _ _ _ _ _ |- _ ] =>
+    | [ Hcs : cstep _ _ _ _ _ _ _ |- _ ] =>
       inversion Hcs as [????????Hes|???????Hjs]; subst
   end.
 
 Lemma atomic_enf e:
   clang_atomic e → language.atomic (e: language.expr clang_lang).
 Proof.
-  - intros ????? Hcs. apply language.val_irreducible. simpl in *.
+  - intros ??????? Hcs. apply language.val_irreducible. simpl in *.
     destruct e=>//.
     + destruct e1=>//. destruct v=>//.
       destruct e2=>//. destruct e3=>//.

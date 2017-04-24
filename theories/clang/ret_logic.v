@@ -149,17 +149,17 @@ Section wp_ret.
     iAlways. iIntros (?). iApply wpr_value.
   Qed.
 
-  Lemma stack_agree_s s σ:
-    own_stack s ∗ state_interp σ ⊢ ⌜ s_stack σ = s⌝.
+  Lemma stack_agree_s s s':
+    own_stack s ∗ local_interp s' ⊢ ⌜ s' = s⌝.
   Proof.
-    iIntros "(?&(?&?&?))".
-    by iDestruct (own_pair_agree with "[~ ~3]") as "%"; first iFrame.
+    iIntros "(?&?)".
+    by iDestruct (own_pair_agree with "[-]") as "%"; first iFrame.
   Qed.
 
   Lemma lookup_text_s f x σ:
     text_interp f x ∗ state_interp σ ⊢ ⌜s_text σ !! f = Some x⌝.
   Proof.
-    iIntros "(?&(?&?&?))".
+    iIntros "(?&(?&?))".
     by iDestruct (lookup_text with "[~ ~2]") as "%"; first iFrame.
   Qed.
 
@@ -179,10 +179,10 @@ Section wp_ret.
 
   Tactic Notation "not_jmp_preserves" ident(Hes) :=
     match goal with
-      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep ?E _ _ _ _ |- _ ] =>
-        move: (not_jmp_preserves [] _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
-      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep (fill_ectxs ?E ?K) _ _ _ _ |- _ ] =>
-        move: (not_jmp_preserves _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
+      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep ?E _ _ _ _ _ _ |- _ ] =>
+        move: (not_jmp_preserves [] _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
+      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep (fill_ectxs ?E ?K) _ _ _ _ _ _ |- _ ] =>
+        move: (not_jmp_preserves _ _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
     end; subst.
 
   Lemma wp_call_r E ks vs params e e' f retty k Φ:
@@ -201,30 +201,30 @@ Section wp_ret.
     - by iDestruct "H'" as (?) "[_ %]".
     - iDestruct "H'" as (??) "[% [[% H'] | [H' | H']]]".
       + iRight. destruct_ands. iSplit=>//.
-        iIntros (σ1) "Hσ1".
+        iIntros (l1 σ1) "[Hσ1 Hs]".
         cont_uninj'.
         rewrite wp_unfold /wp_pre.
         iDestruct "H'" as "[H'|H']".
         * iDestruct "H'" as (?) "[% _]".
           enf_not_val. simpl in *. simplify_eq.
         * iDestruct "H'" as "[% H']".
-          iMod ("H'" $! σ1 with "Hσ1") as "[% H']".
+          iMod ("H'" $! l1 σ1 with "[Hσ1 Hs]") as "[% H']"; first iFrame.
           iModIntro. iSplit.
-          { iPureIntro. inversion H6 as (e'&σ'&?&Hcs).
-            eexists _, σ', _. simpl in *. not_jmp_preserves Hes.
+          { iPureIntro. inversion H6 as (e'&?&σ'&?&Hcs).
+            eexists _, _, σ', _. simpl in *. not_jmp_preserves Hes.
             destruct σ1. destruct σ'.
             simpl in *. enf_not_val. subst.
             apply CSestep. apply ESbind=>//. }
-          iNext. iIntros (e2 σ2 efs) "%".
+          iNext. iIntros (e2 l2 σ2 efs) "%".
           simpl in *. enf_not_val.
           not_jmp_preserves Hes.
           apply fill_estep_inv in Hes=>//.
           destruct Hes as [? [? ?]]. subst.
-          iSpecialize ("H'" $! x σ2 efs).
-          iAssert (⌜cstep H1 σ1 x σ2 efs⌝)%I as "Hs".
+          iSpecialize ("H'" $! x l2 σ2 efs).
+          iAssert (⌜cstep H1 l2 σ1 x l2 σ2 efs⌝)%I as "Hs".
           { iPureIntro. destruct σ1. destruct σ2.
             simpl in *. subst. constructor. done. }
-          iMod ("H'" with "Hs") as "[? [? ?]]". iModIntro.
+          iMod ("H'" with "Hs") as "[? [? [? ?]]]". iModIntro.
           iFrame. iApply wp_bind=>//.
           { eapply estep_preserves_not_jmp=>//. }
             iApply (wp_strong_mono E E)=>//.
@@ -234,23 +234,23 @@ Section wp_ret.
          iDestruct "H'" as (?) "[% H']". subst.
          cont_uninj'. iRight.
          iSplit=>//.
-         iIntros (σ1) "Hσ1".
+         iIntros (l1 σ1) "[Hσ1 Hl1]".
          iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
          iModIntro.
-         iDestruct (stack_agree_s with "[H Hσ1]") as "%"; first iFrame.
+         iDestruct (stack_agree_s with "[H Hσ1 Hl1]") as "%"; first iFrame.
          iSplit.
          { iPureIntro. destruct σ1. simpl in *.
-           eexists _, (State s_heap s_text ks), _. simpl.
+           eexists _, ks, (State s_heap s_text), _. simpl.
            apply CSjstep. subst. apply JSrete.
            by apply cont_uninj. }
-         iNext; iIntros (e2 σ2 efs Hs).
+         iNext; iIntros (e2 l2 σ2 efs Hs).
          simpl in *. inversion_cstep_as Hes Hjs; subst.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
          * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
            inversion Heq. subst.
-           iDestruct "Hσ1" as "(H1&H2&H3)".
-           iMod (stack_pop with "[H H3]") as "(Hstk & Hs & %)"; first iFrame.
+           iDestruct "Hσ1" as "(H1&H3)".
+           iMod (stack_pop with "[H Hl1]") as "(Hstk & Hs & %)"; first iFrame.
            destruct_ands.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
@@ -261,16 +261,16 @@ Section wp_ret.
         iDestruct "H'" as (??????) "[% [H1 H2]]".
         destruct_ands. cont_uninj'.
         iRight. iSplit=>//.
-        iIntros (σ1) "Hσ1".
+        iIntros (l1 σ1) "[Hσ1 Hl1]".
         iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
         iModIntro.
-        iDestruct (stack_agree_s with "[H Hσ1]") as "%"; first iFrame.
+        iDestruct (stack_agree_s with "[H Hσ1 Hl1]") as "%"; first iFrame.
         iDestruct (lookup_text_s with "[H1 Hσ1]") as "%"; first iFrame.
         iSplit.
         { iPureIntro. destruct σ1. simpl in *. subst.
-          eexists _, (State s_heap s_text (_::k::ks)), [].
+          eexists _, (_::k::ks), (State s_heap s_text), [].
           constructor. eapply JScall=>//. }
-        iNext; iIntros (e2 σ2 efs Hcs). simpl in *.
+        iNext; iIntros (e2 l2 σ2 efs Hcs). simpl in *.
         inversion_cstep_as Hes Hjs.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
@@ -279,8 +279,8 @@ Section wp_ret.
            inversion Heq. simplify_eq.
            apply map_inj in Heq. subst.
            simpl in *. subst. simplify_eq.
-           iDestruct "Hσ1" as "(?&?&Hs)".
-           iMod (stack_push with "[Hs H]") as "(Hs & Hstk & %)"; first iFrame.
+           iDestruct "Hσ1" as "(?&?)".
+           iMod (stack_push with "[Hl1 H]") as "(Hs & Hstk & %)"; first iFrame.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
            iApply ("IH" $! _ _ (k::ks) with "[-Hs]")=>//.
