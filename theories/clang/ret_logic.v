@@ -179,10 +179,10 @@ Section wp_ret.
 
   Tactic Notation "not_jmp_preserves" ident(Hes) :=
     match goal with
-      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep ?E _ _ _ |- _ ] =>
-        move: (not_jmp_preserves [] _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
-      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep (fill_ectxs ?E ?K) _ _ _ |- _ ] =>
-        move: (not_jmp_preserves _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
+      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep ?E _ _ _ _ |- _ ] =>
+        move: (not_jmp_preserves [] _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
+      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep (fill_ectxs ?E ?K) _ _ _ _ |- _ ] =>
+        move: (not_jmp_preserves _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
     end; subst.
 
   Lemma wp_call_r E ks vs params e e' f retty k Φ:
@@ -210,22 +210,20 @@ Section wp_ret.
         * iDestruct "H'" as "[% H']".
           iMod ("H'" $! σ1 with "Hσ1") as "[% H']".
           iModIntro. iSplit.
-          { iPureIntro. inversion H6 as (e'&σ'&?&(Hcs&?)).
-            eexists _, σ', []. constructor=>//.
+          { iPureIntro. inversion H6 as (e'&σ'&?&Hcs).
+            eexists _, σ', _. simpl in *. not_jmp_preserves Hes.
             destruct σ1. destruct σ'.
-            simpl in *. enf_not_val.
-            not_jmp_preserves Hes.
-            apply CSestep, ESbind=>//. }
+            simpl in *. enf_not_val. subst.
+            apply CSestep. apply ESbind=>//. }
           iNext. iIntros (e2 σ2 efs) "%".
-          simpl in *. destruct H7. enf_not_val.
+          simpl in *. enf_not_val.
           not_jmp_preserves Hes.
           apply fill_estep_inv in Hes=>//.
           destruct Hes as [? [? ?]]. subst.
-          iSpecialize ("H'" $! x σ2 []).
-          iAssert (⌜step H1 σ1 x σ2 []⌝)%I as "Hs".
-          { iPureIntro. split=>//.
-            destruct σ1. destruct σ2.
-            simpl in *. subst. by constructor. }
+          iSpecialize ("H'" $! x σ2 efs).
+          iAssert (⌜cstep H1 σ1 x σ2 efs⌝)%I as "Hs".
+          { iPureIntro. destruct σ1. destruct σ2.
+            simpl in *. subst. constructor. done. }
           iMod ("H'" with "Hs") as "[? [? ?]]". iModIntro.
           iFrame. iApply wp_bind=>//.
           { eapply estep_preserves_not_jmp=>//. }
@@ -242,12 +240,11 @@ Section wp_ret.
          iDestruct (stack_agree_s with "[H Hσ1]") as "%"; first iFrame.
          iSplit.
          { iPureIntro. destruct σ1. simpl in *.
-           eexists _, (State s_heap s_text ks), []. split; [|split]=>//.
+           eexists _, (State s_heap s_text ks), _. simpl.
            apply CSjstep. subst. apply JSrete.
            by apply cont_uninj. }
          iNext; iIntros (e2 σ2 efs Hs).
-         simpl in *. destruct Hs.
-         inversion_cstep_as Hes Hjs; subst.
+         simpl in *. inversion_cstep_as Hes Hjs; subst.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
          * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
@@ -271,9 +268,9 @@ Section wp_ret.
         iDestruct (lookup_text_s with "[H1 Hσ1]") as "%"; first iFrame.
         iSplit.
         { iPureIntro. destruct σ1. simpl in *. subst.
-          eexists _, (State s_heap s_text (_::k::ks)), []. split; [|split]=>//.
+          eexists _, (State s_heap s_text (_::k::ks)), [].
           constructor. eapply JScall=>//. }
-        iNext; iIntros (e2 σ2 efs (Hcs&?)).
+        iNext; iIntros (e2 σ2 efs Hcs). simpl in *.
         inversion_cstep_as Hes Hjs.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.

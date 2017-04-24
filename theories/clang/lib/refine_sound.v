@@ -16,8 +16,8 @@ Section sound.
   Inductive simulate: expr → spec.spec_code → Prop :=
   | SimVal: ∀ v, simulate (Evalue v) (SCdone (Some v))
   | SimStep:
-      ∀ σ σ' (Σ Σ': spec.spec_state) e c e' c',
-        cstep e σ e' σ' →
+      ∀ σ σ' (Σ Σ': spec.spec_state) e c e' c' efs,
+        cstep e σ e' σ' efs →
         spec_step_star c Σ c' Σ →
         simulate e c.
 
