@@ -10,9 +10,9 @@ Ltac wpr_bind_core Kes :=
 Tactic Notation "wpr_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- _ ⊢ wpr ?E ?s ?Q ?Q2 => reshape_expr s ltac:(fun Kes e' =>
+  | |- _ ⊢ wpr ?E ?e ?Q ?Q2 => reshape_expr e ltac:(fun Kes e' =>
     match e' with
     | efoc => unify e' efoc; wpr_bind_core Kes
-    end) || fail "wpr_bind: cannot find" efoc "in" s
+    end) || fail "wpr_bind: cannot find" efoc "in" e
   | _ => fail "wpr_bind: not a 'wpr'"
   end.

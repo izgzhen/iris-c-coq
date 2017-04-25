@@ -12,7 +12,7 @@ Section wp_ret.
   (* local case *)
   (⌜to_val e1 = None ⌝ ∧ ∃ eh K,
      ⌜ unfill_expr e1 [] = Some (K, eh) ⌝ ∧
-     ((⌜ is_jmp eh = false ⌝ ∗ WP eh @ E {{ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret }}) ∨
+     ((∀ ks, ⌜ is_jmp eh = false ⌝ ∗ WP (eh, ks) @ E {{ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret }}) ∨
       (∃ v, ⌜ eh = Erete (Evalue v) ⌝ ∗ ▷ Φret v) ∨
       (∃ f vs e e' params retty,
          ⌜ eh = Ecall retty f (map Evalue vs) ∧
@@ -33,18 +33,18 @@ Section wp_ret.
   Lemma wpr_unfold E e Φ Φret : wpr E e Φ Φret ⊣⊢ wpr_pre wpr E e Φ Φret.
   Proof. rewrite wpr_eq. apply (fixpoint_unfold wpr_pre). Qed.
 
-  Lemma wpr_helper E P R Q e eh K:
+  Lemma wpr_helper E P R Q e eh K ks:
     unfill_expr e [] = Some (K, eh) →
     (∀ v, P v -∗ R -∗ Q v) ∗
     ▷ R ∗
-    WP eh @ E {{ P }}
-    ⊢ WP eh @ E {{ Q }}.
+    WP (eh, ks) @ E {{ P }}
+    ⊢ WP (eh, ks) @ E {{ Q }}.
   Proof.
     iIntros (?) "[? [HR ?]]".
     assert (to_val eh = None) as ?.
     { move : (cont_uninj' H0) => [? ?].
       by apply enf_not_val. }
-    iDestruct (wp_frame_step_l' with "[-~]") as "?"=>//.
+    iDestruct (wp_frame_step_l' _ (eh : language.expr clang_lang, ks) with "[-~]") as "?"=>//.
     { iFrame "HR". iFrame. }
     iApply (wp_strong_mono E E)=>//.
     iFrame. iIntros (?) "[? ?]".
@@ -57,10 +57,12 @@ Section wp_ret.
     iLöb as "IH" forall (Φ1 Φ2 eh). rewrite !wpr_unfold /wpr_pre.
     iIntros "[#H12 [H | [% H]]]".
     - iDestruct "H" as (?) "[? ?]". eauto.
-    - iDestruct "H" as (??) "[% [[% H] | [H | H]]]".
+    - iDestruct "H" as (??) "[% [H | [H | H]]]".
       + iRight. iSplit=>//. iExists _, _.
-        iSplit=>//. iLeft. iSplitL ""=>//.
-        iApply (wpr_helper)=>//. iFrame "IH". iFrame.
+        iSplit=>//. iLeft.
+        iIntros (ks). iDestruct ("H" $! ks) as "[% H]".
+        iSplitL ""=>//.
+        iApply wpr_helper=>//. iFrame "IH". iFrame.
         iIntros (?) "H1 H2".
         iApply "H2". by iFrame.
       + iRight. iSplit=>//. iExists _, _.
@@ -87,11 +89,11 @@ Section wp_ret.
     - iDestruct "H" as (v) "[% ?]".
       apply of_to_val in H0. subst.
       by rewrite wpr_unfold /wpr_pre.
-    - iDestruct "H" as (eh K) "(% & [[% ?]| [H | H]])".
+    - iDestruct "H" as (eh K) "(% & [ H | [H | H]])".
       + iRight. iSplit=>//; first by iPureIntro; apply fill_ectxs_not_val.
         iExists eh, (kes ++ K).
         iSplit; first by iPureIntro; apply unfill_app.
-        iLeft. iSplitL ""; first done.
+        iLeft. iIntros (ks). iDestruct ("H" $! ks) as "[% H]". iSplitL ""; first done.
         iApply wpr_helper=>//.
         iFrame "IH". iFrame.
         iIntros (?) "H1 H2".
@@ -149,13 +151,6 @@ Section wp_ret.
     iAlways. iIntros (?). iApply wpr_value.
   Qed.
 
-  Lemma stack_agree_s s s':
-    own_stack s ∗ local_interp s' ⊢ ⌜ s' = s⌝.
-  Proof.
-    iIntros "(?&?)".
-    by iDestruct (own_pair_agree with "[-]") as "%"; first iFrame.
-  Qed.
-
   Lemma lookup_text_s f x σ:
     text_interp f x ∗ state_interp σ ⊢ ⌜s_text σ !! f = Some x⌝.
   Proof.
@@ -187,113 +182,107 @@ Section wp_ret.
 
   Lemma wp_call_r E ks vs params e e' f retty k Φ:
     let_params vs params e = Some e' →
-    text_interp f (Function retty params e) ∗ own_stack ks ∗
-    ▷ wpr E e' (fun _ => False%I) (λ v, own_stack ks -∗ WP (fill_ectxs (Evalue v) k) @ E {{ Φ }})
-    ⊢ wp E (fill_ectxs (Ecall retty f (map Evalue vs)) k) Φ.
+    text_interp f (Function retty params e) ∗
+    ▷ wpr E e' (fun _ => False%I) (λ v, WP (fill_ectxs (Evalue v) k, ks) @ E {{ Φ }})
+    ⊢ WP (fill_ectxs (Ecall retty f (map Evalue vs)) k, ks) @ E {{ Φ }}.
   Proof.
-    iIntros (?) "(?&?&?)".
+    iIntros (?) "(?&?)".
     iApply (wp_call k)=>//.
-    iFrame. iNext. iIntros "H". clear H0.
+    iFrame. iNext. clear H0.
     iLöb as "IH" forall (Φ k ks e').
     rewrite wp_unfold /wp_pre.
     rewrite wpr_unfold /wpr_pre.
-    iDestruct "~2" as "[H' | [% H']]".
+    iDestruct "~1" as "[H' | [% H']]".
     - by iDestruct "H'" as (?) "[_ %]".
-    - iDestruct "H'" as (??) "[% [[% H'] | [H' | H']]]".
+    - iDestruct "H'" as (??) "[% [H' | [H' | H']]]".
       + iRight. destruct_ands. iSplit=>//.
-        iIntros (l1 σ1) "[Hσ1 Hs]".
-        cont_uninj'.
+        iIntros (σ1) "Hσ1".
+        cont_uninj'. iDestruct ("H'" $! (k::ks)) as "[% H']".
         rewrite wp_unfold /wp_pre.
         iDestruct "H'" as "[H'|H']".
         * iDestruct "H'" as (?) "[% _]".
           enf_not_val. simpl in *. simplify_eq.
         * iDestruct "H'" as "[% H']".
-          iMod ("H'" $! l1 σ1 with "[Hσ1 Hs]") as "[% H']"; first iFrame.
+          iMod ("H'" $! σ1 with "Hσ1") as "[% H']"; first iFrame.
           iModIntro. iSplit.
-          { iPureIntro. inversion H6 as (e'&?&σ'&?&Hcs).
+          { iPureIntro. inversion H6 as (e'&?&σ'&?&Hcs). simpl in *.
             eexists _, _, σ', _. simpl in *. not_jmp_preserves Hes.
             destruct σ1. destruct σ'.
             simpl in *. enf_not_val. subst.
             apply CSestep. apply ESbind=>//. }
-          iNext. iIntros (e2 l2 σ2 efs) "%".
+          iNext. iIntros (e2 σ2 efs) "%".
           simpl in *. enf_not_val.
           not_jmp_preserves Hes.
           apply fill_estep_inv in Hes=>//.
-          destruct Hes as [? [? ?]]. subst.
-          iSpecialize ("H'" $! x l2 σ2 efs).
-          iAssert (⌜cstep H1 l2 σ1 x l2 σ2 efs⌝)%I as "Hs".
+          destruct Hes as [? [? ?]]. destruct e2. simpl in *. subst.
+          iSpecialize ("H'" $! (x, k::ks) σ2 efs). simpl.
+          iAssert (⌜cstep H1 (k::ks) σ1 x (k::ks) σ2 efs⌝)%I as "Hs".
           { iPureIntro. destruct σ1. destruct σ2.
             simpl in *. subst. constructor. done. }
-          iMod ("H'" with "Hs") as "[? [? [? ?]]]". iModIntro.
+          iMod ("H'" with "Hs") as "[? [? ?]]". iModIntro.
           iFrame. iApply wp_bind=>//.
           { eapply estep_preserves_not_jmp=>//. }
             iApply (wp_strong_mono E E)=>//.
           iFrame. iIntros (?) "H'".
-          iModIntro. iApply ("IH" with "[-H]")=>//.
+          iModIntro. iApply ("IH" with "[-]")=>//.
       +  destruct_ands.
          iDestruct "H'" as (?) "[% H']". subst.
          cont_uninj'. iRight.
          iSplit=>//.
-         iIntros (l1 σ1) "[Hσ1 Hl1]".
+         iIntros (σ1) "Hσ1".
          iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
          iModIntro.
-         iDestruct (stack_agree_s with "[H Hσ1 Hl1]") as "%"; first iFrame.
          iSplit.
          { iPureIntro. destruct σ1. simpl in *.
            eexists _, ks, (State s_heap s_text), _. simpl.
            apply CSjstep. subst. apply JSrete.
            by apply cont_uninj. }
-         iNext; iIntros (e2 l2 σ2 efs Hs).
+         iNext; iIntros (e2 σ2 efs Hs).
          simpl in *. inversion_cstep_as Hes Hjs; subst.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
          * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
            inversion Heq. subst.
            iDestruct "Hσ1" as "(H1&H3)".
-           iMod (stack_pop with "[H Hl1]") as "(Hstk & Hs & %)"; first iFrame.
-           destruct_ands.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
-           { simpl. by iApply "H'". }
+           { simpl. destruct e2. simpl in *. simplify_eq. by iApply "H'". }
            by rewrite big_sepL_nil.
          * apply cont_inj in Heq=>//; auto. by destruct_ands.
       + destruct_ands.
         iDestruct "H'" as (??????) "[% [H1 H2]]".
         destruct_ands. cont_uninj'.
         iRight. iSplit=>//.
-        iIntros (l1 σ1) "[Hσ1 Hl1]".
+        iIntros (σ1) "Hσ1".
         iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
         iModIntro.
-        iDestruct (stack_agree_s with "[H Hσ1 Hl1]") as "%"; first iFrame.
         iDestruct (lookup_text_s with "[H1 Hσ1]") as "%"; first iFrame.
         iSplit.
         { iPureIntro. destruct σ1. simpl in *. subst.
           eexists _, (_::k::ks), (State s_heap s_text), [].
           constructor. eapply JScall=>//. }
-        iNext; iIntros (e2 l2 σ2 efs Hcs). simpl in *.
+        iNext; iIntros (e2 σ2 efs Hcs). simpl in *.
         inversion_cstep_as Hes Hjs.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
          * fill_enf_neq.
          * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
            inversion Heq. simplify_eq.
-           apply map_inj in Heq. subst.
+           apply map_inj in Heq; last by inversion 1.
            simpl in *. subst. simplify_eq.
            iDestruct "Hσ1" as "(?&?)".
-           iMod (stack_push with "[Hl1 H]") as "(Hs & Hstk & %)"; first iFrame.
            iFrame. iMod "Hclose" as "_".
-           iModIntro. iSplitL.
-           iApply ("IH" $! _ _ (k::ks) with "[-Hs]")=>//.
+           iModIntro. iSplitL; last by rewrite big_sepL_nil.
+           destruct e2. simpl in *. simplify_eq.
+           iApply ("IH" $! _ _ (k::ks) with "[-]")=>//.
            iApply wpr_step_mono. iFrame.
            iClear "H1". iAlways.
-           iIntros (?) "H1 H2".
-           iApply ("IH" with "[-H2]")=>//.
-           by rewrite big_sepL_nil.
-           { intros. by simplify_eq. }
+           iIntros (?) "H1".
+           iApply ("IH" with "[-]")=>//.
   Qed.
 
   Lemma wpr_head E eh Φ Φret:
-    is_jmp eh = false → enf eh → WP eh @ E {{ Φ }} ⊢ wpr E eh Φ Φret.
+    is_jmp eh = false → enf eh → (∀ ks, WP (eh, ks) @ E {{ Φ }}) ⊢ wpr E eh Φ Φret.
   Proof.
     iIntros (??) "?".
     rewrite wpr_unfold /wpr_pre.
@@ -301,7 +290,7 @@ Section wp_ret.
     { iPureIntro. by apply enf_not_val. }
     iExists eh, []. iSplit=>//.
     { iPureIntro. by eapply (cont_uninj []). }
-    iLeft. iSplitL ""=>//.
+    iLeft. iIntros (ks). iDestruct ("~" $! ks) as "?". iSplitL ""=>//.
     iApply (wp_strong_mono E E)=>//. iFrame.
     iIntros (?) "HΦ".
     by iApply wpr_value.
@@ -310,6 +299,6 @@ Section wp_ret.
   Lemma wpr_op E op v1 v2 v' Φ Φret:
     evalbop op v1 v2 = Some v' →
     Φ v' ⊢ wpr E (Ebinop op (Evalue v1) (Evalue v2)) Φ Φret.
-  Proof. iIntros (?) "?". iApply wpr_head=>//; auto. iApply wp_op=>//. Qed.
+  Proof. iIntros (?) "?". iApply wpr_head=>//; auto. iIntros (?). iApply wp_op=>//. Qed.
 
 End wp_ret.
