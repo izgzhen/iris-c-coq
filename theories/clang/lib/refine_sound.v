@@ -23,7 +23,7 @@ Section sound.
 
   Local Hint Constructors simulate.
 
-  From iris_c.program_logic Require Import language.
+  From iris_c.program_logic Require Import language adequacy.
 
   Notation world σ := (wsat ∗ ownE ⊤ ∗ state_interp σ)%I.
   Notation wptp t := ([∗ list] ef ∈ t, WP ef {{ _, True }})%I.
@@ -31,16 +31,20 @@ Section sound.
 Lemma wp_step R e1 l1 σ1 e2 l2 σ2 efs Φ :
   (R ⊢ |==> ▷ R) →
   prim_step e1 l1 σ1 e2 l2 σ2 efs →
-  world σ1 ∗ R ∗ WP e1 {{ Φ }} ==∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp efs).
+  world σ1 ∗ R ∗ WP (e1, l1) {{ Φ }} ==∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP (e2, l2) {{ Φ }} ∗ wptp (map (,[]) efs)).
 Proof.
   rewrite {1}wp_unfold /wp_pre.
   iIntros (HR Hstep) "[(Hw & HE & Hσ) [HR [H|[_ H]]]]".
-  { iDestruct "H" as (v) "[% _]". apply val_stuck in Hstep; simplify_eq. }
+  { iDestruct "H" as (v) "[% _]". apply val_stuck in Hstep.
+    simpl in *. simplify_eq. }
   rewrite fupd_eq /fupd_def.
-  iMod ("H" $! l1 σ1 with "[Hσ Hl] [Hw HE]") as ">(Hw & HE & _ & H)".
-  iModIntro; iNext.
-  iMod ("H" $! e2 σ2 efs with "[%] [$Hw $HE]") as ">($ & $ & $ & ? & $)"=>//.
-  by iFrame.
+  iMod ("H" $! σ1 with "Hσ [$Hw $HE]") as ">(Hw & HE & _ & H)".
+  iModIntro; iNext. simpl.
+  iMod ("H" $! (e2, l2) σ2 efs with "[%] [$Hw $HE]") as ">($ & $ & $ & $ & ?)"=>//.
+  iFrame.
+  iDestruct (@big_sepL_fmap _ (expr clang_lang) (expr clang_lang * local_state clang_lang)
+                            (,[]) (fun _ x => (WP x {{ _, True }})%I) efs with "~") as "?".
+  auto.
 Qed.
 
   Lemma wptp_step' R e1 t1 t2 σ1 σ2 Φ :
@@ -50,10 +54,10 @@ Qed.
     ==∗ ∃ e2 t2', ⌜t2 = e2 :: t2'⌝ ∗ ▷ |==> ◇ (world σ2 ∗ R ∗ WP e2 {{ Φ }} ∗ wptp t2').
   Proof.
     iIntros (HR Hstep) "(HW & HR & He & Ht)".
-    destruct Hstep as [e1' σ1' e2' σ2' efs [|? t1'] t2' ?? Hstep]; simplify_eq/=.
-    - iExists e2', (t2' ++ efs); iSplitR; first eauto.
+    destruct Hstep as [e1' l1' σ1' e2' l2' σ2' efs [|? t1'] t2' ?? Hstep]; simplify_eq/=.
+    - iExists (e2', l2'), (t2' ++ map (,[]) efs); iSplitR; first eauto.
       rewrite big_sepL_app. iFrame "Ht". iApply wp_step; try iFrame; eauto.
-    - iExists e, (t1' ++ e2' :: t2' ++ efs); iSplitR; first eauto.
+    - iExists p, (t1' ++ (e2', l2') :: t2' ++ map (,[]) efs); iSplitR; first eauto.
       rewrite !big_sepL_app !big_sepL_cons big_sepL_app.
       iDestruct "Ht" as "($ & He' & $)"; iFrame "He".
       iApply wp_step; try iFrame; eauto.
@@ -80,8 +84,8 @@ Qed.
     ⊢ |==> ▷ (inv N spec_inv ∗ own_sstate ss ∗ own_scode sc).
   Proof. iIntros "?". iModIntro. by iNext. Qed.
 
-  Lemma soudness n e1 t1 σ1 t2 σ2 c1 Σ1 Σ2 v2:
-    nsteps step n (e1 :: t1, σ1) (of_val v2 :: t2, σ2) →
+  Lemma soudness n e1 l2 t1 σ1 t2 σ2 c1 Σ1 Σ2 v2:
+    nsteps step n (e1 :: t1, σ1) ((of_val v2, l2) :: t2, σ2) →
     world σ1 ∗ (inv N spec_inv ∗ own_sstate Σ1 ∗ own_scode c1) ∗
     WP e1 {{ v, own_sstate Σ2 ∗ own_scode (SCdone (Some v)) }} ∗ wptp t1 ⊢
     Nat.iter (S (S n)) (λ P, |==> ▷ P) ⌜simulate (Evalue v2) c1⌝.

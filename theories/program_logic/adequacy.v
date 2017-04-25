@@ -78,8 +78,11 @@ Proof.
   rewrite fupd_eq /fupd_def.
   iMod ("H" $! σ1 with "Hσ [Hw HE]") as ">(Hw & HE & _ & H)"; first by iFrame.
   iModIntro; iNext.
-  (* by iMod ("H" $! e2 σ2 efs with "[%] [$Hw $HE]") as ">($ & $ & $ & $)". *)
-Admitted.
+  iMod ("H" $! e2 σ2 efs with "[%] [$Hw $HE]") as ">($ & $ & $ & $ & ?)"=>//.
+  iDestruct (@big_sepL_fmap _ (expr Λ) (expr Λ * local_state Λ) (,init_local Λ)
+                            (fun _ x => (WP x {{ _, True }})%I) efs with "~") as "?".
+  auto.
+Qed.
 
 Lemma wptp_step e1 t1 t2 σ1 σ2 Φ :
   step (e1 :: t1,σ1) (t2, σ2) →
