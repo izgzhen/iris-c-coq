@@ -16,10 +16,10 @@ Section example.
   Definition f_body : expr :=
     l <- vfalse.
 
-  Lemma ct_spec:
+  Lemma ct_spec ks:
     inv N' True%I ∗
     l ↦ vtrue @ tybool ∗ text_interp f (Function Tvoid [] f_body)
-    ⊢ WP create_task i f 0 {{ _, True%I }}.
+    ⊢ WP (create_task i f 0, ks) {{ _, True%I }}.
   Proof.
     iIntros "[#HI [Hl Hf]]".
     iApply create_task_spec.

@@ -23,9 +23,9 @@ Section vmm.
         end)%I
       end.
 
-  Lemma mem_init_spec n x y Φ:
+  Lemma mem_init_spec n x y ks Φ:
     is_page_table pt ∅ ∗ (∀ m, allocated m (n - 1) -∗ is_page_table pt m -∗ Φ Vvoid)
-    ⊢ WP mem_init n x y {{ Φ }}.
+    ⊢ WP (mem_init n x y, ks) {{ Φ }}.
   Admitted.
 
 End vmm.

@@ -38,15 +38,15 @@ Section example.
 
   Lemma f_spec γ γp f vx Φ k ks:
     text_interp f (Function Tint32 [(x, Tint32)] f_body)  ∗
-    int_ctx γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗ own_stack ks ∗
+    int_ctx γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     own_scode (SCrel (f_rel vx)) ∗
-    (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗ own_stack ks -∗
-          WP (fill_ectxs (Evalue v) k) {{ _, Φ }})
-    ⊢ WP fill_ectxs (Ecall Tint32 f [Evalue vx]) k {{ _, Φ }}.
+    (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗
+          WP (fill_ectxs (Evalue v) k, ks) {{ _, Φ }})
+    ⊢ WP (fill_ectxs (Ecall Tint32 f [Evalue vx]) k, ks) {{ _, Φ }}.
   Proof.
-    iIntros "(? & #? & #? & Hp & Hs & Hsc & HΦ)".
+    iIntros "(? & #? & #? & Hp & Hsc & HΦ)".
     iApply (wp_call _ [Vint32 vx] [(x, Tint32)] f_body)=>//.
-    iFrame. iIntros "!> Hstk".
+    iFrame. iIntros "!>".
     wp_alloc px as "Hpx". wp_let. iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".

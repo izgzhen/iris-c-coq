@@ -57,35 +57,29 @@ Section spin_lock.
 
   Lemma newlock_spec (R: iProp Σ) f Φ k ks:
     text_interp f (Function (Tptr tybool) [] newlock) ∗
-    R ∗ own_stack ks ∗ (∀ γ lk, own_stack ks -∗ is_lock γ lk R -∗ WP fill_ectxs lk k {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall (Tptr tybool) f []) k {{ Φ }}.
+    R ∗ (∀ γ lk, is_lock γ lk R -∗ WP (fill_ectxs lk k, ks) {{ Φ }})
+    ⊢ WP (fill_ectxs (Ecall (Tptr tybool) f []) k, ks) {{ Φ }}.
   Proof.
-    iIntros "(Hf & HR & Hs & HΦ)".
+    iIntros "(Hf & HR & HΦ)".
     iApply (wp_call k []); last iFrame; first done.
-    iNext. iIntros "Hs'". rewrite /newlock /=.
+    iNext. rewrite /newlock /=.
     wp_alloc l as "Hl". iApply (wp_ret []).
-    iFrame. iIntros "Hs". iApply fupd_wp.
+    iFrame. iApply fupd_wp.
     iMod (own_alloc (Excl ())) as (γ) "Hγ"; first done.
-    iMod (inv_alloc N _ (lock_inv γ l R) with "[-Hs HΦ]") as "#?".
+    iMod (inv_alloc N _ (lock_inv γ l R) with "[-HΦ]") as "#?".
     { iIntros "!>". iExists false. by iFrame. }
     iModIntro. iApply ("HΦ" with "[-]")=>//. iExists _. iSplit=>//.
     iPureIntro. split=>//. constructor.
   Qed.
 
-  Definition fspec vs params t e P (Q: val → iProp Σ) : Prop :=
-    ∀ k ks f Φ,
-      P ∗ own_stack ks ∗ text_interp f (Function t params e) ∗
-      (∀ v, Q v -∗ own_stack ks -∗ WP fill_ectxs v k {{ Φ }})
-      ⊢ WP fill_ectxs (Ecall t f $ map Evalue vs) k {{ Φ }}.
-
   Lemma acquire_spec k lk {γ R Φ ks f}:
-    own_stack ks ∗ text_interp f (Function Tvoid [(x, tylock)] acquire) ∗
-    is_lock γ lk R ∗ (locked γ -∗ R -∗ own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
+    text_interp f (Function Tvoid [(x, tylock)] acquire) ∗
+    is_lock γ lk R ∗ (locked γ -∗ R -∗ WP (fill_ectxs void k, ks) {{ Φ }})
+    ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lk]) k, ks) {{ Φ }}.
   Proof.
-    iIntros "(Hs & Hf & #Hlk & HΦ)".
+    iIntros "(Hf & #Hlk & HΦ)".
     iApply (wp_call k [lk]); last iFrame; first done.
-    iNext. iIntros "Hs'". iDestruct (is_lock_tylock with "Hlk") as "%".
+    iNext. iDestruct (is_lock_tylock with "Hlk") as "%".
     wp_alloc lkx as "Hlkx". wp_let. iApply wp_seq=>//.
     iLöb as "IH". iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
     wp_load.
@@ -94,13 +88,13 @@ Section spin_lock.
     iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro; simpl.
     - wp_cas_fail.
       iIntros "Hl".
-      iMod ("Hclose" with "[-Hs' Hlkx HΦ]").
+      iMod ("Hclose" with "[-Hlkx HΦ]").
       { iNext. iExists true. iFrame. }
       iModIntro. do 4 wp_step.
-      iApply ("IH" with "HΦ Hs' Hlkx").
+      iApply ("IH" with "HΦ Hlkx").
     - wp_cas_suc.
       iIntros "Hl'".
-      iMod ("Hclose" with "[-HΦ Hlkx Hs' HR]").
+      iMod ("Hclose" with "[-HΦ Hlkx HR]").
       { iNext. iExists true. iFrame. }
       iModIntro. wp_run.
       iDestruct "HR" as "[Ho HR]". iFrame.
@@ -108,20 +102,18 @@ Section spin_lock.
   Qed.
 
   Lemma release_spec k lk {γ R f Φ ks}:
-    text_interp f (Function Tvoid [(x, tylock)] release) ∗ own_stack ks ∗
-    is_lock γ lk R ∗ locked γ ∗ R ∗ (own_stack ks -∗ WP fill_ectxs void k {{ Φ }})
-    ⊢ WP fill_ectxs (Ecall Tvoid f [Evalue lk]) k {{ Φ }}.
+    text_interp f (Function Tvoid [(x, tylock)] release) ∗
+    is_lock γ lk R ∗ locked γ ∗ R ∗ WP (fill_ectxs void k, ks) {{ Φ }}
+    ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lk]) k, ks) {{ Φ }}.
   Proof.
-    iIntros "(Hf & Hs & #Hlk & Hlked & HR & HΦ)".
+    iIntros "(Hf & #Hlk & Hlked & HR & HΦ)".
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
     iApply (wp_call k [Vptr l]); last iFrame; auto.
-    iIntros "!> Hs'".
-    wp_alloc lkx as "Hlkx". wp_let. wp_bind (_ <- _)%E.
-    wp_load.
-    wp_atomic.
+    iIntros "!>". wp_alloc lkx as "Hlkx". wp_let. wp_bind (_ <- _)%E.
+    wp_load. wp_atomic.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
     - simpl. iApply wp_assign; last iFrame; try by constructor.
-      iIntros "!> Hl". iMod ("Hclose" with "[-Hs' HΦ]")=>//.
+      iIntros "!> Hl". iMod ("Hclose" with "[-HΦ]")=>//.
       iExists false. iFrame. iModIntro. wp_run. iFrame.
     - iDestruct "HR'" as "[>Ho' HR']".
       by iDestruct (locked_exclusive with "Hlked Ho'") as "%".

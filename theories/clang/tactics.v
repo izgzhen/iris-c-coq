@@ -55,9 +55,9 @@ Ltac reshape_expr e tac :=
 Tactic Notation "wp_unfill" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-    | |- _ ⊢ wp ?E ?s ?Q => reshape_expr s ltac:(fun Kes e' =>
+    | |- _ ⊢ wp ?E (?e, ?K) ?Q => reshape_expr e ltac:(fun Kes e' =>
       match e' with
-        | efoc => unify e' efoc; replace s with (fill_ectxs e' Kes); last done
+        | efoc => unify e' efoc; replace e with (fill_ectxs e' Kes); last done
       end)
     | _ => fail "wp_unfill: not a 'wp'"
   end.
@@ -71,23 +71,23 @@ Ltac wp_bind_core Kes :=
 Tactic Notation "wp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- _ ⊢ wp ?E ?s ?Q => reshape_expr s ltac:(fun Kes e' =>
+  | |- _ ⊢ wp ?E (?e, ?K) ?Q => reshape_expr e ltac:(fun Kes e' =>
     match e' with
     | efoc => unify e' efoc; wp_bind_core Kes
-    end) || fail "wp_bind: cannot find" efoc "in" s
+    end) || fail "wp_bind: cannot find" efoc "in" e
   | _ => fail "wp_bind: not a 'wp'"
   end.
 
 Section heap.
 Context `{clangG Σ}.
 
-Lemma tac_wp_alloc Δ Δ' E j v t Φ :
+Lemma tac_wp_alloc Δ Δ' E j v t Φ ks:
   typeof v t →
   IntoLaterNEnvs 1 Δ Δ' →
   (∀ l, ∃ Δ'',
     envs_app false (Esnoc Enil j (l ↦ v @ t)) Δ' = Some Δ'' ∧
     (Δ'' ⊢ Φ (Vptr l))) →
-  Δ ⊢ WP Ealloc t (Evalue v) @ E {{ Φ }}.
+  Δ ⊢ WP (Ealloc t (Evalue v), ks) @ E {{ Φ }}.
 Proof.
   intros ?? HΔ. eapply (wand_apply True%I).
   { iApply wp_alloc; first done. }
@@ -96,13 +96,13 @@ Proof.
   by rewrite right_id HΔ'.
 Qed.
 
-Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ:
+Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ ks:
   typeof v' t' → assign_type_compatible t t' →
   IntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, l ↦ v @ t)%I →
   envs_simple_replace i false (Esnoc Enil i (l ↦ v' @ t)) Δ' = Some Δ'' →
   (Δ'' ⊢ Φ Vvoid) →
-  Δ ⊢ WP Eassign (Evalue (Vptr l)) (Evalue v') @ E {{ Φ }}.
+  Δ ⊢ WP (Eassign (Evalue (Vptr l)) (Evalue v'), ks) @ E {{ Φ }}.
 Proof.
   intros. eapply wand_apply.
   { iIntros "HP HQ". iApply wp_assign; [done|done|].
@@ -111,11 +111,11 @@ Proof.
   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
 Qed.
 
-Lemma tac_wp_load Δ Δ' E i l q v t Φ:
+Lemma tac_wp_load Δ Δ' E i l q v t Φ ks:
   IntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, l ↦{q} v @ t)%I →
   (Δ' ⊢ Φ v) →
-  Δ ⊢ WP (Ederef_typed t (Evalue (Vptr l))) @ E {{ Φ }}.
+  Δ ⊢ WP (Ederef_typed t (Evalue (Vptr l)), ks) @ E {{ Φ }}.
 Proof.
   intros. eapply wand_apply.
   { iIntros "HP HQ". iApply wp_load. iSplitL "HP"; eauto. }
@@ -131,7 +131,7 @@ Tactic Notation "wp_assign" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
   lazymatch goal with
-  | |- _ ⊢ wp ?E (Eassign (Evalue (Vptr ?l)) (Evalue ?rv)) ?P =>
+  | |- _ ⊢ wp ?E (Eassign (Evalue (Vptr ?l)) (Evalue ?rv), _) ?P =>
     iMatchHyp (fun H P => match P with (l ↦{_} _ @ ?t)%I =>
       (match goal with
          | [ H : typeof rv _ |- _ ] => idtac
@@ -154,7 +154,7 @@ Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
   lazymatch goal with
-  | |- _ ⊢ wp ?E ?e ?Q =>
+  | |- _ ⊢ wp ?E (?e, ?K) ?Q =>
     first
       [reshape_expr e ltac:(fun K e' =>
          match eval hnf in e' with Ealloc _ _ => wp_bind_core K end)
@@ -173,11 +173,11 @@ Tactic Notation "wp_load" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
   lazymatch goal with
-  | |- _ ⊢ wp ?E ?s ?P =>
+  | |- _ ⊢ wp ?E (?e, ?K) ?P =>
     first
-      [reshape_expr s ltac:(fun Kes e' =>
+      [reshape_expr e ltac:(fun Kes e' =>
          match eval hnf in e' with Ederef_typed _ (Evalue _) => wp_bind_core Kes end)
-      |fail 1 "wp_load: cannot find 'Ederef_typed' in" s];
+      |fail 1 "wp_load: cannot find 'Ederef_typed' in" e];
     eapply tac_wp_load;
       [apply _
       |let l := match goal with |- _ = Some (_, (?l ↦{_} _ @ _)%I) => l end in
@@ -190,10 +190,10 @@ Tactic Notation "wp_op" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
   lazymatch goal with
-  | |- _ ⊢ wp ?E ?s ?P => reshape_expr s ltac:(fun Kes e' =>
+  | |- _ ⊢ wp ?E (?e, ?K) ?P => reshape_expr e ltac:(fun Kes e' =>
     lazymatch eval hnf in e' with
     | Ebinop _ _ _ => wp_bind_core Kes; iApply wp_op=>//
-    end) || fail "wp_op: cannot find Ebinop in" s
+    end) || fail "wp_op: cannot find Ebinop in" e
   | _ => fail "wp_op: not a 'wp'"
 end.
 
@@ -201,10 +201,10 @@ Tactic Notation "wp_fst" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
   lazymatch goal with
-  | |- _ ⊢ wp ?E ?s ?P => reshape_expr s ltac:(fun Kes e' =>
+  | |- _ ⊢ wp ?E (?e, ?K) ?P => reshape_expr e ltac:(fun Kes e' =>
     lazymatch eval hnf in e' with
     | Esnd _ => wp_bind_core Kes; iApply wp_fst=>//
-    end) || fail "wp_op: cannot find Efst in" s
+    end) || fail "wp_op: cannot find Efst in" e
   | _ => fail "wp_op: not a 'wp'"
 end.
 
@@ -212,10 +212,10 @@ Tactic Notation "wp_snd" :=
   iStartProof;
   repeat (iApply wp_seq; first by simpl);
   lazymatch goal with
-  | |- _ ⊢ wp ?E ?s ?P => reshape_expr s ltac:(fun Kes e' =>
+  | |- _ ⊢ wp ?E (?e, ?K) ?P => reshape_expr e ltac:(fun Kes e' =>
     lazymatch eval hnf in e' with
     | Esnd _ => wp_bind_core Kes; iApply wp_snd=>//
-    end) || fail "wp_op: cannot find Esnd in" s
+    end) || fail "wp_op: cannot find Esnd in" e
   | _ => fail "wp_op: not a 'wp'"
 end.
 
@@ -239,15 +239,15 @@ Tactic Notation "wp_atomic" :=
 
 Ltac wp_step :=
   match goal with
-   | |- _ ⊢ wp _ (Eassign _ _) _ => wp_assign
-   | |- _ ⊢ wp _ (Eseq _ _) _ => wp_skip
-   | |- _ ⊢ wp _ (Ewhile _ (Evalue vfalse) _) _ => iApply wp_while_false
-   | |- _ ⊢ wp _ (Ewhile _ (Evalue vtrue) _) _ => iApply wp_while_true
-   | |- _ ⊢ wp _ (Eif (Evalue vfalse) _ _) _ => iApply wp_if_false
-   | |- _ ⊢ wp _ (Eif (Evalue vtrue) _ _) _ => iApply wp_if_true
-   | |- _ ⊢ wp _ (Erete _) _ => wp_ret
+   | |- _ ⊢ wp _ (Eassign _ _, _) _ => wp_assign
+   | |- _ ⊢ wp _ (Eseq _ _, _) _ => wp_skip
+   | |- _ ⊢ wp _ (Ewhile _ (Evalue vfalse) _, _) _ => iApply wp_while_false
+   | |- _ ⊢ wp _ (Ewhile _ (Evalue vtrue) _, _) _ => iApply wp_while_true
+   | |- _ ⊢ wp _ (Eif (Evalue vfalse) _ _, _) _ => iApply wp_if_false
+   | |- _ ⊢ wp _ (Eif (Evalue vtrue) _ _, _) _ => iApply wp_if_true
+   | |- _ ⊢ wp _ (Erete _, _) _ => wp_ret
    | |- _ ⊢ ▷ _ => iNext
-   | |- _ ⊢ wp _ (Elet _ _ _ _) _ => wp_let
+   | |- _ ⊢ wp _ (Elet _ _ _ _, _) _ => wp_let
    | _ => wp_snd || wp_fst || wp_load || wp_op
   end.
 

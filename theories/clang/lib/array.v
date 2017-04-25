@@ -164,10 +164,10 @@ Section array.
     iPureIntro. by eapply len_varray.
   Qed.
   
-  Lemma index_spec q t p (i n: nat) vs Φ:
+  Lemma index_spec q t p (i n: nat) vs Φ ks:
     i < n → mul_safe (sizeof_type t) i →
     p ↦{q} varray vs @ tyarray t n ∗ (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
-    ⊢ WP !(index t p i)@t {{ Φ }}.
+    ⊢ WP (!(index t p i)@t, ks) {{ Φ }}.
   Proof.
     iIntros (??) "[Hp HΦ]". destruct p.
     iDestruct (array_slice' with "Hp") as "Hs".

@@ -44,18 +44,18 @@ Section definitions.
     cli : expr := Evalue f_cli;
     create_task f p : expr := Evalue $ f_create_task f p;
     (* -- operation specs -- *)
-    create_task_spec E f e prio Φ :
+    create_task_spec E f e prio Φ ks:
       text_interp f (Function Tvoid [] e) ∗
       (∀ N: namespace,
          ⌜ ∀ E, N ⊥ E ⌝ -∗ INVS_range prio ptot -∗
-         WP e @ ⊤∖↑N {{ v, INVS_range prio ptot}})
-      ⊢ WP create_task f prio @ E {{ Φ }};
-    sti_spec prio γ γp Φ :
+         WP (e, []) @ ⊤∖↑N {{ v, INVS_range prio ptot}})
+      ⊢ WP (create_task f prio, ks) @ E {{ Φ }};
+    sti_spec prio γ γp Φ ks:
       int_ctx γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ Vvoid)
-      ⊢ WP sti {{ Φ }};
-    cli_spec prio γ γp Φ :
+      ⊢ WP (sti, ks) {{ Φ }};
+    cli_spec prio γ γp Φ ks:
       int_ctx γ γp ∗ hpri γp prio ∗ (INVS_up prio -∗ hpri γp prio -∗ closed γ -∗ Φ Vvoid)
-      ⊢ WP cli {{ Φ }}
+      ⊢ WP (cli, ks) {{ Φ }}
   }.
 End definitions.
 

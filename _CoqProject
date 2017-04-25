@@ -10,11 +10,9 @@ theories/lib/pair.v
 theories/lib/refine_ra.v
 theories/clang/memory.v
 theories/clang/types.v
-theories/clang/lang.v
 theories/clang/logic.v
-theories/clang/ret_logic.v
+theories/clang/adequacy.v
 theories/clang/tactics.v
-theories/clang/ret_tactics.v
 theories/clang/notations.v
 theories/clang/lib/list.v
 theories/clang/lib/spec.v
@@ -29,7 +27,6 @@ theories/tests/swap.v
 theories/tests/task.v
 theories/tests/spawn.v
 theories/tests/higher_order.v
-theories/tests/ret.v
 theories/program_logic/language.v
 theories/program_logic/weakestpre.v
-theories/program_logic/hoare.v
+theories/program_logic/adequacy.v
