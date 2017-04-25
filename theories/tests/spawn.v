@@ -9,6 +9,7 @@ Section test.
   Variable l : val.
   Definition f_acquire : ident := 3.
   Definition f_release : ident := 4.
+  Definition f_add : ident := 5.
 
   Definition R: iProp Σ := (∃ vx: int32, lx ↦ vx @ Tint32)%I.
   
@@ -17,7 +18,7 @@ Section test.
     lx <- !lx@Tint32 + 1;;
     Ecall Tvoid f_release [Evalue l].
 
-  Lemma add_safe (lr: addr) ks:
+  Lemma add_safe ks:
     own_stack ks ∗ is_lock N γ l R ∗
     text_interp f_release (Function Tvoid [(x, tylock)] release) ∗
     text_interp f_acquire (Function Tvoid [(x, tylock)] acquire)
@@ -37,4 +38,27 @@ Section test.
   (* It is just DRF property -- though we can have a stronger spec
      by encoding some receipt tokens *)
 
-  
+  Definition spawn: expr :=
+    Efork Tvoid f_add [] ;;
+    Efork Tvoid f_add [].
+
+  Lemma spawn_spec:
+    is_lock N γ l R ∗
+    text_interp f_release (Function Tvoid [(x, tylock)] release) ∗
+    text_interp f_acquire (Function Tvoid [(x, tylock)] acquire) ∗
+    text_interp f_add (Function Tvoid [] add)
+    ⊢ WP spawn {{ _, True }}.
+  Proof.
+    iIntros "(#Hlk & Hf1 & Hf2 & Hf3)".
+    unfold spawn. iApply wp_seq=>//.
+    iDestruct (text_interp_dup with "Hf3") as "[Hf3 ?]".
+    iApply (wp_fork _ _ _ []); last iFrame; first done.
+    iNext. iDestruct (text_interp_dup with "Hf1") as "[Hf1 Hf1']".
+    iDestruct (text_interp_dup with "Hf2") as "[Hf2 Hf2']".
+    iSplitL "Hf1 Hf2 Hf3".
+    - wp_skip. iApply (wp_fork _ _ _ []); last iFrame; first done.
+      iNext. iSplit=>//. iIntros "?". iApply add_safe. by iFrame.
+    - iIntros "?". iApply add_safe. by iFrame.
+  Qed.
+
+End test.

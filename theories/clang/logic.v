@@ -29,6 +29,10 @@ Section wp.
   Definition text_interp (f: ident) (x: function) :=
     own clangG_textG_name (◯ {[ f := to_agree (x : discreteC function) ]}).
 
+  Lemma text_interp_dup f x:
+    text_interp f x ⊢ text_interp f x ∗ text_interp f x.
+  Admitted.
+  
   Definition own_stack :=
     @own_pair stack Σ clangG_stackG clangG_stackG_name.
 
