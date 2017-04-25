@@ -10,6 +10,7 @@ theories/lib/pair.v
 theories/lib/refine_ra.v
 theories/clang/memory.v
 theories/clang/types.v
+theories/clang/lang.v
 theories/clang/logic.v
 theories/clang/adequacy.v
 theories/clang/tactics.v
