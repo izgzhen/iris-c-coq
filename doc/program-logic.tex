@@ -11,7 +11,6 @@ Using the standard Iris assertions and the ownership of ghost heap resource, we 
 l \mapsto_q v : t \eqdef{}&  l \mapsto_q \encode(v) \land \tychk{v}{t} \\
 l \mapsto v : t              \eqdef{}& l \mapsto_1 v : t\\
 l \mapsto_q - : t            \eqdef{}& \Exists v. l \mapsto_q v : t\\
-\ownstack(s) \eqdef{}& \ownGhost{\Stack}{(\frac12, \aginj s)} \\
 f \tmapsto F \eqdef{}& \ownGhost{\Text}{\authfrag \mapsingleton{f}{\aginj F}}
 \end{align*}
 
@@ -19,22 +18,24 @@ f \tmapsto F \eqdef{}& \ownGhost{\Text}{\authfrag \mapsingleton{f}{\aginj F}}
 
 \paragraph{Defining weakest precondition.}
 
-The state interpreting predicate $S : \State \to \iProp$ for our \irisc{} language is defined below, as required for
-instantiating the parametric WP provided by Iris already (but we copy its definition over for reference).
+The shared state interpreting predicate $S : \State \to \iProp$ for our \irisc{} language is defined below,
+with threads local state $s$ set to $\Stack$ (and initialized to $\emptyset$),
+as required for instantiating the parametric WP defined for a general class of \texttt{language}.
 
 \[S(\sigma) \eqdef 
   \ownGhost{\Heap}{\authfull \fmap (\lambda v. (1, \aginj v), \sigma.\text{heap})} *
-  \ownGhost{\Text}{\authfull \fmap (\aginj, \sigma.\text{text})} *
-  \ownGhost{\Stack}{(\frac12, \sigma.\text{stack})}
+  \ownGhost{\Text}{\authfull \fmap (\aginj, \sigma.\text{text})}
 \]
 
 \begin{align*}
-  \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, e, \pred. \\
+  \textdom{wp} \eqdef{}& \MU \textdom{wp}. \Lam \mask, (e, s), \pred. \\
         & (\Exists v. \toval(e) = v \land \pvs[\mask] \pred(v)) \lor {}\\
         & \Bigl(\toval(e) = \bot \,\land \\
         &\qquad \All \state. S(\state) \vsW[\mask][\emptyset] {}\\
-        &\qquad \red(e, \state) * \later\All e', \state'. \cstep{e}{\state}{e'}{\state'} \vsW[\emptyset][\mask] {}\\
-        &\qquad\qquad S(\state') * \textdom{wp}(\mask, e', \pred)\Bigr) \\
+        &\qquad \red(e, s, \state) * \later\All e', s', \state', \vec e.
+            \cstepf{e}{s, \state}{e'}{s', \state'}{\vec e} \vsW[\emptyset][\mask] {}\\
+            &\qquad\qquad S(\state') * \textdom{wp}(\mask, (e', s'), \pred) *
+            \Sep_{\expr'' \in \vec e} \textdom{wp}(\top, (\expr'', \mathrm{init}_s), \Lam \any. \TRUE)\Bigr) \\
 \end{align*}
 
 Here are some conventions:
@@ -42,6 +43,8 @@ Here are some conventions:
 \begin{itemize}
 \item If we leave away the mask $\mask$, we assume it to be $\top$.
 \item $\pred$ in post-condition might or might not take a value parameter, depending on the context.
+\item When we elide stack $s$ in WP-rules, like $\wpre{e}{\pred}$, then the rules holds for all such
+      WP with any same $s$. This is useful in making local WP rules looking less cluttered.
 \end{itemize}
 
 \paragraph{Laws of weakest precondition.}
@@ -55,23 +58,22 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 
 \infer[wp-atomic]
 { \textlog{atomic}(e)}
-{ \pvs[\mask_1][\mask_2]  \wpre{\expr}[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
+{ \pvs[\mask_1][\mask_2] \wpre{\expr}[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
    \proves \wpre{\expr}[\mask_1]{\Ret\var.\prop} }
-
 
 \infer[wp-strong-mono]
 {\mask_1 \subseteq \mask_2}
-{((\All v. \Phi(v) \pvs[\mask_2] \Psi(v)) \land (\All v. \predret(v) \pvs[\mask_2] \Psi_\text{ret}(v))) * \wpre\cureval[\mask_1]{\pred}
- \proves \wpre\cureval[\mask_2]{\Psi}{\Psi_\text{ret}}}
+{(\All v. \Phi(v) \pvs[\mask_2] \Psi(v)) * \wpre{e}[\mask_1]{\pred}
+ \proves \wpre{e}[\mask_2]{\Psi}}
 
-\infer[fup-wp]
-{}{\pvs[\mask] \wpre\cureval[\mask]{\pred} \proves \wpre\cureval[\mask]{\pred}}
+\infer[fupd-wp]
+{}{\pvs[\mask] \wpre{e}[\mask]{\pred} \proves \wpre{e}[\mask]{\pred}}
 
-\infer[wp-fup]
-{}{\wpre\cureval[\mask]{\Ret\var.\pvs[\mask] \pred(\var)}{\Ret\var.\pvs[\mask] \predret(\var)} \proves \wpre\expr[\mask]{\pred}}
+\infer[wp-fupd]
+{}{\wpre{e}[\mask]{\Ret\var.\pvs[\mask] \pred(\var)} \proves \wpre{e}[\mask]{\pred}}
 
 \end{mathpar}
-\caption{General WP rules provided by Iris}
+\caption{General WP rules}
 \end{figure}
 
 \begin{figure}[!ht]
@@ -88,7 +90,7 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
  \wpre{l \la v}[\mask]{\pred}}
 
 \infer[wp-ret]
-{}{\ownstack(k'::ks) * (\ownstack(ks) \wand \wpre{k'(v)}[\mask]{\pred}) \proves \wpre{k(\erete{v})}[\mask]{\pred}}
+{}{\wpre{k'(v); ks}[\mask]{\pred} \proves \wpre{k(\erete{v}); k'::ks}[\mask]{\pred}}
 
 \infer[wp-bind]
 {\isjmp(e) = \FALSE}
@@ -113,6 +115,11 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 {\wpre{e_1}[\mask]{v,\,\wpre{v;e_2}[\mask]{\pred}}
  \proves
  \wpre{e_1 ; e_2}[\mask]{\pred}}
+
+\infer[wp-alloc]
+{\tychk{v}{\tau}}
+{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\ealloc{\tau}{v}}[\mask]{\pred}}
+
 
 \infer[wp-while-true]
 {}{\later \wpre{s; \ewhile{c}{c}{s}}[\mask]{\pred}
@@ -144,14 +151,10 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 {}
 {\later \pred(v_2) \proves \wpre{\efst{(v_1, v_2)}}[\mask]{\pred}}
 
-\infer[wp-alloc]
-{\tychk{v}{\tau}}
-{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\ealloc{\tau}{v}}[\mask]{\pred}}
-
 \infer[wp-call]
 {}
-{ f \tmapsto \Funct(\tau, ps, e) * \ownstack(ks) * \later (\ownstack(k::ks) \wand \wpre{e[ps/ls]}[\mask]{\pred})
-  \proves \wpre{k(\ecall{\tau}{f}{ls})}[\mask]{\pred}}
+{ f \tmapsto \Funct(\tau, ps, e) * \later (\wpre{e[ps/ls]; k::ks}[\mask]{\pred})
+  \proves \wpre{k(\ecall{\tau}{f}{ls}); ks}[\mask]{\pred}}
 
 \infer[wp-cas-fail]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad v_1 \neq v}
@@ -165,6 +168,10 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 
 \infer[wp-let]
 {}{\later \wpre{e[x/v:\tau]}[\mask]{\pred} \proves \wpre{\elet{\tau}{x}{v}{e}}[\mask]{\pred}}
+
+\infer[wp-fork]
+{}{f \tmapsto \Funct(\tau, ps, e) * \later \pred(\void) * \later (\wpre{e[ps/vs]; \emptyset}{\Ret\any.\TRUE})
+   \proves \wpre{\efork{\tau}{f}{vs}; ks}[\mask]{\pred}}
 
 \end{mathpar}
 \caption{WP rules specific to \irisc{}}

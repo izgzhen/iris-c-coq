@@ -152,8 +152,8 @@ Induction scheme II for $\Expr$:
 \begin{lemma}
   Local step has a focus:
   \[
-  \infer{\estep{e_1}{h_1}{e_2}{h_2}}
-  {\Exists e_1', e_2', k. \isenf(e_1') \land e_1 = k(e_1') \land e_2 = k(e_2') \land \estep{e_1'}{h_1}{e_2'}{h_2}}
+  \infer{\estep{\Sigma}{e_1}{h_1}{e_2}{h_2}}
+  {\Exists e_1', e_2', k. \isenf(e_1') \land e_1 = k(e_1') \land e_2 = k(e_2') \land \estep{\Sigma}{e_1'}{h_1}{e_2'}{h_2}}
   \]
 \end{lemma}
 \begin{proof}
@@ -161,9 +161,9 @@ Induction scheme II for $\Expr$:
     \begin{enumerate}
     \item If $e_1$ is already in normal form, then we just need to let $e_1' = e_1, e_2' = e_2$, and $k = \emptyset$.
     \item We know that there are some $k'', e_1'', e_2''$, where $|k''| > 0$, such that $e_1 = k''(e_1''), e_2 = k''(e_2'')$,
-          and $\estep{e_1''}{h_1}{e_2''}{h_2}$. Since by the metric of depth $||_d$, $|e_1''|_d < |e_1|_d$,
+          and $\estep{\Sigma}{e_1''}{h_1}{e_2''}{h_2}$. Since by the metric of depth $||_d$, $|e_1''|_d < |e_1|_d$,
           so we can derive inductively that there exists $e_1', e_2', k'$ that
-          \[\isenf(e_1') \land e_1'' = k'(e_1') \land e_2'' = k'(e_2') \land \estep{e_1'}{h_1}{e_2'}{h_2}\]
+          \[\isenf(e_1') \land e_1'' = k'(e_1') \land e_2'' = k'(e_2') \land \estep{\Sigma}{e_1'}{h_1}{e_2'}{h_2}\]
           Now let $k = k '' \append k'$, and use the same $e_1', e_2'$, we can prove the original existential goal.
     \end{enumerate}
 \end{proof}

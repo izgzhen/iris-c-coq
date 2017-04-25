@@ -33,7 +33,8 @@ The language is a simplified version of C. It mainly consists of
        \edereft{\tau}{e} \mid
        \eaddrof{e} \mid
        \efst{e} \mid
-       \esnd{e}
+       \eCAS{\tau}{e}{e}{e} \mid
+       \esnd{e} \mid
        \\&
        e \la e \mid
        \eif{e}{e}{e} \mid
@@ -45,7 +46,7 @@ The language is a simplified version of C. It mainly consists of
        \ealloc{\tau}{e} \mid
        \\&
        \elet{\tau}{x}{e}{e} \mid
-       \eCAS{\tau}{e}{e}{e}
+       \efork{\tau}{f}{e_1, ..., e_n}
 \\
 \end{align*}
 
@@ -67,10 +68,13 @@ we can remove lexical and typing environment from the core program logic. The de
 
 (NOTE) Compared with C, there are several notable differences:
 \begin{enumerate}
-  \item We currently don't support declarations of local variables, \texttt{for} loop and \texttt{switch},
+  \item We currently don't support \texttt{for} loop and \texttt{switch},
     \texttt{break} and \texttt{continue}
   \item C differentiates statements and expressions (so do many other program logics). For simplicity and
     expressivity, we merged them together into a coherent expression $\Expr$ instead
+  \item We support declarations of local variables through a syntactic sugar based on the core language
+        (definition of $\mathrm{default}: \Type \ra \Val$ is trivial)
+        \[ \edecl{\tau}{x}{e} \eqdef \elet{\tau}{x}{\ealloc{\tau}{\mathrm{default}(\tau)}}{e}\]
 \end{enumerate}
 
 \paragraph{Evaluation Context.}
@@ -100,7 +104,9 @@ we define the \emph{evaluation context}:
         \erete{\emptyctx} \mid
         \ecall{\tau}{f}{v_1, ..., \emptyctx, e_1, ...} \mid
         \ealloc{\tau}{\emptyctx} \mid
-        \emptyctx ; e
+        \emptyctx ; e \mid
+        \\&
+        \efork{\tau}{f}{v_1, ..., \emptyctx, e_1, ...}
 \end{align*}
 
 \subsection{Semantics}\label{sec:semantics}
@@ -112,7 +118,7 @@ First define
 \item Heap $h: \Heap \eqdef [ l \gmapsto \bval ]$
 \item Continuation $k: \Cont \eqdef [\ectx]$
 \item Stack $s: \Stack \eqdef [\Cont]$
-\item Whole state \[\sigma: \State \eqdef (\text{heap}: \Heap, \text{text}: \Text, \text{stack}: \Stack)\]
+\item Shared state \[\sigma: \State \eqdef (\text{heap}: \Heap, \text{text}: \Text)\]
 \end{itemize}
 
 (NOTE) You may notice the difference between $\Val$ and $\byteval$, it is intended to create a layer of abstraction for
@@ -120,49 +126,53 @@ easier manipulation of spatial assertions and also for a clean, unified language
 
 \paragraph{Small-Step Operational Semantics.}
 
-We define the small-step semantics (see figure \ref{fig:semantics}) for both local reduction ($\estep{e}{h}{e'}{h'}$) and
-non-local reductions ($\jstep{\Sigma}{e}{s: \Stack}{e'}{s': \Stack}$),
-and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) point-wise.
-
-%% XXX: Define $\sigma \vdash l \mapsto \vec \bval$
+We define the small-step semantics (see figure \ref{fig:semantics}) for both
+local reduction $\estepf{\Sigma}{e}{h}{e'}{h'}{t_1, t_2, ...}$
+(when the set of forked-off threads $t_1, ...$ is empty, we abbreviate it as $\estep{\Sigma}{e}{h}{e'}{h'}$) and
+non-local reductions $\jstep{\Sigma}{e}{s}{e'}{s'}$,
+and then combine them together into $\cstepf{e}{s, \sigma}{e'}{s', \sigma'}{t_1, ...}$ point-wise.
 
 \begin{figure}[!ht]
 \begin{mathpar}\label{fig:semantics}
 
-\infer[es-binop]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{v_1 \oplus v_2}{h}{v'}{h}}
+\infer[es-binop]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{\Sigma}{v_1 \oplus v_2}{h}{v'}{h}}
 
-\infer[es-deref-typed]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\edereft{\tau}{l}}{h}{v}{h}}
+\infer[es-deref-typed]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\Sigma}{\edereft{\tau}{l}}{h}{v}{h}}
 
-\infer[es-fst]{}{\estep{\efst{(v_1, v_2)}}{h}{v_1}{h}}
+\infer[es-fst]{}{\estep{\Sigma}{\efst{(v_1, v_2)}}{h}{v_1}{h}}
 
-\infer[es-snd]{}{\estep{\esnd{(v_1, v_2)}}{h}{v_2}{h}}
+\infer[es-snd]{}{\estep{\Sigma}{\esnd{(v_1, v_2)}}{h}{v_2}{h}}
 
-\infer[es-assign]{}{\estep{l \la v}{h}{\eskip}{h[ l \mapsto \encode(v) ]}}
+\infer[es-assign]{}{\estep{\Sigma}{l \la v}{h}{\eskip}{h[ l \mapsto \encode(v) ]}}
 
-\infer[es-seq]{}{\estep{v ; e}{h}{e}{h}}
+\infer[es-seq]{}{\estep{\Sigma}{v ; e}{h}{e}{h}}
 
-\infer[es-alloc]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\ealloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
+\infer[es-alloc]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\Sigma}{\ealloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
 
-\infer[es-while-true]{}{\estep{\ewhile{c}{\vtrue}{s}}{h}{s; \ewhile{c}{c}{s}}{h}}
+\infer[es-while-true]{}{\estep{\Sigma}{\ewhile{c}{\vtrue}{s}}{h}{s; \ewhile{c}{c}{s}}{h}}
 
-\infer[es-while-false]{}{\estep{\ewhile{c}{\vfalse}{s}}{h}{\eskip}{h}}
+\infer[es-while-false]{}{\estep{\Sigma}{\ewhile{c}{\vfalse}{s}}{h}{\eskip}{h}}
 
-\infer[es-if-true]{}{\estep{\eif{\vtrue}{e_1}{e_2}}{h}{e_1}{h}}
+\infer[es-if-true]{}{\estep{\Sigma}{\eif{\vtrue}{e_1}{e_2}}{h}{e_1}{h}}
 
-\infer[es-if-false]{}{\estep{\eif{\vfalse}{e_1}{e_2}}{h}{e_2}{h}}
+\infer[es-if-false]{}{\estep{\Sigma}{\eif{\vfalse}{e_1}{e_2}}{h}{e_2}{h}}
 
-\infer[es-bind']{\isjmp(e) = \FALSE \quad \estep{e}{h}{e'}{h'}}{\estep{(k::ks)e}{h}{(k::ks)e'}{h'}}
+\infer[es-bind']{\isjmp(e) = \FALSE \quad \estep{\Sigma}{e}{h}{e'}{h'}}{\estep{\Sigma}{(k::ks)e}{h}{(k::ks)e'}{h'}}
 
 \infer[es-cas-fail]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad \tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v) \quad v_1 \neq v}
-{\estep{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vfalse}{h}}
+{\estep{\Sigma}{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vfalse}{h}}
 
 \infer[es-cas-suc]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad h \vdash l \mapsto \encode(v_1)}
-{\estep{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vtrue}{h[ l \mapsto \encode(v_2) ]}}
+{\estep{\Sigma}{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vtrue}{h[ l \mapsto \encode(v_2) ]}}
 
 \infer[es-let]
-{}{\estep{\elet{\tau}{x}{v}{e}}{h}{e[x/v:\tau]}{h}}
+{}{\estep{\Sigma}{\elet{\tau}{x}{v}{e}}{h}{e[x/v:\tau]}{h}}
+
+\infer[es-fork]
+  {\Sigma(f) = \Funct(\tau, ps, e)}
+  {\estepf{\Sigma}{\efork{\tau}{f}{vs}}{h}{\void}{h}{\{e[ps/vs]}\}}
 
 \infer[js-rete]
   {\unfill(k(\erete{v})) = (k', \erete{v})}
@@ -170,7 +180,7 @@ and then combine them together ($\cstep{e}{\sigma}{e'}{\sigma'}$) point-wise.
 
 \infer[js-call]
   {\Sigma(f) = \Funct(\tau, ps, e)}
-  {\jstep{\Sigma}{k(\ecall{\tau}{f}{ls})}{ks}{e[ps/ls]}{k::ks}}
+  {\jstep{\Sigma}{k(\ecall{\tau}{f}{vs})}{ks}{e[ps/vs]}{k::ks}}
 
 \end{mathpar}
 \caption{Semantics rules}
