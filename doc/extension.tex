@@ -13,7 +13,7 @@ by defining it as below:
   \textdom{wp}^{+} \eqdef{}& \MU \textdom{wp}^{+}. \Lam \mask, e, \pred, \predret. \\
         & (\Exists v. \toval(e) = v \land \pred(v)) \lor {}\\
         & (\toval(e) = \bot \,\land \Exists e_h, K. e = K(e_h) \land \Bigl({}\\
-        &\qquad (\isjmp(e_h) = \FALSE * \wpre{e_h}[\mask]{\Ret v. \wprer{K(v)}[\mask]{\pred}{\predret}}) \lor \\
+        &\qquad (\All s. \isjmp(e_h) = \FALSE * \wpre{e_h; s}[\mask]{\Ret v. \wprer{K(v)}[\mask]{\pred}{\predret}}) \lor \\
         &\qquad (\Exists v. e_h = \erete{v} * \later \predret(v)) \lor \\
         &\qquad (\Exists f, ps, ls, F. \\
                            & \qquad \qquad f \tmapsto \Funct(\any, ps, F) * \\
@@ -39,7 +39,7 @@ And this definition supports the following inference rules:
 {}
 {\wprer{e_1}{\Ret\var. \wprer{\var ; e_2}[\mask]{\pred}{\predret}}{\predret}
  \proves 
- \wprer{e_1; e_2}[\mask]{\pred}{\predret}}
+ \wprer{e_1;; e_2}[\mask]{\pred}{\predret}}
 
 \infer[wpr-call]
 {}
@@ -53,9 +53,9 @@ And this definition supports the following inference rules:
  \wprer{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
 
 \infer[wp-call-r]
-{f \tmapsto \Funct(\tau, ps, e) * \ownstack(ks) *
- \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \ownstack(ks) * \wpre{k(v)}[\mask]{\pred}} }
-{\wpre{k(\ecall{\tau}{f}{ls})}[\mask]{\pred}}
+{f \tmapsto \Funct(\tau, ps, e) *
+ \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \wpre{k(v); s}[\mask]{\pred}} }
+{\wpre{k(\ecall{\tau}{f}{ls}); s}[\mask]{\pred}}
 
 \end{mathpar}
 
@@ -87,6 +87,7 @@ but the second form is easier for use, for example, splitting or indexing. We ha
  \equiv p \mapsto_q [v_i : \tau, ..., v_{i + l_1 + l_2 - 1}:\tau]}
 
 \infer[index-spec]{i < n}
-{p \mapsto_q vs: \tau^n * (\All v. p \mapsto_q vs: \tau^n \wand \lookupmap{vs}{i} = \Some{v} \wand \pred(v))
-\proves \wpre{\edereft{\tau}{p + i}}{\pred}}
+{\hoare{p \mapsto_q vs: \tau^n}{\edereft{\tau}{p + i}}
+       {\Ret v. p \mapsto_q vs: \tau^n * \lookupmap{vs}{i} = \Some{v}}}
+
 \end{mathpar}

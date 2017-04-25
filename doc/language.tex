@@ -42,7 +42,7 @@ The language is a simplified version of C. It mainly consists of
        \\&
        \erete{e} \mid
        \ecall{\tau}{f}{e_1, ..., e_n} \mid
-       e ; e \mid
+       e ;; e \mid
        \ealloc{\tau}{e} \mid
        \\&
        \elet{\tau}{x}{e}{e} \mid
@@ -145,7 +145,7 @@ and then combine them together into $\cstepf{e}{s, \sigma}{e'}{s', \sigma'}{t_1,
 
 \infer[es-assign]{}{\estep{\Sigma}{l \la v}{h}{\eskip}{h[ l \mapsto \encode(v) ]}}
 
-\infer[es-seq]{}{\estep{\Sigma}{v ; e}{h}{e}{h}}
+\infer[es-seq]{}{\estep{\Sigma}{v ;; e}{h}{e}{h}}
 
 \infer[es-alloc]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\Sigma}{\ealloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
 

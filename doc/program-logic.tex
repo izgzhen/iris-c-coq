@@ -114,7 +114,7 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 {\isjmp(e_1) = \FALSE}
 {\wpre{e_1}[\mask]{v,\,\wpre{v;e_2}[\mask]{\pred}}
  \proves
- \wpre{e_1 ; e_2}[\mask]{\pred}}
+ \wpre{e_1 ;; e_2}[\mask]{\pred}}
 
 \infer[wp-alloc]
 {\tychk{v}{\tau}}
