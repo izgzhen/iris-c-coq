@@ -182,11 +182,11 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 The soundness of WP-style program is proven by showing that it is \emph{adequate}:
 
 \begin{lemma}
-For all $e, \sigma, \pred: \Val \ra \Prop$,
+For all $e, s, \sigma, \pred: \Val \ra \Prop$,
 \begin{align*}
 &\TRUE \proves \wpre{e}[\top]{\pred} \Ra \\
-&\quad (\All v, \sigma'. \cstep{e}{\sigma}{v}{\sigma'} \Ra \pred(v)) \land \\
-&\quad (\All e', \sigma'. \cstep{e}{\sigma}{e'}{\sigma'} \Ra (\Exists v. e' = v) \lor \red(e', \sigma'))
+&\quad (\All v, s', \sigma'. \cstep{e}{s, \sigma}{v}{s', \sigma'} \Ra \pred(v)) \land \\
+&\quad (\All e', \sigma'. \cstep{e}{s, \sigma}{e'}{s', \sigma'} \Ra (\Exists v. e' = v) \lor \red(e', s', \sigma'))
 \end{align*}
 \end{lemma}
 

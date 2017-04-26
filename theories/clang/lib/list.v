@@ -61,7 +61,7 @@ Section proof.
       y <- x ;;
       x <- t
     ) ;;
-    return: void.
+    return: y.
 
   Definition ps :=
     [ (x, Tlist); (y, Tptr Tvoid) ].
@@ -221,7 +221,7 @@ Section proof.
     ∀ lx ly ys,
       isList lx xs Tint32 ∗
       isList ly ys Tint32 ∗
-      (∀ ly' : val, isList ly' (rev xs ++ ys) Tint32 -∗ Φ void) ∗
+      (∀ ly' : val, py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ void) ∗
       px ↦ lx @ Tlist ∗
       py ↦ ly @ Tptr Tvoid ∗
       pt ↦ - @ Tptr Tlist
@@ -234,7 +234,7 @@ Section proof.
     induction xs as [|x xs' IHxs']; intros ??? ; subst.
     - iIntros "(Hlx & Hly & HΦ & Hpx & Hpy & Hpt)".
       iDestruct "Hlx" as "%". subst. wp_run.
-      iApply ("HΦ" with "[-]")=>//.
+      iApply ("HΦ" with "[-]")=>//. iFrame.
     - iIntros "(Hlx & Hly & HΦ & Hpx & Hpy & Hpt)".
       iDestruct "Hlx" as (p l') "(% & Hp & Hl')".
       destruct H0 as [? [? ?]]. subst.
@@ -258,7 +258,7 @@ Section proof.
     ∀ lx ly ys,
       text_interp f (Function Tvoid ps rev_list) ∗
       isList lx xs Tint32 ∗ isList ly ys Tint32 ∗
-      (∀ ly', isList ly' (rev xs ++ ys) Tint32 -∗ WP (fill_ectxs void k, ks) {{ Φ }})
+      (∀ ly', isList ly' (rev xs ++ ys) Tint32 -∗ WP (fill_ectxs ly' k, ks) {{ Φ }})
       ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lx ; Evalue ly]) k, ks) {{ Φ }}.
    Proof.
     iIntros (???) "(Hf & Hlx & Hly & HΦ)".
@@ -271,7 +271,8 @@ Section proof.
     wp_alloc pt as "Hpt". wp_let. iApply wp_seq=>//.
     iApply (rev_spec' f (k::ks)). iFrame.
     iSplitR "Hpt"; last by iExists _.
-    iIntros (?) "?". wp_skip. wp_ret. by iApply "HΦ".
+    iIntros (?) "[? ?]".
+    wp_skip. wp_load. wp_ret. by iApply "HΦ".
   Qed.
 
 End proof.
