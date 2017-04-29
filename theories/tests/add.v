@@ -35,7 +35,7 @@ Section example.
   Definition int_ctx := @interrupt.int_ctx _ _ invs 1 i.
 
   Lemma f_spec γ γp f vx Φ k ks:
-    text_interp f (Function Tint32 [("x", Tint32)] f_body)  ∗
+    f T↦ Function Tint32 [("x", Tint32)] f_body ∗
     int_ctx γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     own_scode (SCrel (f_rel vx)) ∗
     (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗

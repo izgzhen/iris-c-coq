@@ -45,7 +45,7 @@ Section definitions.
     create_task f p : expr := Evalue $ f_create_task f p;
     (* -- operation specs -- *)
     create_task_spec E f e prio Φ ks:
-      text_interp f (Function Tvoid [] e) ∗
+      f T↦ Function Tvoid [] e ∗
       (∀ N: namespace,
          ⌜ ∀ E, N ⊥ E ⌝ -∗ INVS_range prio ptot -∗
          WP (e, []) @ ⊤∖↑N {{ v, INVS_range prio ptot}})

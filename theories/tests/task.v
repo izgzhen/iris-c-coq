@@ -16,7 +16,7 @@ Section example.
 
   Lemma ct_spec ks:
     inv N' True%I ∗
-    l ↦ vtrue @ tybool ∗ text_interp "f" (Function Tvoid [] f_body)
+    l ↦ vtrue @ tybool ∗ "f" T↦ Function Tvoid [] f_body
     ⊢ WP (create_task i "f" 0, ks) {{ _, True%I }}.
   Proof.
     iIntros "[#HI [Hl Hf]]".

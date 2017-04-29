@@ -53,10 +53,10 @@ Section spin_lock.
   Lemma is_lock_tylock γ l R: is_lock γ l R ⊢ ⌜ typeof l tylock ⌝.
   Proof. iIntros "Hlk". iDestruct "Hlk" as (?) "[% ?]". by destruct H0. Qed.
 
-  Lemma newlock_spec (R: iProp Σ) f Φ k ks:
-    text_interp f (Function (Tptr tybool) [] newlock) ∗
+  Lemma newlock_spec (R: iProp Σ) Φ k ks:
+    "newlock" T↦ Function (Tptr tybool) [] newlock ∗
     R ∗ (∀ γ lk, is_lock γ lk R -∗ WP (fill_ectxs lk k, ks) {{ Φ }})
-    ⊢ WP (fill_ectxs (Ecall (Tptr tybool) f []) k, ks) {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall (Tptr tybool) "newlock" []) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & HR & HΦ)".
     iApply (wp_call k []); last iFrame; first done.
@@ -70,10 +70,10 @@ Section spin_lock.
     iPureIntro. split=>//. constructor.
   Qed.
 
-  Lemma acquire_spec k lk {γ R Φ ks f}:
-    text_interp f (Function Tvoid [("x", tylock)] acquire) ∗
+  Lemma acquire_spec k lk {γ R Φ ks}:
+    "acquire" T↦ (Function Tvoid [("x", tylock)] acquire) ∗
     is_lock γ lk R ∗ (locked γ -∗ R -∗ WP (fill_ectxs void k, ks) {{ Φ }})
-    ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lk]) k, ks) {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall Tvoid "acquire" [Evalue lk]) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & #Hlk & HΦ)".
     iApply (wp_call k [lk]); last iFrame; first done.
@@ -99,10 +99,10 @@ Section spin_lock.
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
 
-  Lemma release_spec k lk {γ R f Φ ks}:
-    text_interp f (Function Tvoid [("x", tylock)] release) ∗
+  Lemma release_spec k lk {γ R Φ ks}:
+    "release" T↦ Function Tvoid [("x", tylock)] release ∗
     is_lock γ lk R ∗ locked γ ∗ R ∗ WP (fill_ectxs void k, ks) {{ Φ }}
-    ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lk]) k, ks) {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall Tvoid "release" [Evalue lk]) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & #Hlk & Hlked & HR & HΦ)".
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
@@ -112,12 +112,13 @@ Section spin_lock.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
     - simpl. iApply wp_assign; last iFrame; try by constructor.
       iIntros "!> Hl". iMod ("Hclose" with "[-HΦ]")=>//.
-      iExists false. iFrame. iModIntro. wp_run. iFrame.
+      + iExists false. iFrame.
+      + iModIntro. wp_run. iFrame.
     - iDestruct "HR'" as "[>Ho' HR']".
       by iDestruct (locked_exclusive with "Hlked Ho'") as "%".
   Qed.
 
 End spin_lock.
 
-Arguments acquire_spec {_ _ _ _} _ _ {_ _ _ _ _}.
-Arguments release_spec {_ _ _ _} _ _ {_ _ _ _ _}.
+Arguments acquire_spec {_ _ _ _} _ {_ _ _ _ _}.
+Arguments release_spec {_ _ _ _} _ {_ _ _ _ _}.

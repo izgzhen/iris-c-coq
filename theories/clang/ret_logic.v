@@ -17,7 +17,7 @@ Section wp_ret.
       (∃ f vs e e' params retty,
          ⌜ eh = Ecall retty f (map Evalue vs) ∧
            let_params vs params e = Some e' ⌝ ∗
-         text_interp f (Function retty params e) ∗
+         f T↦ Function retty params e ∗
          (▷ wpr E e' (λ _, False)%I (λ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret))))
   ))%I.
 
@@ -132,7 +132,7 @@ Section wp_ret.
 
   Lemma wpr_call E vs params e e' f retty Φ Φret:
     let_params vs params e = Some e' →
-    text_interp f (Function retty params e) ∗
+    f T↦ Function retty params e ∗
     ▷ wpr E e' (fun _ => False%I) Φ
     ⊢ wpr E (Ecall retty f (map Evalue vs)) Φ Φret.
   Proof.
@@ -152,7 +152,7 @@ Section wp_ret.
   Qed.
 
   Lemma lookup_text_s f x σ:
-    text_interp f x ∗ state_interp σ ⊢ ⌜s_text σ !! f = Some x⌝.
+    f T↦ x ∗ state_interp σ ⊢ ⌜s_text σ !! f = Some x⌝.
   Proof.
     iIntros "(?&(?&?))".
     by iDestruct (lookup_text with "[~ ~2]") as "%"; first iFrame.
@@ -182,7 +182,7 @@ Section wp_ret.
 
   Lemma wp_call_r E ks vs params e e' f retty k Φ:
     let_params vs params e = Some e' →
-    text_interp f (Function retty params e) ∗
+    f T↦ Function retty params e ∗
     ▷ wpr E e' (fun _ => False%I) (λ v, WP (fill_ectxs (Evalue v) k, ks) @ E {{ Φ }})
     ⊢ WP (fill_ectxs (Ecall retty f (map Evalue vs)) k, ks) @ E {{ Φ }}.
   Proof.

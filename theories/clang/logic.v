@@ -24,12 +24,11 @@ Class clangG Σ := ClangG {
 Section wp.
   Context `{clangG Σ}.
 
-  Definition text_interp (f: ident) (x: function) :=
-    own clangG_textG_name (◯ {[ f := to_agree (x : discreteC function) ]}).
+  Definition tmapsto (f: ident) (x: function) :=
+    (□ own clangG_textG_name (◯ {[ f := to_agree (x : discreteC function) ]}))%I.
 
-  Lemma text_interp_dup f x:
-    text_interp f x ⊢ text_interp f x ∗ text_interp f x.
-  Admitted.
+  Global Instance tmapsto_persistent f x: PersistentP (tmapsto f x).
+  Proof. apply _. Qed.
   
   Definition to_gen_text (t: text) :=
     fmap (λ v, to_agree (v : leibnizC function)) t.
@@ -66,6 +65,7 @@ Notation "l ↦ v @ t" :=
 Notation "l ↦{ q } - @ t" := (∃ v, l ↦{q} v @ t)%I
   (at level 20, q at level 50, format "l  ↦{ q }  -  @  t") : uPred_scope.
 Notation "l ↦ - @ t" := (l ↦{1} - @ t)%I (at level 20) : uPred_scope.
+Notation "f T↦ F" := (tmapsto f F) (at level 20): uPred_scope.
 
 Section rules.
   Context `{clangG Σ}.
@@ -583,25 +583,25 @@ Ltac atomic_step H :=
   Qed.
 
   Lemma lookup_text f x Γ:
-    text_interp f x ∗ own_text Γ
+    f T↦ x ∗ own_text Γ
     ⊢ ⌜ Γ !! f = Some x⌝.
   Proof.
-    iIntros "[Hf HΓ]".
-    rewrite /own_text /text_interp.
+    iIntros "[#Hf HΓ]".
+    rewrite /own_text.
     by iDestruct (own_valid_2 with "HΓ Hf")
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
  
   Lemma wp_fork E t f vs params e e' Φ ks:
     let_params vs params e = Some e' →
-    text_interp f (Function t params e) ∗ ▷ Φ Vvoid ∗ ▷ (WP (e', []) {{ _, True }})
+    f T↦ Function t params e ∗ ▷ Φ Vvoid ∗ ▷ (WP (e', []) {{ _, True }})
     ⊢ WP (Efork t f (map Evalue vs), ks) @ E {{ Φ }}.
   Proof.
-    iIntros (?) "(Hf & HΦ & He)".
+    iIntros (?) "(#Hf & HΦ & He)".
     iApply wp_lift_step=>//.
     iIntros (σ1) "[Hσ1 HΓ]".
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
-    iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
+    iDestruct (lookup_text with "[HΓ]") as "%"; first iFrame=>//.
     simpl in *. iModIntro. iSplit.
     { iPureIntro. eexists (Evalue Vvoid), ks, σ1, [e']. simpl.
       destruct σ1. simpl in *. apply CSestep. by econstructor. }
@@ -620,16 +620,16 @@ Ltac atomic_step H :=
   
   Lemma wp_call {E ks} k vs params e e' f retty Φ:
     let_params vs params e = Some e' →
-    text_interp f (Function retty params e) ∗
+    f T↦ Function retty params e ∗
     ▷ WP (e', k::ks) @ E {{ Φ }}
     ⊢ WP (fill_ectxs (Ecall retty f (map Evalue vs)) k, ks) @ E {{ Φ }}.
   Proof.
-    iIntros (Hls) "[Hf HΦ]".
+    iIntros (Hls) "[#Hf HΦ]".
     iApply wp_lift_step=>//.
     { apply fill_ectxs_not_val. done. }
     iIntros (σ1) "[Hσ1 HΓ]".
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
-    iDestruct (lookup_text with "[HΓ Hf]") as "%"; first iFrame=>//.
+    iDestruct (lookup_text with "[HΓ]") as "%"; first iFrame=>//.
     simpl in *. iModIntro. iSplit.
     { iPureIntro. eexists _, _, _, []. destruct σ1. simpl in *.
       apply CSjstep. eapply JScall=>//. }
@@ -649,3 +649,5 @@ Ltac atomic_step H :=
   Qed.
 
 End rules.
+
+Global Opaque tmapsto.

@@ -249,14 +249,14 @@ Section proof.
       by rewrite -app_assoc.
   Qed.
 
-  Lemma rev_spec (f: ident) k ks Φ xs:
+  Lemma rev_spec k ks Φ xs:
     ∀ lx ly ys,
-      text_interp f (Function Tvoid ps rev_list) ∗
+      "rev" T↦ Function Tvoid ps rev_list ∗
       isList lx xs Tint32 ∗ isList ly ys Tint32 ∗
       (∀ ly', isList ly' (rev xs ++ ys) Tint32 -∗ WP (fill_ectxs ly' k, ks) {{ Φ }})
-      ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lx ; Evalue ly]) k, ks) {{ Φ }}.
+      ⊢ WP (fill_ectxs (Ecall Tvoid "rev" [Evalue lx ; Evalue ly]) k, ks) {{ Φ }}.
    Proof.
-    iIntros (???) "(Hf & Hlx & Hly & HΦ)".
+    iIntros (???). iIntros "(Hf & Hlx & Hly & HΦ)".
     iApply (wp_call _ [lx; ly]); last iFrame; first by simpl.
     iNext.
     iDestruct (isList_ptr with "Hly") as "%".
@@ -264,7 +264,7 @@ Section proof.
     wp_alloc px as "Hpx". wp_let.
     wp_alloc py as "Hpy". wp_let.
     wp_alloc pt as "Hpt". wp_let. iApply wp_seq=>//.
-    iApply (rev_spec' f (k::ks)). iFrame.
+    iApply (rev_spec' "rev" (k::ks)). iFrame.
     iSplitR "Hpt"; last by iExists _.
     iIntros (?) "[? ?]".
     wp_skip. wp_load. wp_ret. by iApply "HΦ".
