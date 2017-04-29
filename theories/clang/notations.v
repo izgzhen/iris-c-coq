@@ -5,7 +5,7 @@ Coercion Vint8 : int8 >-> val.
 Coercion Vint32 : int32 >-> val.
 Coercion Vptr : addr >-> val.
 Coercion Evalue : val >-> expr.
-Coercion Evar : ident >-> expr.
+Coercion Evar : string >-> expr.
 
 Notation "'void'" := Vvoid.
 Notation "'null'" := Vnull.

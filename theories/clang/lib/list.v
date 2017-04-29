@@ -46,25 +46,20 @@ Section proof.
       by destruct_ands.
   Qed.
 
-  Definition x: ident := 1.
-  Definition y: ident := 2.
-  Definition t: ident := 3.
-  Definition t': ident := 4.
-
   Notation "'Tlist'" := (Tptr (tcell Tint32)).
 
   Definition rev_list : expr :=
-    let: t ::: Tptr Tlist in
-    while: ( x != null ) (
-      t <- snd (!?x) ;;
-      snd (!?x) <- y ;;
-      y <- x ;;
-      x <- t
+    let: "t" ::: Tptr Tlist in
+    while: ( "x" != null ) (
+      "t" <- snd (!?"x") ;;
+      snd (!?"x") <- "y" ;;
+      "y" <- "x" ;;
+      "x" <- "t"
     ) ;;
-    return: y.
+    return: "y".
 
   Definition ps :=
-    [ (x, Tlist); (y, Tptr Tvoid) ].
+    [ ("x", Tlist); ("y", Tptr Tvoid) ].
 
   Definition traverse_list (lx: val) : expr :=
     while: (!lx@Tlist != null) ( lx <- snd (!(!lx@Tlist)@(tcell Tint32)) ).
@@ -163,14 +158,14 @@ Section proof.
   Qed.
 
   Definition enq_list (lx: val) (v: val) : expr :=
-    let: t ::: Tlist := Ealloc Tlist (!lx@Tlist) in
-    if: (t != null) then: (
-      let: t' ::: Tlist := Ealloc Tlist (snd (!?t)) in
-      while: (t' != null) (
-        t <- t';;
-        t' <- snd (!?t')
+    let: "t" ::: Tlist := Ealloc Tlist (!lx@Tlist) in
+    if: ("t" != null) then: (
+      let: "t'" ::: Tlist := Ealloc Tlist (snd (!?"t")) in
+      while: ("t'" != null) (
+        "t" <- "t'";;
+        "t'" <- snd (!?"t'")
       ) ;;
-      snd !?t <- Ealloc (tcell Tint32) (Vpair v null)
+      snd !?"t" <- Ealloc (tcell Tint32) (Vpair v null)
     ) else: (
       lx <- Ealloc (tcell Tint32) (Vpair v null)
     ).

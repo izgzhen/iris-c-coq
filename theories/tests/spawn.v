@@ -7,21 +7,18 @@ Section test.
 
   Variable lx : addr.
   Variable l : val.
-  Definition f_acquire : ident := 3.
-  Definition f_release : ident := 4.
-  Definition f_add : ident := 5.
 
   Definition R: iProp Σ := (∃ vx: int32, lx ↦ vx @ Tint32)%I.
   
   Definition add: expr :=
-    Ecall Tvoid f_acquire [Evalue l] ;;
+    Ecall Tvoid "acquire" [Evalue l] ;;
     lx <- !lx@Tint32 + 1;;
-    Ecall Tvoid f_release [Evalue l].
+    Ecall Tvoid "release" [Evalue l].
 
   Lemma add_safe ks:
     is_lock N γ l R ∗
-    text_interp f_release (Function Tvoid [(x, tylock)] release) ∗
-    text_interp f_acquire (Function Tvoid [(x, tylock)] acquire)
+    text_interp "release" (Function Tvoid [("x", tylock)] release) ∗
+    text_interp "acquire" (Function Tvoid [("x", tylock)] acquire)
     ⊢ WP (add, ks) {{ _, True }}.
   Proof.
     iIntros "(#Hlk & H1 & H2)". unfold add.
@@ -39,14 +36,14 @@ Section test.
      by encoding some receipt tokens *)
 
   Definition spawn: expr :=
-    Efork Tvoid f_add [] ;;
-    Efork Tvoid f_add [].
+    Efork Tvoid "add" [] ;;
+    Efork Tvoid "add" [].
 
   Lemma spawn_spec ks:
     is_lock N γ l R ∗
-    text_interp f_release (Function Tvoid [(x, tylock)] release) ∗
-    text_interp f_acquire (Function Tvoid [(x, tylock)] acquire) ∗
-    text_interp f_add (Function Tvoid [] add)
+    text_interp "release" (Function Tvoid [("x", tylock)] release) ∗
+    text_interp "acquire" (Function Tvoid [("x", tylock)] acquire) ∗
+    text_interp "add" (Function Tvoid [] add)
     ⊢ WP (spawn, ks) {{ _, True }}.
   Proof.
     iIntros "(#Hlk & Hf1 & Hf2 & Hf3)".

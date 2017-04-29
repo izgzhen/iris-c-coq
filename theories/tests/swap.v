@@ -3,19 +3,15 @@ From iris_c.clang Require Import logic notations tactics.
 Section example.
   Context `{clangG Σ}.
 
-  Definition x: ident := 1.
-  Definition a1: ident := 2.
-  Definition a2: ident := 3.
-
   Definition swap (t: type) : expr :=
-    let: x ::: t in
-    x <- a1 ;;
-    a1 <- a2 ;;
-    a2 <- x.
+    let: "x" ::: t in
+    "x" <- "a1" ;;
+    "a1" <- "a2" ;;
+    "a2" <- "x".
 
   (* Instantiate the variables *)
   Definition swap' t  (l1 l2: addr) :=
-    instantiate_let a1 l1 t (swap t) ≫= instantiate_let a2 l2 t.
+    instantiate_let "a1" l1 t (swap t) ≫= instantiate_let "a2" l2 t.
   
   Lemma swap_spec' t swap_e l1 l2 v1 v2 ks:
     swap' t l1 l2 = Some swap_e →

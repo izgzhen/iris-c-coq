@@ -24,7 +24,7 @@ Definition tid := nat.
 
 Inductive expr :=
 | Evalue (v: val)
-| Evar (x: ident)
+| Evar (x: string)
 | Elet (t: type) (x: ident) (ex ebody: expr)
 | ECAS (t: type) (e1 e2 e3: expr)
 | Ebinop (op: bop) (e1: expr) (e2: expr)

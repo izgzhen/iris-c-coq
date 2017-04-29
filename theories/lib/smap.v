@@ -1,6 +1,7 @@
 (* Simple map structure *)
 
 Require Import iris_c.lib.prelude.
+Require Import iris.prelude.base.
 
 Definition smap (A: Type) := list (ident * A).
 
@@ -8,7 +9,7 @@ Definition semp {A: Type} : smap A := nil.
 
 Fixpoint sget {A} k (m: smap A) : option A :=
   match m with
-    | cons (k', v') m' => if (Zbool.Zeq_bool k' k) then Some v' else sget k m'
+    | cons (k', v') m' => if decide (k'= k) then Some v' else sget k m'
     | _ => None
   end.
 

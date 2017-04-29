@@ -1,11 +1,11 @@
 (* Re-export of Iris and some general stuff *)
 
 From iris_c.lib Require Export CpdtTactics Integers.
-From iris.prelude Require Import prelude countable.
+From iris.prelude Require Export prelude countable strings.
 From mathcomp Require Import ssreflect.
 Open Scope Z_scope.
 
-Definition ident : Set := Z.
+Definition ident : Set := string.
 
 Lemma drop_app {A} (xs ys: list A):
   drop (length xs) (xs ++ ys) = ys.

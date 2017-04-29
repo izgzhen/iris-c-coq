@@ -11,17 +11,15 @@ Definition lockΣ : gFunctors := #[GFunctor (exclR unitC)].
 
 Section spin_lock.
 
-  Definition x : ident := 1.
-  
   Definition acquire : expr :=
-    while: (ECAS tybool x vfalse vtrue == vfalse ) ( void ) ;;
+    while: (ECAS tybool "x" vfalse vtrue == vfalse ) ( void ) ;;
     return: void.
 
   Definition newlock : expr :=
     return: Ealloc tybool vfalse.
 
   Definition release : expr :=
-    !?x <- vfalse ;;
+    !?"x" <- vfalse ;;
     return: void.
 
   Context `{!clangG Σ, !lockG Σ} (N: namespace).
@@ -73,7 +71,7 @@ Section spin_lock.
   Qed.
 
   Lemma acquire_spec k lk {γ R Φ ks f}:
-    text_interp f (Function Tvoid [(x, tylock)] acquire) ∗
+    text_interp f (Function Tvoid [("x", tylock)] acquire) ∗
     is_lock γ lk R ∗ (locked γ -∗ R -∗ WP (fill_ectxs void k, ks) {{ Φ }})
     ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lk]) k, ks) {{ Φ }}.
   Proof.
@@ -102,7 +100,7 @@ Section spin_lock.
   Qed.
 
   Lemma release_spec k lk {γ R f Φ ks}:
-    text_interp f (Function Tvoid [(x, tylock)] release) ∗
+    text_interp f (Function Tvoid [("x", tylock)] release) ∗
     is_lock γ lk R ∗ locked γ ∗ R ∗ WP (fill_ectxs void k, ks) {{ Φ }}
     ⊢ WP (fill_ectxs (Ecall Tvoid f [Evalue lk]) k, ks) {{ Φ }}.
   Proof.
