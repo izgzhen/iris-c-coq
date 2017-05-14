@@ -32,6 +32,7 @@ theories/tests/ret.v
 theories/tests/task.v
 theories/tests/spawn.v
 theories/tests/higher_order.v
+theories/tests/rec.v
 theories/program_logic/language.v
 theories/program_logic/weakestpre.v
 theories/program_logic/adequacy.v

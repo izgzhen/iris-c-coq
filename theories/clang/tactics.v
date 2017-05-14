@@ -50,6 +50,7 @@ Ltac reshape_expr e tac :=
   | Eif ?e ?e1 ?e2 => go (EKif e1 e2 :: K) e
   | Ealloc ?t ?e => go (EKalloc t :: K) e
   | Eseq ?e1 ?e2 => go (EKseq e2 :: K) e1
+  | Ecall ?t ?f [?e1] => go (EKcall t f [] []) e1
   end in go (@nil exprctx) e.
 
 Tactic Notation "wp_unfill" open_constr(efoc) :=
