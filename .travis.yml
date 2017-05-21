@@ -16,6 +16,6 @@ addons:
       - aspcud
 env:
   global:
-    - COQ_VERSION=8.5.3
+    - COQ_VERSION=8.6
     - SSREFLECT_VERSION=1.6.1
     - IRIS_VERSION=3.0.0

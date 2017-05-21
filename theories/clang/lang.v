@@ -1020,7 +1020,7 @@ Proof.
     end; exists e2'; split; [| split ]; auto.
   - inversion_jstep_as Heq;
     eapply cont_incl in Heq=>//;
-    destruct Heq as (?&?); subst; auto.
+    try destruct Heq as (?&?); subst; auto.
     + by rewrite is_jmp_ret in Hnj.
     + by rewrite is_jmp_call in Hnj.
 Qed.
@@ -1078,7 +1078,7 @@ Proof.
   inversion 2; subst.
   - inversion_estep; subst=>//; try by (simpl in *; solve_is_jmp_false).
     + by eapply instantiate_let_preserves_not_jmp.
-    + by eapply estep_preserves_not_jmp.
+    + eapply estep_preserves_not_jmp; first apply H; done.
   - exfalso. move:(cstep_not_val H0)=>Hn.
     by eapply (is_jmp_jstep_false []).
 Qed.

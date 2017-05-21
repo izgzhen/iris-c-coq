@@ -146,4 +146,4 @@ Fixpoint encode_val (v: val) : list byteval :=
 
 Lemma size_of_encode_val v:
   length (encode_val v) = sizeof v.
-Proof. simpl. induction v=>//. rewrite app_length. simpl. omega. Qed.
+Proof. simpl. induction v=>//. simpl. rewrite app_length. omega. Qed.

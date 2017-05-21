@@ -105,9 +105,10 @@ Lemma tac_wp_assign Δ Δ' Δ'' E i l (v v': val) (t t': type) Φ ks:
   (Δ'' ⊢ Φ Vvoid) →
   Δ ⊢ WP (Eassign (Evalue (Vptr l)) (Evalue v'), ks) @ E {{ Φ }}.
 Proof.
-  intros. eapply wand_apply.
-  { iIntros "HP HQ". iApply wp_assign; [done|done|].
-    iSplitL "HP"; eauto. }
+  intros. eapply wand_apply with (P:=(▷ l ↦ v @ t)%I)
+                                 (Q:=(▷ (l ↦ v' @ t -∗ Φ Vvoid))%I).
+  { iIntros "HP HQ". iApply (@wp_assign _ _ _ _ v); [done|done|].
+    iSplitL "HP"=>//. }
   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
   rewrite right_id. apply later_mono, sep_mono_r, wand_mono=>//.
 Qed.
@@ -118,8 +119,9 @@ Lemma tac_wp_load Δ Δ' E i l q v t Φ ks:
   (Δ' ⊢ Φ v) →
   Δ ⊢ WP (Ederef_typed t (Evalue (Vptr l)), ks) @ E {{ Φ }}.
 Proof.
-  intros. eapply wand_apply.
-  { iIntros "HP HQ". iApply wp_load. iSplitL "HP"; eauto. }
+  intros. eapply wand_apply with (P:=(▷ l ↦{q} v @ t)%I)
+                                 (Q:=(▷ (l ↦{q} v @ t -∗ Φ v))%I).
+  { iIntros "HP HQ". iApply (wp_load _ _ _ v _ q). iSplitL "HP"; eauto. }
   rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
   by apply later_mono, sep_mono_r, wand_mono.
 Qed.
