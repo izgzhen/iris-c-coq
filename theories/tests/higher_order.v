@@ -6,7 +6,7 @@ Section example.
   Definition abs_spec g E (P Q: iProp Σ) :=
     (∃ gbody, g T↦ Function Tvoid [] gbody ∗
                 (∀ Φ k ks, P -∗ (Q -∗ WP (fill_ectxs void k, ks) {{ Φ }}) -∗
-                           WP (gbody, k::ks) @ E {{ Φ }}))%I.
+                           WP (gbody, Kcall k::ks) @ E {{ Φ }}))%I.
 
   Lemma higher_order_spec k ks E g Φ P Q:
     abs_spec g E P Q ∗ P ∗ (Q -∗ WP (fill_ectxs void k, ks) {{ Φ }})

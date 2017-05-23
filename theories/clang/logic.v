@@ -103,7 +103,7 @@ Section rules.
     destruct e2 as [e2 l2].
     edestruct (fill_step_inv e σ1 e2 σ2 s l2 kes) as (e2'&->&?&?); auto; subst=>//.
     iMod ("H" $! (e2', l2) _ _ with "[%]") as "($ & H & Hefs)"; eauto.
-    iFrame "Hefs". iApply "IH". iModIntro. iSplit=>//.
+    iFrame "Hefs". iApply "IH". try iModIntro. iSplit=>//.
     iPureIntro. eapply cstep_preserves_not_jmp=>//.
   Qed.
 
@@ -140,10 +140,10 @@ Section rules.
     destruct (Hs _ _ _ _ _ _ Hsp) as [? ?]. subst. iFrame.
     simpl in *. destruct e2. by iApply "H".
   Qed.
-
+  
   Lemma wp_ret k k' ks v E Φ:
     WP (fill_ectxs (Evalue v) k', ks) @ E {{ Φ }}
-    ⊢ WP (fill_ectxs (Erete (Evalue v)) k, k'::ks) @ E {{ Φ }}.
+    ⊢ WP (fill_ectxs (Erete (Evalue v)) k, Kcall k'::ks) @ E {{ Φ }}.
   Proof.
     iIntros "HΦ".
     iApply wp_lift_step; eauto; first by apply fill_ectxs_not_val.
@@ -151,7 +151,7 @@ Section rules.
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit.
     { iPureIntro. destruct σ. simpl. eexists _, _, (State s_heap s_text), _.
-      apply CSjstep. simpl in *. subst. constructor.
+      apply CSjstep. simpl in *. subst. apply JSrete with (KS:=[])=>//.
       apply cont_uninj. auto. }
     iNext. iIntros (e2 σ2 efs Hcs).
     inversion_cstep_as Hes Hjs; subst.
@@ -159,9 +159,9 @@ Section rules.
     destruct e2. simpl in *. inversion_jstep_as Heq; subst.
     - apply cont_inj in Heq=>//; auto;
       destruct Heq as [Heq ?]; inversion Heq; subst.
-      iFrame. by rewrite big_sepL_nil.
+      iFrame. admit. (* by rewrite big_sepL_nil. *)
     - fill_enf_neq.
-  Qed.
+  Admitted.
 
   Lemma eseq_pure v s h e2 h' G efs:
     estep G (Eseq (Evalue v) s) h e2 h' efs → h = h' ∧ efs = [].
@@ -183,7 +183,7 @@ Section rules.
         simplify_eq. exfalso.
         rewrite_empty_ctx. simpl in *. escape_false.
       + simplify_eq. inversion Hjs; subst.
-        * unfold unfill in H2. rewrite H0 in H2.
+        * unfold unfill in H1. rewrite H0 in H1.
           by simpl in *.
         * fill_enf_neq.
     - iNext. iIntros (??????).
@@ -192,7 +192,7 @@ Section rules.
         { iFrame. by rewrite big_sepL_nil. }
         { escape_false. }
       + simplify_eq. inversion Hjs; subst.
-        * by rewrite /unfill H1 /= in H3.
+        * by rewrite /unfill H1 /= in H2.
         * fill_enf_neq.
   Qed.
 
@@ -425,33 +425,23 @@ Ltac atomic_step H :=
     simplify_eq. subst. iApply wp_value=>//.
   Qed.
 
-  Lemma wp_while_true cond s Φ ks:
-    ▷ WP (Eseq s (Ewhile cond cond s), ks) {{ Φ }}
-    ⊢ WP (Ewhile cond (Evalue vtrue) s, ks) {{ Φ }}.
-  Proof. iIntros "Hnext". by wp_solve_pure. Qed.
-
-  Lemma wp_while_false cond s ks Φ:
-    ▷ Φ Vvoid
-    ⊢ WP (Ewhile cond (Evalue vfalse) s, ks) {{ Φ }}.
-  Proof. iIntros "HΦ". wp_solve_pure. iApply wp_value=>//. Qed.
-
-  Lemma wp_while_inv I Q cond s ks:
-    is_jmp s = false → is_jmp cond = false →
-    □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP (cond, ks) {{ Φ }})) ∗
-    □ (∀ Φ, (I ∗ (I -∗ Φ Vvoid)) -∗ WP (s, ks) {{ Φ }}) ∗ I
-    ⊢ WP (Ewhile cond cond s, ks) {{ Q }}.
-  Proof.
-    iIntros (??) "(#Hcond & #Hs & HI)".
-    iLöb as "IH".
-    iApply (wp_bind [EKwhile cond s])=>//.
-    iApply "Hcond". iFrame.
-    iIntros (v) "[[% HQ]|[% HI]]"; subst.
-    - iApply wp_while_false. by iNext.
-    - iApply wp_while_true. iNext.
-      iApply wp_seq=>//. iApply "Hs". iFrame.
-      iIntros "HI". iApply wp_skip.
-      iApply "IH". by iNext.
-  Qed.
+  (* Lemma wp_while_inv I Q cond s ks: *)
+  (*   is_jmp s = false → is_jmp cond = false → *)
+  (*   □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP (cond, ks) {{ Φ }})) ∗ *)
+  (*   □ (∀ Φ, (I ∗ (I -∗ Φ Vvoid)) -∗ WP (s, ks) {{ Φ }}) ∗ I *)
+  (*   ⊢ WP (Ewhile cond cond s, ks) {{ Q }}. *)
+  (* Proof. *)
+  (*   iIntros (??) "(#Hcond & #Hs & HI)". *)
+  (*   iLöb as "IH". *)
+  (*   iApply (wp_bind [EKwhile cond s])=>//. *)
+  (*   iApply "Hcond". iFrame. *)
+  (*   iIntros (v) "[[% HQ]|[% HI]]"; subst. *)
+  (*   - iApply wp_while_false. by iNext. *)
+  (*   - iApply wp_while_true. iNext. *)
+  (*     iApply wp_seq=>//. iApply "Hs". iFrame. *)
+  (*     iIntros "HI". iApply wp_skip. *)
+  (*     iApply "IH". by iNext. *)
+  (* Qed. *)
 
   Lemma wp_fst v1 v2 Φ ks:
     ▷ Φ v1
@@ -617,11 +607,26 @@ Ltac atomic_step H :=
       + exfalso. escape_false.
     - absurd_jstep Hjs.
   Qed.
+
+  Lemma wp_while {ks E} c e k Φ :
+    ▷ WP (Eif c (Eseq e Econtinue) Ebreak, Kwhile c e k::ks) @ E {{ Φ }}
+    ⊢ WP (fill_ectxs (Ewhile c e) k, ks) @ E {{ Φ }}.
+  Admitted.
+
+  Lemma wp_break {ks E} k k' c e Φ:
+    WP (fill_ectxs (Evalue Vvoid) k', ks) @ E {{ Φ }}
+    ⊢ WP (fill_ectxs Ebreak k, Kwhile c e k'::ks) @ E {{ Φ }}.
+  Admitted.
   
+  Lemma wp_continue {E ks} c e k k' Φ:
+    WP (fill_ectxs (Ewhile c e) k', ks) @ E {{ Φ }}
+    ⊢ WP (fill_ectxs Econtinue k, Kwhile c e k'::ks) @ E {{ Φ }}.
+  Admitted.
+
   Lemma wp_call {E ks} k vs params e e' f retty Φ:
     let_params vs params e = Some e' →
     f T↦ Function retty params e ∗
-    ▷ WP (e', k::ks) @ E {{ Φ }}
+    ▷ WP (e', Kcall k::ks) @ E {{ Φ }}
     ⊢ WP (fill_ectxs (Ecall retty f (map Evalue vs)) k, ks) @ E {{ Φ }}.
   Proof.
     iIntros (Hls) "[#Hf HΦ]".

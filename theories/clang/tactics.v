@@ -37,8 +37,6 @@ Ltac reshape_expr e tac :=
     go (EKassignr e2 :: K) e1
   | Erete ?e =>
     go (EKrete :: K) e
-  | Ewhile ?c ?e ?s =>
-    go (EKwhile c s :: K) e
   | ECAS ?t (Evalue (Vptr ?l)) (Evalue ?v1) ?e2 =>
     go (EKCASr t l v1 :: K) e2
   | ECAS ?t (Evalue (Vptr ?l)) ?e1 ?e2 =>
@@ -244,8 +242,6 @@ Ltac wp_step :=
   match goal with
    | |- _ ⊢ wp _ (Eassign _ _, _) _ => wp_assign
    | |- _ ⊢ wp _ (Eseq _ _, _) _ => wp_skip
-   | |- _ ⊢ wp _ (Ewhile _ (Evalue vfalse) _, _) _ => iApply wp_while_false
-   | |- _ ⊢ wp _ (Ewhile _ (Evalue vtrue) _, _) _ => iApply wp_while_true
    | |- _ ⊢ wp _ (Eif (Evalue vfalse) _ _, _) _ => iApply wp_if_false
    | |- _ ⊢ wp _ (Eif (Evalue vtrue) _ _, _) _ => iApply wp_if_true
    | |- _ ⊢ wp _ (Erete _, _) _ => wp_ret

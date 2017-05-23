@@ -197,7 +197,7 @@ Section wp_ret.
     - iDestruct "H'" as (??) "[% [H' | [H' | H']]]".
       + iRight. destruct_ands. iSplit=>//.
         iIntros (σ1) "Hσ1".
-        cont_uninj'. iDestruct ("H'" $! (k::ks)) as "[% H']".
+        cont_uninj'. iDestruct ("H'" $! (Kcall k::ks)) as "[% H']".
         rewrite wp_unfold /wp_pre.
         iDestruct "H'" as "[H'|H']".
         * iDestruct "H'" as (?) "[% _]".
@@ -215,8 +215,8 @@ Section wp_ret.
           not_jmp_preserves Hes.
           apply fill_estep_inv in Hes=>//.
           destruct Hes as [? [? ?]]. destruct e2. simpl in *. subst.
-          iSpecialize ("H'" $! (x, k::ks) σ2 efs). simpl.
-          iAssert (⌜cstep H1 (k::ks) σ1 x (k::ks) σ2 efs⌝)%I as "Hs".
+          iSpecialize ("H'" $! (x, Kcall k::ks) σ2 efs). simpl.
+          iAssert (⌜cstep H1 (Kcall k::ks) σ1 x (Kcall k::ks) σ2 efs⌝)%I as "Hs".
           { iPureIntro. destruct σ1. destruct σ2.
             simpl in *. subst. constructor. done. }
           iMod ("H'" with "Hs") as "[? [? ?]]". iModIntro.
@@ -235,8 +235,8 @@ Section wp_ret.
          iSplit.
          { iPureIntro. destruct σ1. simpl in *.
            eexists _, ks, (State s_heap s_text), _. simpl.
-           apply CSjstep. subst. apply JSrete.
-           by apply cont_uninj. }
+           apply CSjstep. subst. apply JSrete with (KS := []).
+           by apply cont_uninj. done. }
          iNext; iIntros (e2 σ2 efs Hs).
          simpl in *. inversion_cstep_as Hes Hjs; subst.
          { by apply fill_estep_false in Hes. }
@@ -246,7 +246,8 @@ Section wp_ret.
            iDestruct "Hσ1" as "(H1&H3)".
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
-           { simpl. destruct e2. simpl in *. simplify_eq. by iApply "H'". }
+           { simpl. destruct e2. simpl in *. simplify_eq. admit.
+           (* by iApply "H'". *) }
            by rewrite big_sepL_nil.
          * apply cont_inj in Heq=>//; auto. by destruct_ands.
       + destruct_ands.
@@ -259,7 +260,7 @@ Section wp_ret.
         iDestruct (lookup_text_s with "[H1 Hσ1]") as "%"; first iFrame.
         iSplit.
         { iPureIntro. destruct σ1. simpl in *. subst.
-          eexists _, (_::k::ks), (State s_heap s_text), [].
+          eexists _, (_::Kcall k::ks), (State s_heap s_text), [].
           constructor. eapply JScall=>//. }
         iNext; iIntros (e2 σ2 efs Hcs). simpl in *.
         inversion_cstep_as Hes Hjs.
@@ -274,12 +275,12 @@ Section wp_ret.
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL; last by rewrite big_sepL_nil.
            destruct e2. simpl in *. simplify_eq.
-           iApply ("IH" $! _ _ (k::ks) with "[-]")=>//.
+           iApply ("IH" $! _ _ (Kcall k::ks) with "[-]")=>//.
            iApply wpr_step_mono. iFrame.
            iClear "H1". iAlways.
            iIntros (?) "H1".
            iApply ("IH" with "[-]")=>//.
-  Qed.
+  Admitted.
 
   Lemma wpr_head E eh Φ Φret:
     is_jmp eh = false → enf eh → (∀ ks, WP (eh, ks) @ E {{ Φ }}) ⊢ wpr E eh Φ Φret.

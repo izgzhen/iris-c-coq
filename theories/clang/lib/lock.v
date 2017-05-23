@@ -78,8 +78,11 @@ Section spin_lock.
     iIntros "(Hf & #Hlk & HΦ)".
     iApply (wp_call k [lk]); last iFrame; first done.
     iNext. iDestruct (is_lock_tylock with "Hlk") as "%".
-    wp_alloc lkx as "Hlkx". wp_let. iApply wp_seq=>//.
-    iLöb as "IH". iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
+    wp_alloc lkx as "Hlkx". wp_let.
+    iLöb as "IH".
+    wp_unfill (Ewhile _ _).
+    iApply wp_while. iNext.
+    iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
     wp_load.
     wp_bind (ECAS _ _ _ _).
     wp_atomic.
@@ -89,13 +92,16 @@ Section spin_lock.
       iMod ("Hclose" with "[-Hlkx HΦ]").
       { iNext. iExists true. iFrame. }
       iModIntro. do 4 wp_step.
+      iApply (@wp_continue _ _ _ _ _ _ []). simpl.
       iApply ("IH" with "HΦ Hlkx").
     - wp_cas_suc.
       iIntros "Hl'".
       iMod ("Hclose" with "[-HΦ Hlkx HR]").
       { iNext. iExists true. iFrame. }
       iModIntro. wp_run.
-      iDestruct "HR" as "[Ho HR]". iFrame.
+      iApply (@wp_break _ _ _ _ []).
+      iDestruct "HR" as "[Ho HR]". simpl.
+      wp_run.
       iApply ("HΦ" with "[-HR]")=>//.
   Qed.
 

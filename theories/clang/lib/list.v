@@ -71,11 +71,18 @@ Section proof.
     induction xs as [|x xs' IHxs'].
     - iIntros (l) "[? [% HΦ]]".
       rewrite /traverse_list. subst.
-      repeat wp_step. by iApply "HΦ".
+      iApply (@wp_while _ _ [] _ _ _ []).
+      repeat wp_step.
+      iApply (@wp_break _ _ [] _ []).
+      simpl. iApply wp_value=>//.
+      by iApply "HΦ".
     - iIntros (l) "[Hlx [Hl HΦ]]".
       simpl. iDestruct "Hl" as (p l') "[% [Hp Hl']]".
       destruct_ands.
-      rewrite /traverse_list. do 9 wp_step.
+      rewrite /traverse_list.
+      iApply (@wp_while _ _ [] _ _ _ []).
+      do 10 wp_step.
+      iApply (@wp_continue _ _ _ [] _ _ []).
       iApply IHxs'. iFrame. iIntros "?".
       iApply "HΦ". iExists _, _. by iFrame.
   Qed.
@@ -135,22 +142,26 @@ Section proof.
       iExists _, _. iFrame. iSplit=>//.
   Qed.
 
-  Lemma enq_spec' lx (p: addr) Φ x xs: ∀ xs2 xs1 pt pt' (p': addr) l',
+  Lemma enq_spec' lx (p: addr) Φ x xs k: ∀ xs2 xs1 pt pt' (p': addr) l',
     typeof l' Tlist → typeof p Tlist →
     lx ↦ p @ Tlist ∗ pt ↦ p' @ Tlist ∗ pt' ↦ l' @ Tlist ∗
     isListSeg p p' l' x xs1 Tint32 ∗ isList l' xs2 Tint32 ∗ ⌜ xs = xs1 ++ xs2 ⌝ ∗
     (∀ p': addr, lx ↦ p @ Tlist -∗ pt ↦ p' @ Tlist -∗ isListSeg p p' null x xs Tint32 -∗
-                 pt' ↦ null @ Tlist -∗ Φ void)
-    ⊢ WP (while: (! pt' @ Tlist != null) (
+                 pt' ↦ null @ Tlist -∗ WP (fill_ectxs void k, []) {{ Φ }})
+    ⊢ WP (fill_ectxs (while: (! pt' @ Tlist != null) (
             pt <- ! pt' @ Tlist ;; pt' <- snd ! ! pt' @ Tlist @ (tcell Tint32)
-          ), []) {{ Φ }}.
+          )) k, []) {{ Φ }}.
   Proof.
     induction xs2 as [|x' xs2' IHxs']; iIntros (???????) "(Hlx&Hpt&Hpt'&Hxs1&Hxs2&%&HΦ)".
     - iDestruct "Hxs2" as "%". subst.
+      iApply wp_while. iNext.
       repeat wp_step. rewrite (right_id_L _ (++)).
+      iApply (@wp_break _ _ _ _ []). simpl.
       by iSpecialize ("HΦ" $! p' with "Hlx Hpt Hxs1 Hpt'").
     - simpl. iDestruct "Hxs2" as (p'' l'') "[% [? ?]]". destruct_ands.
+      iApply wp_while. iNext.
       do 11 wp_step.
+      iApply (@wp_continue _ _ _ _ _ _ []).
       iApply (IHxs' (xs1 ++ [x'])); last iFrame; auto.
       iSplitL.
       { iApply lseg_snoc=>//. iFrame. }
@@ -185,11 +196,11 @@ Section proof.
     - simpl. iDestruct "Hl" as (p l') "[% [? ?]]".
       destruct_ands. wp_run.
       wp_alloc pt' as "Hpt'". wp_let.
-      iApply wp_seq=>//.
-      iApply (enq_spec' lx p _ x _ _ [] pt pt' p l'); last iFrame; auto.
+      wp_unfill (Ewhile _ _).
+      iApply (enq_spec' lx p _ x _ _ _ [] pt pt' p l'); last iFrame; auto.
       iSplitL "~".
       { simpl. iExists _. iSplit=>//. }
-      iSplit=>//. iIntros (?) "? ? ? ?". destruct a.
+      iSplit=>//. iIntros (?) "? ? ? ?". destruct a. simpl.
       wp_run. rewrite_byte. replace (Z.to_nat 4) with 4%nat; last done.
       iDestruct (lseg_unsnoc with "~2") as "[H|[% Hp]]".
       + iDestruct "H" as (???) "[Hl [Hp %]]". destruct_ands.
@@ -212,23 +223,25 @@ Section proof.
         iExists _, _. iFrame. iSplit=>//.
   Qed.
   
-  Lemma rev_spec' (f: ident) ks Φ px py pt xs:
+  Lemma rev_spec' (f: ident) k ks Φ px py pt xs:
     ∀ lx ly ys,
       isList lx xs Tint32 ∗
       isList ly ys Tint32 ∗
-      (∀ ly' : val, py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ Φ void) ∗
+      (∀ ly' : val, py ↦ ly' @ Tptr Tvoid ∗ isList ly' (rev xs ++ ys) Tint32 -∗ WP (fill_ectxs void k, ks) {{ Φ }}) ∗
       px ↦ lx @ Tlist ∗
       py ↦ ly @ Tptr Tvoid ∗
       pt ↦ - @ Tptr Tlist
-      ⊢ WP (while: (! px @ Tlist != null) (
+      ⊢ WP (fill_ectxs (while: (! px @ Tlist != null) (
              pt <- snd ! ! px @ Tlist @ (tcell Tint32) ;;
              ! px @ Tlist + (Byte.repr 4) <- ! py @ (Tptr Tvoid) ;;
              py <- ! px @ Tlist ;;
-             px <- ! pt @ (Tptr Tlist) ), ks) {{ v, Φ v }}.
+             px <- ! pt @ (Tptr Tlist) )) k, ks) {{ v, Φ v }}.
   Proof.
     induction xs as [|x xs' IHxs']; intros ??? ; subst.
     - iIntros "(Hlx & Hly & HΦ & Hpx & Hpy & Hpt)".
-      iDestruct "Hlx" as "%". subst. wp_run.
+      iDestruct "Hlx" as "%". subst.
+      iApply wp_while. iNext.
+      wp_run. iApply (@wp_break _ _ _ _ []). simpl.
       iApply ("HΦ" with "[-]")=>//. iFrame.
     - iIntros "(Hlx & Hly & HΦ & Hpx & Hpy & Hpt)".
       iDestruct "Hlx" as (p l') "(% & Hp & Hl')".
@@ -236,9 +249,11 @@ Section proof.
       iDestruct "Hpt" as (?) "Hpt".
       destruct p as [pb po].
       iDestruct (isList_ptr with "Hly") as "%".
+      iApply wp_while. iNext.
       wp_run. rewrite_byte. replace (Z.to_nat 4) with 4%nat; last done.
       iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
       do 5 wp_step.
+      iApply (@wp_continue _ _ _ _ _ _ []).
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)).
       iFrame. iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".
       { iSplitL "Hp1"; by simpl. }
@@ -263,8 +278,11 @@ Section proof.
     iDestruct (isList_ptr' with "Hlx") as "%".
     wp_alloc px as "Hpx". wp_let.
     wp_alloc py as "Hpy". wp_let.
-    wp_alloc pt as "Hpt". wp_let. iApply wp_seq=>//.
-    iApply (rev_spec' "rev" (k::ks)). iFrame.
+    wp_alloc pt as "Hpt". wp_let. wp_unfill (Ewhile _ _).
+    move: (rev_spec' "rev" (reverse [EKseq (return: ! py @ (Tptr Tvoid))])
+                     (Kcall k::ks) Φ px py pt xs lx ly ys) => Hspec.
+    iApply Hspec.
+    iFrame.
     iSplitR "Hpt"; last by iExists _.
     iIntros (?) "[? ?]".
     wp_skip. wp_load. wp_ret. by iApply "HΦ".
