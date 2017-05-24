@@ -517,13 +517,18 @@ Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
 
 Definition is_val e := is_some (to_val e).
 
-Lemma fill_ectxs_not_is_val Kes:
-  ∀ e, is_val (fill_ectxs e Kes) = true → is_val e = true.
-Admitted.
-
 Lemma to_val_is_val e:
   to_val e = None ↔ is_val e = false.
 Proof. induction e; crush. Qed.
+
+Lemma fill_ectxs_not_is_val Kes:
+  ∀ e, is_val (fill_ectxs e Kes) = true → is_val e = true.
+Proof.
+  intros. destruct (is_val e) eqn:Heqn=>//.
+  apply to_val_is_val in Heqn.
+  apply (fill_ectxs_not_val Kes) in Heqn.
+  apply to_val_is_val in Heqn. rewrite H in Heqn. done.
+Qed.
 
 Lemma forall_is_val vs:
   forallb is_val (map Evalue vs) = true.
@@ -706,10 +711,25 @@ Lemma weak_cont_inj e k e':
   enf e → enf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
 Admitted.
 
-Lemma cont_inj {e e' kes kes'}:
+Lemma fill_expr_inj e e' k k':
+  fill_expr e k = fill_expr e' k' -> e = e' ∧ k = k'.
+Admitted.
+
+Lemma cont_inj: ∀ kes kes' e e',
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
-Admitted. (* Should be provable from the weaker version *)
+Proof.
+  induction kes; induction kes'=>//.
+  - intros. replace (fill_ectxs e []) with e in H1=>//.
+    symmetry in H1. apply weak_cont_inj in H1=>//.
+    destruct_ands; done.
+  - intros. replace (fill_ectxs e' []) with e' in H1=>//.
+    apply weak_cont_inj in H1=>//.
+  - intros.
+    simpl in H1. apply fill_expr_inj in H1.
+    destruct_ands. apply IHkes in H1=>//.
+    destruct_ands. done.
+Qed.
 
 Lemma fill_not_enf e k:
   is_val e = false → enf (fill_expr e k) → False.
