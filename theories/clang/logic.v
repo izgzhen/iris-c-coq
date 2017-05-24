@@ -151,8 +151,7 @@ Section rules.
     iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
     iModIntro. iSplit.
     { iPureIntro. destruct σ. simpl. eexists _, _, (State s_heap s_text), _.
-      apply CSjstep. simpl in *. subst. apply JSrete with (KS:=[])=>//.
-      apply cont_uninj. auto. }
+      apply CSjstep. simpl in *. subst. apply JSrete with (KS:=[])=>//. }
     iNext. iIntros (e2 σ2 efs Hcs).
     inversion_cstep_as Hes Hjs; subst.
     { destruct e2. simpl in *. by apply fill_estep_false in Hes. }
@@ -182,18 +181,13 @@ Section rules.
       + f_equal. simplify_eq. inversion Hes=>//.
         simplify_eq. exfalso.
         rewrite_empty_ctx. simpl in *. escape_false.
-      + simplify_eq. inversion Hjs; subst.
-        * unfold unfill in H1. rewrite H0 in H1.
-          by simpl in *.
-        * fill_enf_neq.
+      + simplify_eq. absurd_jstep Hjs.
     - iNext. iIntros (??????).
       inversion_cstep_as Hes Hjs; subst.
       + inversion Hes; subst.
         { iFrame. by rewrite big_sepL_nil. }
         { escape_false. }
-      + simplify_eq. inversion Hjs; subst.
-        * by rewrite /unfill H1 /= in H2.
-        * fill_enf_neq.
+      + simplify_eq. absurd_jstep Hjs.
   Qed.
 
   Lemma wp_seq E e1 e2 l Φ:

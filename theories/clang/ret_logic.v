@@ -1,6 +1,22 @@
 From iris_c.clang Require Export logic.
 From iris_c.lib Require Import pair.
 
+Axiom cont_uninj':
+  ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
+
+Arguments cont_uninj' {_ _ _} _.
+
+Axiom cont_uninj:
+  ∀ kes e, enf e → unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
+
+Lemma unfill_app e eh K K':
+  unfill_expr e [] = Some (K, eh) →
+  unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
+Proof.
+  intros H. move: (cont_uninj' H) => [? ?].
+  subst. rewrite fill_app. by apply cont_uninj.
+Qed.
+
 Section wp_ret.
   Context `{clangG Σ}.
 
@@ -235,8 +251,7 @@ Section wp_ret.
          iSplit.
          { iPureIntro. destruct σ1. simpl in *.
            eexists _, ks, (State s_heap s_text), _. simpl.
-           apply CSjstep. subst. apply JSrete with (KS := []).
-           by apply cont_uninj. done. }
+           apply CSjstep. subst. apply JSrete with (KS := []). done. }
          iNext; iIntros (e2 σ2 efs Hs).
          simpl in *. inversion_cstep_as Hes Hjs; subst.
          { by apply fill_estep_false in Hes. }

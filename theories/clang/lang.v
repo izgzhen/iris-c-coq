@@ -379,10 +379,15 @@ Fixpoint is_jmp (e: expr) :=
   end.
 
 Inductive jnf: expr → Prop :=
-  | JNFcall: ∀ t f vs, jnf (Ecall t f (map Evalue vs))
-  | JNFrete: ∀ v, jnf (Erete (Evalue v)).
+| JNFcall: ∀ t f vs, jnf (Ecall t f (map Evalue vs))
+| JNFrete: ∀ v, jnf (Erete (Evalue v)).
 
-Global Hint Constructors jnf.
+Inductive wnf: expr → Prop :=
+| WNFwhile: ∀ c e, wnf (Ewhile c e)
+| WNFbreak: wnf Ebreak
+| WNFcontinue: wnf Econtinue.
+
+Global Hint Constructors jnf wnf.
 
 Ltac solve_is_jmp_false :=
   repeat (
@@ -512,6 +517,10 @@ Proof. induction 1=>//. by apply fill_ectxs_not_val. Qed.
 
 Definition is_val e := is_some (to_val e).
 
+Lemma fill_ectxs_not_is_val Kes:
+  ∀ e, is_val (fill_ectxs e Kes) = true → is_val e = true.
+Admitted.
+
 Lemma to_val_is_val e:
   to_val e = None ↔ is_val e = false.
 Proof. induction e; crush. Qed.
@@ -623,9 +632,13 @@ Inductive lnf: expr → Prop :=
 
 Inductive enf: expr → Prop :=
 | jnf_enf: ∀ e, jnf e → enf e
-| lnf_enf: ∀ e, lnf e → enf e.
+| lnf_enf: ∀ e, lnf e → enf e
+| wnf_enf: ∀ e, wnf e → enf e.
 
 Global Hint Constructors lnf enf.
+
+Definition UF (e: expr) (eh: expr) (k: cont) : Prop :=
+  fill_ectxs eh k = e.
 
 Lemma enf_not_val e: enf e → to_val e = None.
 Proof. induction e; crush. inversion H; inversion H0. Qed.
@@ -633,39 +646,79 @@ Proof. induction e; crush. inversion H; inversion H0. Qed.
 Lemma fill_app e K K': fill_ectxs (fill_ectxs e K) K' = fill_ectxs e (K' ++ K).
 Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 
-Definition unfill e kes := unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
 
-Axiom cont_uninj: ∀ kes e, enf e → unfill e kes.
+Lemma lnf_not_val e: lnf e → is_val e = false.
+Admitted.
 
-Axiom cont_uninj':
-  ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
+Lemma jnf_not_val e: jnf e → is_val e = false.
+Admitted.
 
-Arguments cont_uninj' {_ _ _} _.
+Lemma vs_map vs vs' a args:
+  map Evalue vs = map Evalue vs' ++ a :: args → is_val a = true.
+Admitted.
 
-Lemma unfill_app e eh K K':
-  unfill_expr e [] = Some (K, eh) →
-  unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
+Lemma fill_uninj_val e ks v1:
+  fill_ectxs e ks = Evalue v1 → e = Evalue v1 ∧ ks = [].
+Admitted.
+
+Ltac solve_val_fill NF :=
+  simpl in *; simplify_eq;
+  match goal with
+    | [ H : fill_ectxs _ _ = Evalue _ |- _] =>
+      apply fill_uninj_val in H; destruct_ands;
+        match goal with
+        | [ H: NF (Evalue _) |- _ ] => inversion H
+        end
+    end.
+
+Lemma weak_cont_inj_lnf e k e':
+  lnf e → lnf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
 Proof.
-  intros H. move: (cont_uninj' H) => [? ?].
-  subst. rewrite fill_app. by apply cont_uninj.
+  inversion 2; subst; intros; destruct k as [|k ks]=>//;
+  simpl in *; destruct k=>//; try solve_val_fill lnf.
+  simpl in *. simplify_eq.
+  symmetry in H3.
+  apply vs_map in H3. apply fill_ectxs_not_is_val in H3.
+  apply lnf_not_val in H. rewrite H in H3. done.
 Qed.
+
+Lemma weak_cont_inj_jnf e k e':
+  jnf e → jnf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
+Proof.
+  inversion 2; subst; intros; destruct k as [|k ks]=>//;
+  simpl in *; destruct k=>//; try solve_val_fill jnf.
+  simpl in *. simplify_eq.
+  symmetry in H3.
+  apply vs_map in H3. apply fill_ectxs_not_is_val in H3.
+  apply jnf_not_val in H. rewrite H in H3. done.
+Qed.
+
+Lemma weak_cont_inj_wnf e k e':
+  wnf e → wnf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
+Proof.
+  inversion 2; subst; intros; destruct k as [|k ks]=>//;
+  simpl in *; destruct k=>//; try solve_val_fill wnf.
+Qed.
+
+(* Lemma lnf_jnf_disj e: jnf e → lnf e →  *)
+
+Lemma weak_cont_inj e k e':
+  enf e → enf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
+Admitted.
 
 Lemma cont_inj {e e' kes kes'}:
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
-Proof.
-  intros H H' Heq. apply (cont_uninj kes) in H.
-  apply (cont_uninj kes') in H'.
-  unfold unfill in H', H.
-  rewrite Heq in H. by simplify_eq.
-Qed.
+Admitted. (* Should be provable from the weaker version *)
 
 Lemma fill_not_enf e k:
   is_val e = false → enf (fill_expr e k) → False.
 Proof. induction k=>//; simpl; intros H1 H2;
        try (inversion H2; by subst);
        try (inversion H2;
-            [ inversion H | subst; inversion H; by subst ]).
+            [ inversion H
+            | subst; inversion H; by subst
+            | subst; inversion H; by subst ]).
        - assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
          { subst. rewrite -H6. apply forall_is_val. }
          rewrite forallb_app in Hcontra.
@@ -673,13 +726,14 @@ Proof. induction k=>//; simpl; intros H1 H2;
          rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
            by rewrite andb_false_r in Hcontra.
        - inversion H2; first inversion H.
-         inversion H. subst.
-         assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
-         { subst. rewrite -H6. apply forall_is_val. }
-         rewrite forallb_app in Hcontra.
-         replace (e::args) with ([e] ++ args) in Hcontra; last done.
-         rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
+         + inversion H. subst.
+           assert (forallb is_val (map Evalue vargs ++ e :: args) = true) as Hcontra.
+           { subst. rewrite -H6. apply forall_is_val. }
+           rewrite forallb_app in Hcontra.
+           replace (e::args) with ([e] ++ args) in Hcontra; last done.
+           rewrite forallb_app in Hcontra. simpl in Hcontra. rewrite H1 in Hcontra.
            by rewrite andb_false_r in Hcontra.
+         + inversion H.
        - by subst.
 Qed.
 
@@ -907,7 +961,6 @@ Definition not_Kwhile (K: ctx) :=
 Inductive jstep: text → expr → stack → expr → stack → Prop :=
 | JSrete:
     ∀ t v k k' ks KS,
-      unfill (Erete (Evalue v)) k' →
       forallb not_Kcall KS = true →
       jstep t
             (fill_ectxs (Erete (Evalue v)) k') (KS ++ Kcall k :: ks)
@@ -927,13 +980,11 @@ Inductive wstep: expr → stack → expr → stack → Prop :=
             (Kwhile c e k::ks)
 | WSbreak:
     ∀ c e k k' ks KS,
-      unfill Ebreak k' →
       forallb not_Kwhile KS = true →
       wstep (fill_ectxs Ebreak k') (KS ++ Kwhile c e k :: ks)
             (fill_ectxs (Evalue Vvoid) k) ks
 | WScontinue:
     ∀ k' KS c e k ks,
-      unfill Econtinue k' →
       forallb not_Kwhile KS = true →
       wstep (fill_ectxs Econtinue k')
             (KS ++ Kwhile c e k :: ks)
@@ -1160,8 +1211,8 @@ Ltac absurd_jstep' :=
 Ltac absurd_jstep Hjs :=
   inversion Hjs; simplify_eq; last absurd_jstep';
   match goal with
-  | [ HU: unfill _ _ , HF: fill_ectxs _ _ = _ |- _ ] =>
-      by rewrite /unfill HF /= in HU
+  | [ HF: fill_ectxs _ _ = _ |- _ ] =>
+      by apply weak_cont_inj in HF; eauto; destruct_ands
   end.
 
 Ltac atomic_step H :=
@@ -1219,7 +1270,7 @@ Proof.
       { inversion Hes; subst=>//;
         ((exfalso; by escape_false) || (simpl; by eauto)). }
       { absurd_jstep Hjs. }
-Qed. (* FIXME: prettify the proof *)
+Qed.
 
 Lemma empty_ctx e: e = fill_ectxs e []. done. Qed.
 
