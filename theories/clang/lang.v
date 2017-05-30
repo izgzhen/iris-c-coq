@@ -778,11 +778,19 @@ Ltac gen_eq H E1 E2 KS :=
 Lemma fill_cons e K K': fill_expr (fill_ectxs e K) K' = fill_ectxs e (K' :: K).
 Proof. induction K'=>//. Qed.
 
-Axiom cont_ind:
-  ∀ P: cont → Prop,
-    (P []) →
-    (∀ ks, (∀ ks', length ks' < length ks → P ks')%nat → P ks) →
-    (∀ ks, P ks).
+Lemma size_ind (P: cont → Prop):
+  (∀ ks, (∀ ks', length ks' < length ks → P ks')%nat → P ks) →
+  (∀ ks, P ks).
+Proof.
+  intros Hstep ks.
+  apply Hstep.
+  assert (∀ n, ∀ ks', (length ks' < n)%nat → P ks') as G.
+  { induction n.
+    + intros ks' H. inversion H.
+    + intros ks' H. apply Hstep. intros ??.
+      apply IHn. omega. }
+  apply G.
+Qed.
 
 Axiom unfill_segment: ∀ e ks eh ks',
   to_val e = None → enf eh →
@@ -822,14 +830,13 @@ Lemma focus_estep_inv' eh1 σ1 σ2:
       )
   in ∀ K, P K.
 Proof.
-  intros Hnf P. apply (cont_ind P).
-  - unfold P. eauto.
-  - unfold P. intros ks Hind e2 G efs Hes.
-    inversion_cstep Hnf idtac.
-    apply (Hind K') in H2.
-    + destruct H2 as [eh2 [? ?]]. subst.
-      exists eh2. split=>//. by rewrite fill_app.
-    + rewrite app_length. simpl. omega.
+  intros Hnf P. apply (size_ind P).
+  unfold P. intros ks Hind e2 G efs Hes.
+  inversion_cstep Hnf idtac.
+  apply (Hind K') in H2.
+  + destruct H2 as [eh2 [? ?]]. subst.
+    exists eh2. split=>//. by rewrite fill_app.
+  + rewrite app_length. simpl. omega.
 Qed.
 
 Lemma focus_estep_inv'' {eh1 σ1 σ2}:
@@ -880,15 +887,11 @@ Lemma fill_estep_false' e σ σ':
   in ∀ K, P K.
 Proof.
   intros Hjn P. assert (enf e) as Henf; first by apply jnf_enf.
-  apply (cont_ind P).
-  - unfold P. simpl. intros.
-    inversion Hjn; subst.
-    + by eapply estep_call_false.
-    + by eapply estep_ret_false.
-  - unfold P. intros ks Hind e' G efs Hes.
-    inversion_cstep Henf ltac:(inversion Hjn).
-    apply (Hind K') in H2=>//.
-    rewrite app_length. simpl. omega.
+  apply (size_ind P).
+  unfold P. intros ks Hind e' G efs Hes.
+  inversion_cstep Henf ltac:(inversion Hjn).
+  apply (Hind K') in H2=>//.
+  rewrite app_length. simpl. omega.
 Qed.
 
 Lemma fill_estep_false {e kes e' σ σ' G efs}:
