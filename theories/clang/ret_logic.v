@@ -143,7 +143,7 @@ Section wp_ret.
     iRight. iSplit=>//. iExists (Erete (Evalue v)), [].
     iSplit.
     - iPureIntro. split=>//.
-    - iRight. iLeft. iExists v. iSplitL ""=>//.
+    - iRight. iLeft. iExists v. iSplitL ""=>//. eauto.
   Qed.
 
   Lemma wpr_call E vs params e e' f retty Φ Φret:
