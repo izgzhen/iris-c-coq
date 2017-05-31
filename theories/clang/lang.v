@@ -792,10 +792,24 @@ Proof.
   apply G.
 Qed.
 
-Axiom unfill_segment: ∀ e ks eh ks',
+Lemma unfill_segment: ∀ ks ks' e eh,
   to_val e = None → enf eh →
   fill_ectxs e ks = fill_ectxs eh ks' →
   ∃ ks'', ks' = ks ++ ks'' ∧ e = fill_ectxs eh ks''.
+Proof.
+  induction ks.
+  - intros. simpl in *. subst. eauto.
+  - intros.
+    destruct ks'.
+    + simpl in *. subst.
+      apply fill_not_enf in H0=>//.
+      by apply to_val_is_val, fill_ectxs_not_val.
+    + simpl in *. apply fill_expr_inj in H1.
+      destruct_ands.
+      apply IHks in H1=>//.
+      destruct H1 as [? [? ?]].
+      subst. eauto.
+Qed.
 
 Arguments unfill_segment {_ _ _ _} _ _ _.
 
