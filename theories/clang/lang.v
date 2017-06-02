@@ -862,6 +862,22 @@ Proof. intros H. move: (focus_estep_inv' eh1 σ1 σ2 H) => /= H'. done. Qed.
 
 Definition wellformed e := ∃ K eh, e = fill_ectxs eh K ∧ enf eh.
 
+Lemma fill_wellformed e ks:
+  to_val e = None → wellformed (fill_ectxs e ks) → wellformed e.
+Proof.
+  intros H1 H2. destruct ks=>//.
+  inversion H2 as [? [? [? ?]]].
+  apply unfill_segment in H=>//.
+  destruct H as [? [? ?]].
+  eexists _, _. split=>//.
+Qed.
+
+Lemma wf_not_val e: wellformed e → to_val e = None.
+Proof.
+  intros [? [? [? ?]]].
+  subst. apply fill_ectxs_not_val. by apply enf_not_val.
+Qed.
+
 Axiom wellformed_estep: ∀ e1 σ1 e2 σ2 G efs,
   estep G e1 σ1 e2 σ2 efs → wellformed e1.
 
@@ -927,11 +943,11 @@ Proof.
   - by apply Henf.
 Qed.
 
-Axiom not_val_ind:
-  ∀ P: expr → Prop,
-    (∀ e, enf e → P e) →
-    (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) →
-    (∀ e, to_val e = None → P e).
+(* Axiom not_val_ind: *)
+(*   ∀ P: expr → Prop, *)
+(*     (∀ e, enf e → P e) → *)
+(*     (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) → *)
+(*     (∀ e, to_val e = None → P e). *)
 
 Axiom not_val_ind':
   ∀ P: expr → Prop,
@@ -947,7 +963,7 @@ Lemma fill_estep_inv':
        is_jmp e = false →
        estep G (fill_ectxs e ks) σ e' σ' efs →
        ∃ e'', estep G e σ e'' σ' efs ∧ e' = fill_ectxs e'' ks)
-  in ∀ e, to_val e = None → P e.
+  in ∀ e, wellformed e → P e.
 Proof.
   intros P. apply (wf_not_val_ind P).
   - unfold P. intros e Henf e' σ σ' ks G efs Hnj Hes.
@@ -970,7 +986,11 @@ Lemma fill_estep_inv {e ks a a1 a2 G efs}:
   is_jmp e = false →
   estep G (fill_ectxs e ks) a a1 a2 efs →
   ∃ e', estep G e a e' a2 efs ∧ a1 = fill_ectxs e' ks.
-Proof. move: fill_estep_inv' => /= H. intros. apply H=>//. Qed.
+Proof. move: fill_estep_inv' => /= H. intros.
+       move:(wellformed_estep H2)=>?.
+       apply H=>//.
+       by eapply fill_wellformed.
+Qed.
 
 Lemma cont_incl':
   let P e' :=
@@ -978,9 +998,9 @@ Lemma cont_incl':
         enf e →
         fill_ectxs e kes = fill_ectxs e' kes' →
         ∃ kes'', e' = fill_ectxs e kes'')
-  in ∀ e', to_val e' = None → P e'.
+  in ∀ e', wellformed e' → P e'.
 Proof.
-  intros P. apply (not_val_ind P).
+  intros P. apply (wf_not_val_ind P).
   - unfold P. intros e Henf e' kes kes' Henf' Heq.
     apply cont_inj in Heq=>//.
     destruct Heq. subst.
@@ -993,7 +1013,7 @@ Qed.
 
 Lemma cont_incl {e' kes kes' e}:
   enf e →
-  to_val e' = None →
+  wellformed e' →
   fill_ectxs e kes = fill_ectxs e' kes' →
   ∃ kes'', e' = fill_ectxs e kes''.
 Proof. move: cont_incl' => /= H. intros. by eapply H. Qed.
@@ -1054,6 +1074,10 @@ Inductive cstep: expr → local_state → state → expr → local_state → sta
     ∀ s t e h e' h' efs, estep t e h e' h' efs → cstep e s (State h t) e' s (State h' t) efs
 | CSjstep:
     ∀ e e' h t s s' , jstep t e s e' s' → cstep e s (State h t) e' s' (State h t) [].
+
+Axiom wellformed_cstep: ∀ e1 l1 σ1 e2 l2 σ2 efs,
+  cstep e1 l1 σ1 e2 l2 σ2 efs → wellformed e1.
+Arguments wellformed_cstep {_ _ _ _ _ _ _} _.
 
 Ltac inversion_estep :=
   match goal with [ H : estep _ _ _ _ _ _ |- _ ] => inversion H end.
@@ -1141,18 +1165,16 @@ Proof.
 Qed.
 
 Lemma fill_step_inv e1' σ1 e2 σ2 s1 s2 K efs:
-  to_val e1' = None →
+  wellformed e1' →
   is_jmp e1' = false →
   cstep (fill_ectxs e1' K) s1 σ1 e2 s2 σ2 efs →
   ∃ e2', e2 = fill_ectxs e2' K ∧ cstep e1'  s1 σ1 e2' s2 σ2 efs ∧ s1 = s2.
 Proof.
   intros Hnv Hnj.
   inversion 1; subst.
-  - match goal with
-    | [ H : estep _ _ _ _ _ _ |- _ ] =>
-      eapply fill_estep_inv in H=>//;
-      destruct H as (e2'&?&?)
-    end; exists e2'; split; [| split ]; auto.
+  - eapply fill_estep_inv in H0=>//; last by apply wf_not_val.
+    destruct H0 as (e2'&?&?).
+    exists e2'. split; [| split ]; auto.
   - inversion_jstep_as Heq;
     eapply cont_incl in Heq=>//;
     try destruct Heq as (?&?); subst; auto.

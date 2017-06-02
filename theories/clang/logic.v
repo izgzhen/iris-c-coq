@@ -102,6 +102,7 @@ Section rules.
     iNext. iIntros (e2 σ2 efs Hstep). simpl in *.
     destruct e2 as [e2 l2].
     edestruct (fill_step_inv e σ1 e2 σ2 s l2 kes) as (e2'&->&?&?); auto; subst=>//.
+    { eapply fill_wellformed=>//. by eapply wellformed_cstep. }
     iMod ("H" $! (e2', l2) _ _ with "[%]") as "($ & H & Hefs)"; eauto.
     iFrame "Hefs". iApply "IH". try iModIntro. iSplit=>//.
     iPureIntro. eapply cstep_preserves_not_jmp=>//.
