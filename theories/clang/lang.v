@@ -860,16 +860,18 @@ Lemma focus_estep_inv'' {eh1 σ1 σ2}:
     ∃ eh2, estep G eh1 σ1 eh2 σ2 efs ∧ e2 = fill_ectxs eh2 K.
 Proof. intros H. move: (focus_estep_inv' eh1 σ1 σ2 H) => /= H'. done. Qed.
 
-Axiom focus_estep: ∀ e1 σ1 e2 σ2 G efs,
-  estep G e1 σ1 e2 σ2 efs → ∃ K eh1, e1 = fill_ectxs eh1 K ∧ enf eh1.
+Definition wellformed e := ∃ K eh, e = fill_ectxs eh K ∧ enf eh.
 
-Arguments focus_estep {_ _ _ _ _ _} _.
+Axiom wellformed_estep: ∀ e1 σ1 e2 σ2 G efs,
+  estep G e1 σ1 e2 σ2 efs → wellformed e1.
+
+Arguments wellformed_estep {_ _ _ _ _ _} _.
 
 Lemma focus_estep_inv {e1 σ1 e2 σ2 G efs}:
   estep G e1 σ1 e2 σ2 efs →
   ∃ e1' e2' K, enf e1' ∧ e1 = fill_ectxs e1' K ∧ estep G e1' σ1 e2' σ2 efs ∧ e2 = fill_ectxs e2' K.
 Proof.
-  intros H. move: (focus_estep H) => [K [eh1 [? H']]].
+  intros H. move: (wellformed_estep H) => [K [eh1 [? H']]].
   subst. exists eh1.
   edestruct (@focus_estep_inv'' eh1 σ1 σ2 H' K e2) as [e' [? ?]]=>//.
   eexists _, _. split=>//; split=>//.
@@ -912,6 +914,19 @@ Lemma fill_estep_false {e kes e' σ σ' G efs}:
   jnf e → estep G (fill_ectxs e kes) σ e' σ' efs → False.
 Proof. intros H. move: (fill_estep_false' e σ σ' H kes e' G efs) => /= H'. done. Qed.
 
+Lemma wf_not_val_ind:
+  ∀ P: expr → Prop,
+    (∀ e, enf e → P e) →
+    (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) →
+    (∀ e, wellformed e → P e).
+Proof.
+  intros P Henf Hind e Hwf.
+  destruct Hwf as [K [eh [ ? ?]]].
+  subst. apply Hind.
+  - by apply enf_not_val.
+  - by apply Henf.
+Qed.
+
 Axiom not_val_ind:
   ∀ P: expr → Prop,
     (∀ e, enf e → P e) →
@@ -934,7 +949,7 @@ Lemma fill_estep_inv':
        ∃ e'', estep G e σ e'' σ' efs ∧ e' = fill_ectxs e'' ks)
   in ∀ e, to_val e = None → P e.
 Proof.
-  intros P. apply (not_val_ind P).
+  intros P. apply (wf_not_val_ind P).
   - unfold P. intros e Henf e' σ σ' ks G efs Hnj Hes.
     eapply focus_estep_inv in Hes.
     destruct Hes as (e1'&e2'&K&Henf'&Heq&Hes'&Heq'). subst.
