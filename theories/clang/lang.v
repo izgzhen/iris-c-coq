@@ -653,18 +653,29 @@ Proof. induction K'=>//. simpl. by rewrite IHK'. Qed.
 
 
 Lemma lnf_not_val e: lnf e → is_val e = false.
-Admitted.
+Proof. inversion 1=>//. Qed.
 
 Lemma jnf_not_val e: jnf e → is_val e = false.
-Admitted.
+Proof. inversion 1=>//. Qed.
 
-Lemma vs_map vs vs' a args:
+Lemma vs_map: ∀ vs vs' a args,
   map Evalue vs = map Evalue vs' ++ a :: args → is_val a = true.
-Admitted.
+Proof.
+  induction vs.
+  - simpl. intros. destruct vs'=>//.
+  - simpl. intros.
+    destruct vs'.
+    + simpl in *. by simplify_eq.
+    + simpl in *. simplify_eq. by eapply IHvs.
+Qed.
 
 Lemma fill_uninj_val e ks v1:
   fill_ectxs e ks = Evalue v1 → e = Evalue v1 ∧ ks = [].
-Admitted.
+Proof.
+  destruct ks=>//.
+  simpl. intros.
+  destruct e0=>//.
+Qed.
 
 Ltac solve_val_fill NF :=
   simpl in *; simplify_eq;
@@ -942,12 +953,6 @@ Proof.
   - by apply enf_not_val.
   - by apply Henf.
 Qed.
-
-(* Axiom not_val_ind: *)
-(*   ∀ P: expr → Prop, *)
-(*     (∀ e, enf e → P e) → *)
-(*     (∀ e ks, to_val e = None → P e → P (fill_ectxs e ks)) → *)
-(*     (∀ e, to_val e = None → P e). *)
 
 Axiom not_val_ind':
   ∀ P: expr → Prop,
