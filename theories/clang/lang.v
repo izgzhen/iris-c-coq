@@ -669,6 +669,16 @@ Proof.
     + simpl in *. simplify_eq. by eapply IHvs.
 Qed.
 
+Lemma vs_map2: ∀ vs vs' e e' es es',
+  to_val e = None → to_val e' = None →
+  map Evalue vs ++ e :: es = map Evalue vs' ++ e' :: es' →
+  vs = vs' ∧ e = e' ∧ es = es'.
+Proof.
+  induction vs; intros; destruct vs'; simpl in *; simplify_eq=>//.
+  eapply IHvs in H2=>//.
+  by destruct_ands.
+Qed.
+
 Lemma fill_uninj_val e ks v1:
   fill_ectxs e ks = Evalue v1 → e = Evalue v1 ∧ ks = [].
 Proof.
@@ -723,9 +733,14 @@ Lemma weak_cont_inj e k e':
 Admitted.
 
 Lemma fill_expr_inj e e' k k':
+  to_val e = None → to_val e' = None →
   fill_expr e k = fill_expr e' k' -> e = e' ∧ k = k'.
-Admitted.
-
+Proof.
+  destruct k; destruct k'; intros; simpl in *; try by simplify_eq.
+  - simplify_eq. apply vs_map2 in H3=>//. by destruct_ands.
+  - simplify_eq. apply vs_map2 in H3=>//. by destruct_ands.
+Qed.
+  
 Lemma cont_inj: ∀ kes kes' e e',
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
@@ -738,8 +753,10 @@ Proof.
     apply weak_cont_inj in H1=>//.
   - intros.
     simpl in H1. apply fill_expr_inj in H1.
-    destruct_ands. apply IHkes in H1=>//.
-    destruct_ands. done.
+    + destruct_ands. apply IHkes in H1=>//.
+      by destruct_ands.
+    + by apply fill_ectxs_not_val, enf_not_val.
+    + by apply fill_ectxs_not_val, enf_not_val.
 Qed.
 
 Lemma fill_not_enf e k:
@@ -816,10 +833,12 @@ Proof.
       apply fill_not_enf in H0=>//.
       by apply to_val_is_val, fill_ectxs_not_val.
     + simpl in *. apply fill_expr_inj in H1.
-      destruct_ands.
-      apply IHks in H1=>//.
-      destruct H1 as [? [? ?]].
-      subst. eauto.
+      * destruct_ands.
+        apply IHks in H1=>//.
+        destruct H1 as [? [? ?]].
+        subst. eauto.
+      * by apply fill_ectxs_not_val.
+      * by apply fill_ectxs_not_val, enf_not_val.
 Qed.
 
 Arguments unfill_segment {_ _ _ _} _ _ _.
