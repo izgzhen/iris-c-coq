@@ -697,41 +697,6 @@ Ltac solve_val_fill NF :=
         end
     end.
 
-Lemma weak_cont_inj_lnf e k e':
-  lnf e → lnf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
-Proof.
-  inversion 2; subst; intros; destruct k as [|k ks]=>//;
-  simpl in *; destruct k=>//; try solve_val_fill lnf.
-  simpl in *. simplify_eq.
-  symmetry in H3.
-  apply vs_map in H3. apply fill_ectxs_not_is_val in H3.
-  apply lnf_not_val in H. rewrite H in H3. done.
-Qed.
-
-Lemma weak_cont_inj_jnf e k e':
-  jnf e → jnf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
-Proof.
-  inversion 2; subst; intros; destruct k as [|k ks]=>//;
-  simpl in *; destruct k=>//; try solve_val_fill jnf.
-  simpl in *. simplify_eq.
-  symmetry in H3.
-  apply vs_map in H3. apply fill_ectxs_not_is_val in H3.
-  apply jnf_not_val in H. rewrite H in H3. done.
-Qed.
-
-Lemma weak_cont_inj_wnf e k e':
-  wnf e → wnf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
-Proof.
-  inversion 2; subst; intros; destruct k as [|k ks]=>//;
-  simpl in *; destruct k=>//; try solve_val_fill wnf.
-Qed.
-
-(* Lemma lnf_jnf_disj e: jnf e → lnf e →  *)
-
-Lemma weak_cont_inj e k e':
-  enf e → enf e' → fill_ectxs e k = e' → e = e' ∧ k = [].
-Admitted.
-
 Lemma fill_expr_inj e e' k k':
   to_val e = None → to_val e' = None →
   fill_expr e k = fill_expr e' k' -> e = e' ∧ k = k'.
@@ -739,6 +704,27 @@ Proof.
   destruct k; destruct k'; intros; simpl in *; try by simplify_eq.
   - simplify_eq. apply vs_map2 in H3=>//. by destruct_ands.
   - simplify_eq. apply vs_map2 in H3=>//. by destruct_ands.
+Qed.
+
+Lemma weak_cont_inj': ∀ ks e e',
+  to_val e = None → enf e' → fill_expr e ks = e' → False.
+Proof.
+  destruct ks=>//;
+    (intros; simpl in *; subst;
+    inversion H0; try by inversion H1; inversion H1
+    ; try by subst).
+  - inversion H1. subst.
+    apply vs_map in H6. apply to_val_is_val in H. by rewrite H in H6.
+  - inversion H1. subst.
+    apply vs_map in H6. apply to_val_is_val in H. by rewrite H in H6.
+Qed.
+
+Lemma weak_cont_inj: ∀ ks e e',
+  enf e → enf e' → fill_ectxs e ks = e' → e = e' ∧ ks = [].
+Proof.
+  induction ks=>//.
+  intros. simpl in *. apply weak_cont_inj' in H1=>//.
+  by apply fill_ectxs_not_val, enf_not_val.
 Qed.
   
 Lemma cont_inj: ∀ kes kes' e e',
