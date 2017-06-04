@@ -959,13 +959,19 @@ Proof.
   - by apply Henf.
 Qed.
 
-Axiom not_val_ind':
+Lemma not_val_ind'':
   ∀ P: expr → Prop,
     (∀ e, enf e → P e) →
     (∀ e ks, enf e →
              (∀ ks', length ks' < length ks →
                      P (fill_ectxs e ks'))%nat → P (fill_ectxs e ks)) →
-    (∀ e, to_val e = None → P e).
+    (∀ e, wellformed e → P e).
+Proof.
+  intros.
+  destruct H1 as [? [? [? ?]]].
+  subst. apply (size_ind (fun x => P (fill_ectxs x0 x))).
+  intros. apply H0=>//.
+Qed.
 
 Lemma fill_estep_inv':
   let P e :=
@@ -1201,9 +1207,9 @@ Admitted. (* Apparent but hard for now. Documented *)
 Lemma estep_preserves_not_jmp' σ1 σ2:
   let P e1 :=
       (∀ e2 G efs, is_jmp e1 = false → estep G e1 σ1 e2 σ2 efs → is_jmp e2 = false)
-  in ∀ e1, to_val e1 = None → P e1.
+  in ∀ e1, wellformed e1 → P e1.
 Proof.
-  intros P. apply (not_val_ind' P).
+  intros P. apply (not_val_ind'' P).
   - unfold P. intros e Henf e2 G efs Hjn Hes.
     inversion Hes=>//; subst; simpl in Hes=>//; simpl in Hjn.
     + by eapply instantiate_let_preserves_not_jmp.
@@ -1226,7 +1232,10 @@ Lemma estep_preserves_not_jmp'' e σ1 e2' σ2 G efs:
   to_val e = None → is_jmp e = false →
   estep G e σ1 e2' σ2 efs → is_jmp e2' = false.
 Proof.
-  intros H. move: (estep_preserves_not_jmp' σ1 σ2 e H e2' G efs) => /= H'. done.
+  intros H ??.
+  move:(wellformed_estep H1)=>Hwf.
+  move: (estep_preserves_not_jmp' σ1 σ2 e Hwf e2' G efs) => /= H'.
+  auto.
 Qed.
 
 Lemma estep_preserves_not_jmp e σ1 e2' σ2 G efs:
