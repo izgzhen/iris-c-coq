@@ -141,6 +141,22 @@ Section rules.
     destruct (Hs _ _ _ _ _ _ Hsp) as [? ?]. subst. iFrame.
     simpl in *. destruct e2. by iApply "H".
   Qed.
+
+  Lemma kcall_map KS k0 k' l ks:
+    forallb not_Kcall KS = true →
+    KS ++ Kcall k0 :: l = Kcall k' :: ks →
+    k0 = k' ∧ ks = l.
+  Proof.
+    destruct KS; simpl; intros; by simplify_eq.
+  Qed.
+
+  Lemma kwhile_map KS c e c' e' k k' l ks:
+    forallb not_Kwhile KS = true →
+    KS ++ Kwhile c e k :: l = Kwhile c' e' k' :: ks →
+    k = k' ∧ c = c' ∧ e = e' ∧ ks = l.
+  Proof.
+    destruct KS; simpl; intros; by simplify_eq.
+  Qed.
   
   Lemma wp_ret k k' ks v E Φ:
     WP (fill_ectxs (Evalue v) k', ks) @ E {{ Φ }}
@@ -154,14 +170,16 @@ Section rules.
     { iPureIntro. destruct σ. simpl. eexists _, _, (State s_heap s_text), _.
       apply CSjstep. simpl in *. subst. apply JSrete with (KS:=[])=>//. }
     iNext. iIntros (e2 σ2 efs Hcs).
-    inversion_cstep_as Hes Hjs; subst.
+    inversion_cstep_as Hes Hjs Hws; subst.
     { destruct e2. simpl in *. by apply fill_estep_false in Hes. }
-    destruct e2. simpl in *. inversion_jstep_as Heq; subst.
-    - apply cont_inj in Heq=>//; auto;
-      destruct Heq as [Heq ?]; inversion Heq; subst.
-      iFrame. admit. (* by rewrite big_sepL_nil. *)
-    - fill_enf_neq.
-  Admitted.
+    { destruct e2. simpl in *. inversion_jstep_as Heq; subst.
+      - apply cont_inj in Heq=>//; auto;
+        destruct Heq as [Heq ?]; inversion Heq; subst.
+        iFrame. apply kcall_map in H3=>//. destruct_ands.
+        iMod "Hclose". rewrite big_sepL_nil. by iFrame.
+      - fill_enf_neq. }
+    { destruct e2. simpl in *. apply fill_wstep_false in Hws=>//.  }
+  Qed.
 
   Lemma eseq_pure v s h e2 h' G efs:
     estep G (Eseq (Evalue v) s) h e2 h' efs → h = h' ∧ efs = [].
@@ -178,17 +196,19 @@ Section rules.
     iIntros "Φ". iApply wp_lift_pure_step; eauto.
     - destruct σ1. eexists _, _, _, _. simpl. eauto.
     - intros σ1 σ2 e2 l1 l2 efs Hs.
-      inversion_cstep_as Hes Hjs=>//.
+      inversion_cstep_as Hes Hjs Hws=>//.
       + f_equal. simplify_eq. inversion Hes=>//.
         simplify_eq. exfalso.
         rewrite_empty_ctx. simpl in *. escape_false.
       + simplify_eq. absurd_jstep Hjs.
+      + simplify_eq. absurd_jstep Hws.
     - iNext. iIntros (??????).
-      inversion_cstep_as Hes Hjs; subst.
+      inversion_cstep_as Hes Hjs Hws; subst.
       + inversion Hes; subst.
         { iFrame. by rewrite big_sepL_nil. }
         { escape_false. }
       + simplify_eq. absurd_jstep Hjs.
+      + simplify_eq. absurd_jstep Hws.
   Qed.
 
   Lemma wp_seq E e1 e2 l Φ:
@@ -350,7 +370,7 @@ Section rules.
     { iPureIntro. eexists _, _, σ1, [].
       destruct σ1. constructor. econstructor=>//. }
     iNext; iIntros (s2 l2 σ2 efs Hstep). iModIntro.
-    inversion_cstep_as Hes Hjs; subst.
+    inversion_cstep_as Hes Hjs Hws; subst.
     - inversion Hes; subst.
       + iFrame. iSplitL; last by rewrite big_sepL_nil.
         iApply ("HΦ" with "[-]"). iSplitR=>//.
@@ -358,6 +378,7 @@ Section rules.
         rewrite (same_type_encode_inj h t v' v1 l) in H0=>//.
       + escape_false.
     - absurd_jstep Hjs.
+    - absurd_jstep Hws.
   Qed.
 
   Lemma wp_cas_suc Φ E ks l t v v2 :
@@ -375,7 +396,7 @@ Section rules.
     { iPureIntro. destruct σ1. eexists _, _, _, [].
       constructor. apply ESCASSuc=>//. }
     iNext; iIntros (s2 l2 σ2 efs Hstep).
-    inversion_cstep_as Hes Hjs; subst.
+    inversion_cstep_as Hes Hjs Hws; subst.
     - inversion Hes; subst.
       + exfalso. simpl in *.
         rewrite (same_type_encode_inj h' t v vl l) in H17=>//.
@@ -389,20 +410,9 @@ Section rules.
         iApply "HΦ". iSplit=>//.
       + escape_false.
     - absurd_jstep Hjs.
+    - absurd_jstep Hws.
   Qed.
 
-Ltac atomic_step H :=
-  inversion H; subst;
-  [ match goal with
-    | [ HE: estep _ _ _ _ _ _ |- _ ] =>
-      inversion HE; subst;
-      [ idtac | exfalso; by escape_false ]
-    end
-  | match goal with
-    | [ HJ : jstep _ _ _ _ _ |- _ ] => absurd_jstep HJ
-    end
-  ].
-  
   Ltac wp_solve_pure :=
     iApply wp_lift_pure_step;
     [ intros; solve_red |
@@ -419,24 +429,6 @@ Ltac atomic_step H :=
     iIntros (?) "HΦ". wp_solve_pure.
     simplify_eq. subst. iApply wp_value=>//.
   Qed.
-
-  (* Lemma wp_while_inv I Q cond s ks: *)
-  (*   is_jmp s = false → is_jmp cond = false → *)
-  (*   □ (∀ Φ, (I ∗ (∀ v, ((⌜ v = vfalse ⌝ ∗ Q Vvoid) ∨ (⌜ v = vtrue ⌝ ∗ I)) -∗ Φ v) -∗ WP (cond, ks) {{ Φ }})) ∗ *)
-  (*   □ (∀ Φ, (I ∗ (I -∗ Φ Vvoid)) -∗ WP (s, ks) {{ Φ }}) ∗ I *)
-  (*   ⊢ WP (Ewhile cond cond s, ks) {{ Q }}. *)
-  (* Proof. *)
-  (*   iIntros (??) "(#Hcond & #Hs & HI)". *)
-  (*   iLöb as "IH". *)
-  (*   iApply (wp_bind [EKwhile cond s])=>//. *)
-  (*   iApply "Hcond". iFrame. *)
-  (*   iIntros (v) "[[% HQ]|[% HI]]"; subst. *)
-  (*   - iApply wp_while_false. by iNext. *)
-  (*   - iApply wp_while_true. iNext. *)
-  (*     iApply wp_seq=>//. iApply "Hs". iFrame. *)
-  (*     iIntros "HI". iApply wp_skip. *)
-  (*     iApply "IH". by iNext. *)
-  (* Qed. *)
 
   Lemma wp_fst v1 v2 Φ ks:
     ▷ Φ v1
@@ -537,16 +529,18 @@ Ltac atomic_step H :=
     iIntros (?) "HΦ".
     iApply wp_lift_pure_step; first eauto.
     - intros; solve_red.
-    - intros ???????Hcs. inversion_cstep_as Hes Hjs.
+    - intros ???????Hcs. inversion_cstep_as Hes Hjs Hws.
       + inversion Hes=>//. simplify_eq.
         escape_false.
       + absurd_jstep Hjs.
+      + absurd_jstep Hws.
     - iNext. iIntros (e2 l2 σ1 σ2 efs Hcs). subst.
-      inversion_cstep_as Hes Hjs.
+      inversion_cstep_as Hes Hjs Hws.
       + inversion Hes=>//; simplify_eq=>//.
         * iSplitL; last by rewrite big_sepL_nil. done.
         * escape_false.
       + absurd_jstep Hjs.
+      + absurd_jstep Hws.
   Qed.
 
   (* Call *)
@@ -591,7 +585,7 @@ Ltac atomic_step H :=
     { iPureIntro. eexists (Evalue Vvoid), ks, σ1, [e']. simpl.
       destruct σ1. simpl in *. apply CSestep. by econstructor. }
     iNext. iIntros (????Hcs).
-    iMod "Hclose". inversion_cstep_as Hes Hjs.
+    iMod "Hclose". inversion_cstep_as Hes Hjs Hws.
     - iModIntro. iFrame. simpl in *. destruct a. simpl in *.
       inversion Hes=>//; subst.
       + iFrame. iSplitR "He".
@@ -601,22 +595,87 @@ Ltac atomic_step H :=
         simplify_eq. by rewrite big_sepL_singleton.
       + exfalso. escape_false.
     - absurd_jstep Hjs.
+    - absurd_jstep Hws.
   Qed.
 
   Lemma wp_while {ks E} c e k Φ :
     ▷ WP (Eif c (Eseq e Econtinue) Ebreak, Kwhile c e k::ks) @ E {{ Φ }}
     ⊢ WP (fill_ectxs (Ewhile c e) k, ks) @ E {{ Φ }}.
-  Admitted.
+  Proof.
+    iIntros "?".
+    iApply wp_lift_step=>//.
+    { apply fill_ectxs_not_val. done. }
+    iIntros (σ1) "[Hσ1 HΓ]".
+    iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    simpl in *. iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _, []. destruct σ1. simpl in *.
+      apply CSwstep. eapply WSwhile. }
+    iNext. iIntros (e2 σ2 efs Hcs).
+    iMod "Hclose". inversion_cstep_as Hes Hjs Hws.
+    { apply wfill_estep_false in Hes=>//. }
+    { apply wfill_jstep_false in Hjs=>//. }
+    { inversion_wstep_as Heq.
+      + apply cont_inj in Heq=>//; auto.
+        destruct Heq as [Heq ?]. inversion Heq. subst.
+        iFrame. destruct e2. simpl in *. subst.
+        iFrame. by rewrite big_sepL_nil.
+      + fill_enf_neq.
+      + fill_enf_neq. }
+  Qed.
 
   Lemma wp_break {ks E} k k' c e Φ:
     WP (fill_ectxs (Evalue Vvoid) k', ks) @ E {{ Φ }}
-    ⊢ WP (fill_ectxs Ebreak k, Kwhile c e k'::ks) @ E {{ Φ }}.
-  Admitted.
+       ⊢ WP (fill_ectxs Ebreak k, Kwhile c e k'::ks) @ E {{ Φ }}.
+  Proof.
+    iIntros "?".
+    iApply wp_lift_step=>//.
+    { apply fill_ectxs_not_val. done. }
+    iIntros (σ1) "[Hσ1 HΓ]".
+    iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    simpl in *. iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _, _. destruct σ1. simpl in *.
+      apply CSwstep. eapply WSbreak with (KS:=[]). done. }
+    iNext. iIntros (e2 σ2 efs Hcs).
+    iMod "Hclose". inversion_cstep_as Hes Hjs Hws.
+    { apply wfill_estep_false in Hes=>//. }
+    { apply wfill_jstep_false in Hjs=>//. }
+    { inversion_wstep_as Heq.
+      + fill_enf_neq.
+      + apply cont_inj in Heq=>//; auto.
+        destruct Heq as [Heq ?]. inversion Heq.
+        iFrame. destruct e2. simpl in *. subst.
+        iFrame. apply kwhile_map in H2=>//.
+        destruct_ands. iFrame.
+        by rewrite big_sepL_nil.
+      + fill_enf_neq. }
+  Qed.
   
   Lemma wp_continue {E ks} c e k k' Φ:
     WP (fill_ectxs (Ewhile c e) k', ks) @ E {{ Φ }}
     ⊢ WP (fill_ectxs Econtinue k, Kwhile c e k'::ks) @ E {{ Φ }}.
-  Admitted.
+  Proof.
+    iIntros "?".
+    iApply wp_lift_step=>//.
+    { apply fill_ectxs_not_val. done. }
+    iIntros (σ1) "[Hσ1 HΓ]".
+    iMod (fupd_intro_mask' _ ∅) as "Hclose"; first set_solver.
+    simpl in *. iModIntro. iSplit.
+    { iPureIntro. eexists _, _, _, _. destruct σ1. simpl in *.
+      apply CSwstep. eapply WScontinue with (KS:=[]). done. }
+    iNext. iIntros (e2 σ2 efs Hcs).
+    iMod "Hclose". inversion_cstep_as Hes Hjs Hws.
+    { apply wfill_estep_false in Hes=>//. }
+    { apply wfill_jstep_false in Hjs=>//. }
+    { inversion_wstep_as Heq.
+      + fill_enf_neq.
+      + fill_enf_neq.
+      + apply cont_inj in Heq=>//; auto.
+        destruct Heq as [Heq ?]. inversion Heq.
+        iFrame. destruct e2. simpl in *. subst.
+        iFrame. apply kwhile_map in H2=>//.
+        destruct_ands. iFrame.
+        by rewrite big_sepL_nil. }
+  Qed.
 
   Lemma wp_call {E ks} k vs params e e' f retty Φ:
     let_params vs params e = Some e' →
@@ -634,18 +693,20 @@ Ltac atomic_step H :=
     { iPureIntro. eexists _, _, _, []. destruct σ1. simpl in *.
       apply CSjstep. eapply JScall=>//. }
     iNext. iIntros (e2 σ2 efs Hcs).
-    iMod "Hclose". inversion_cstep_as Hes Hjs.
+    iMod "Hclose". inversion_cstep_as Hes Hjs Hws.
     { apply fill_estep_false in Hes=>//. }
-    inversion_jstep_as Heq.
-    + fill_enf_neq.
-    + apply cont_inj in Heq=>//; auto.
-      destruct Heq as [Heq ?]. inversion Heq. subst.
-      iFrame. destruct e2. simpl in *. subst.
-      assert (vs0 = vs) as ?.
-      { eapply map_inj=>//. simpl. by inversion 1. }
-      subst. clear Heq. simplify_eq.
-      iSplitL; first by iApply "HΦ".
-      by rewrite big_sepL_nil.
+    {
+      inversion_jstep_as Heq.
+      + fill_enf_neq.
+      + apply cont_inj in Heq=>//; auto.
+        destruct Heq as [Heq ?]. inversion Heq. subst.
+        iFrame. destruct e2. simpl in *. subst.
+        assert (vs0 = vs) as ?.
+        { eapply map_inj=>//. simpl. by inversion 1. }
+        subst. clear Heq. simplify_eq.
+        iSplitL; first by iApply "HΦ".
+        by rewrite big_sepL_nil. }
+    { apply fill_wstep_false in Hws=>//. }
   Qed.
 
 End rules.

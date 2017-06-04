@@ -1078,6 +1078,101 @@ Inductive wstep: expr → stack → expr → stack → Prop :=
             (KS ++ Kwhile c e k :: ks)
             (fill_ectxs (Ewhile c e) k) ks.
 
+Lemma fill_wstep_false' e σ σ':
+  jnf e →
+  let P K :=
+      (∀ e', wstep (fill_ectxs e K) σ e' σ' → False)
+  in ∀ K, P K.
+Proof.
+  intros Hjn P. assert (enf e) as Henf; first by apply jnf_enf.
+  apply (size_ind P).
+  unfold P. intros ks Hind e' Hes.
+  inversion Hjn; subst.
+  - inversion Hes; subst.
+    + apply cont_inj in H0=>//.
+      { by destruct_ands. }
+      { by apply wnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply wnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply wnf_enf. }
+  - inversion Hes; subst.
+    + apply cont_inj in H0=>//.
+      { by destruct_ands. }
+      { by apply wnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply wnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply wnf_enf. }
+Qed.
+
+Lemma fill_wstep_false {e kes e' σ σ'}:
+  jnf e → wstep (fill_ectxs e kes) σ e' σ' → False.
+Proof.
+  intros H. move: (fill_wstep_false' e σ σ' H kes e') => /= H'. apply H'.
+Qed.
+
+Lemma wfill_jstep_false' e σ σ':
+  wnf e →
+  let P K :=
+      (∀ e' t, jstep t (fill_ectxs e K) σ e' σ' → False)
+  in ∀ K, P K.
+Proof.
+  intros Hwn P. assert (enf e) as Henf; first by apply wnf_enf.
+  apply (size_ind P).
+  unfold P. intros ks Hind e' t Hes.
+  inversion Hwn; subst.
+  - inversion Hes; subst.
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply jnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply jnf_enf. }
+  - inversion Hes; subst.
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply jnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply jnf_enf. }
+  - inversion Hes; subst.
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply jnf_enf. }
+    + apply cont_inj in H=>//.
+      { by destruct_ands. }
+      { by apply jnf_enf. }
+Qed.
+
+Lemma wfill_jstep_false {e kes e' σ σ' t}:
+  wnf e → jstep t (fill_ectxs e kes) σ e' σ' → False.
+Proof.
+  intros H. move: (wfill_jstep_false' e σ σ' H kes e') => /= H'. apply H'.
+Qed.
+
+Lemma wfill_estep_false' e σ σ':
+  wnf e →
+  let P K :=
+      (∀ e' G efs, estep G (fill_ectxs e K) σ e' σ' efs → False)
+  in ∀ K, P K.
+Proof.
+  intros Hwn P. assert (enf e) as Henf; first by apply wnf_enf.
+  apply (size_ind P).
+  unfold P. intros ks Hind e' G efs Hes.
+  inversion_cstep Henf ltac:(inversion Hwn).
+  apply (Hind K') in H2=>//.
+  rewrite app_length. simpl. omega.
+Qed.
+
+Lemma wfill_estep_false {e kes e' σ σ' G efs}:
+  wnf e → estep G (fill_ectxs e kes) σ e' σ' efs → False.
+Proof. intros H. move: (wfill_estep_false' e σ σ' H kes e' G efs) => /= H'. done. Qed.
+
 Bind Scope val_scope with val.
 Delimit Scope val_scope with V.
 Bind Scope expr_scope with expr.
@@ -1089,7 +1184,9 @@ Inductive cstep: expr → local_state → state → expr → local_state → sta
 | CSestep:
     ∀ s t e h e' h' efs, estep t e h e' h' efs → cstep e s (State h t) e' s (State h' t) efs
 | CSjstep:
-    ∀ e e' h t s s' , jstep t e s e' s' → cstep e s (State h t) e' s' (State h t) [].
+    ∀ e e' h t s s' , jstep t e s e' s' → cstep e s (State h t) e' s' (State h t) []
+| CSwstep:
+    ∀ σ e s e' s', wstep e s e' s' → cstep e s σ e' s' σ [].
 
 Axiom wellformed_cstep: ∀ e1 l1 σ1 e2 l2 σ2 efs,
   cstep e1 l1 σ1 e2 l2 σ2 efs → wellformed e1.
@@ -1114,6 +1211,27 @@ Proof.
   by apply orb_true_r.
 Qed.
 
+Lemma is_jmp_while k' c e: is_jmp (fill_ectxs (Ewhile c e) k') = true.
+Proof.
+  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
+  rewrite existsb_app. simpl. rewrite IHk'. simpl.
+  by apply orb_true_r.
+Qed.
+
+Lemma is_jmp_break k': is_jmp (fill_ectxs Ebreak k') = true.
+Proof.
+  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
+  rewrite existsb_app. simpl. rewrite IHk'. simpl.
+  by apply orb_true_r.
+Qed.
+
+Lemma is_jmp_continue k': is_jmp (fill_ectxs Econtinue k') = true.
+Proof.
+  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
+  rewrite existsb_app. simpl. rewrite IHk'. simpl.
+  by apply orb_true_r.
+Qed.
+
 Lemma is_jmp_jstep_false {e e' σ} k {ks ks'}:
   to_val e = None →
   is_jmp e = false →
@@ -1131,10 +1249,38 @@ Proof.
   - by rewrite is_jmp_call in Hnj.
 Qed.
 
+Lemma is_jmp_wstep_false {e e'} k {ks ks'}:
+  to_val e = None →
+  is_jmp e = false →
+  wstep (fill_ectxs e k) ks e' ks' → false.
+Proof.
+  intros Hnv Hnj.
+  inversion 1; subst;
+    match goal with
+    | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] =>
+      symmetry in H;
+      apply unfill_segment in H=>//;
+      destruct H as [? [? ?]]; subst
+    end; auto.
+  - by rewrite is_jmp_while in Hnj.
+  - by rewrite is_jmp_break in Hnj.
+  - by rewrite is_jmp_continue in Hnj.
+Qed.
+
 Ltac inversion_jstep_as Heq :=
   match goal with
   | [ Hjs: jstep _ _ _ _ _ |- _ ] =>
     inversion Hjs as [?|?]; subst;
+    match goal with
+    | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] => rename H into Heq
+    | _ => idtac
+    end
+  end.
+
+Ltac inversion_wstep_as Heq :=
+  match goal with
+  | [ Hws: wstep _ _ _ _ |- _ ] =>
+    inversion Hws as [?|?|?]; subst;
     match goal with
     | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _ ] => rename H into Heq
     | _ => idtac
@@ -1147,6 +1293,7 @@ Proof.
   inversion 1; subst=>//.
   - by eapply estep_not_val.
   - inversion_jstep_as Heq; by apply fill_ectxs_not_val.
+  - inversion_wstep_as Heq; by apply fill_ectxs_not_val.
 Qed.
 
 Lemma CSbind' e e' σ σ' s s' efs k kes:
@@ -1158,6 +1305,8 @@ Proof.
   - apply CSestep. apply ESbind=>//.
   - exfalso. move: (cstep_not_val Hcs) => Hn.
     apply (is_jmp_jstep_false [] Hn Hnj H).
+  - exfalso. move: (cstep_not_val Hcs) => Hn.
+    apply (is_jmp_wstep_false [] Hn Hnj H).
 Qed.
 
 Lemma CSbind:
@@ -1177,7 +1326,8 @@ Lemma not_jmp_preserves k e e' σ σ' s s' efs:
   estep (s_text σ) (fill_ectxs e k) (s_heap σ) e' (s_heap σ') efs.
 Proof.
   intros Hnv Hnj Hcs. inversion Hcs; subst=>//.
-  exfalso. eapply (is_jmp_jstep_false k)=>//.
+  - exfalso. eapply (is_jmp_jstep_false k)=>//.
+  - exfalso. eapply (is_jmp_wstep_false k)=>//.
 Qed.
 
 Lemma fill_step_inv e1' σ1 e2 σ2 s1 s2 K efs:
@@ -1196,6 +1346,12 @@ Proof.
     try destruct Heq as (?&?); subst; auto.
     + by rewrite is_jmp_ret in Hnj.
     + by rewrite is_jmp_call in Hnj.
+  - inversion_wstep_as Heq;
+    eapply cont_incl in Heq=>//;
+    try destruct Heq as (?&?); subst; auto.
+    + by rewrite is_jmp_while in Hnj.
+    + by rewrite is_jmp_break in Hnj.
+    + by rewrite is_jmp_continue in Hnj.
 Qed.
 
 Lemma instantiate_let_preserves_not_jmp x xv xt e e':
@@ -1256,6 +1412,8 @@ Proof.
     + eapply estep_preserves_not_jmp; first apply H; done.
   - exfalso. move:(cstep_not_val H0)=>Hn.
     by eapply (is_jmp_jstep_false []).
+  - exfalso. move:(cstep_not_val H0)=>Hn.
+    by eapply (is_jmp_wstep_false []).
 Qed.
 
 Lemma same_type_encode_inj σ:
@@ -1318,6 +1476,9 @@ Ltac atomic_step H :=
   | match goal with
     | [ HJ : jstep _ _ _ _ _ |- _ ] => absurd_jstep HJ
     end
+  | match goal with
+    | [ HW : wstep _ _ _ _ |- _ ] => absurd_jstep HW
+    end
   ].
 
 Definition clang_atomic (e: expr) :=
@@ -1329,10 +1490,10 @@ Definition clang_atomic (e: expr) :=
   | _ => false
   end.
 
-Ltac inversion_cstep_as Hes Hjs :=
+Ltac inversion_cstep_as Hes Hjs Hws :=
   match goal with
     | [ Hcs : cstep _ _ _ _ _ _ _ |- _ ] =>
-      inversion Hcs as [????????Hes|???????Hjs]; subst
+      inversion Hcs as [????????Hes|???????Hjs|??????Hws]; subst
   end.
 
 Lemma atomic_enf e:
@@ -1342,27 +1503,28 @@ Proof.
     destruct e=>//.
     + destruct e1=>//. destruct v=>//.
       destruct e2=>//. destruct e3=>//.
-      inversion_cstep_as Hes Hjs.
+      inversion_cstep_as Hes Hjs Hws.
       { inversion Hes; subst=>//;
         ((exfalso; by escape_false) || (simpl; by eauto)). }
       { absurd_jstep Hjs. }
-    + destruct e=>//. inversion_cstep_as Hes Hjs.
-      inversion_cstep_as Hes Hjs.
+      { absurd_jstep Hws. }
+    + destruct e=>//.
+      inversion_cstep_as Hes Hjs Hws.
       { inversion Hes; subst=>//;
         ((exfalso; by escape_false) || (simpl; by eauto)). }
       { absurd_jstep Hjs. }
-      { absurd_jstep Hjs. }
-    + destruct e=>//. inversion_cstep_as Hes Hjs.
-      inversion_cstep_as Hes Hjs.
+      { absurd_jstep Hws. }
+    + destruct e=>//. inversion_cstep_as Hes Hjs Hws.
       { inversion Hes; subst=>//;
         ((exfalso; by escape_false) || (simpl; by eauto)). }
       { absurd_jstep Hjs. }
-      { absurd_jstep Hjs. }
+      { absurd_jstep Hws. }
     + destruct e1=>//. destruct v=>//. destruct e2=>//.
-      inversion_cstep_as Hes Hjs.
+      inversion_cstep_as Hes Hjs Hws.
       { inversion Hes; subst=>//;
         ((exfalso; by escape_false) || (simpl; by eauto)). }
       { absurd_jstep Hjs. }
+      { absurd_jstep Hws. }
 Qed.
 
 Lemma empty_ctx e: e = fill_ectxs e []. done. Qed.

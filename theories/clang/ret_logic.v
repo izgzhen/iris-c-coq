@@ -253,7 +253,7 @@ Section wp_ret.
            eexists _, ks, (State s_heap s_text), _. simpl.
            apply CSjstep. subst. apply JSrete with (KS := []). done. }
          iNext; iIntros (e2 σ2 efs Hs).
-         simpl in *. inversion_cstep_as Hes Hjs; subst.
+         simpl in *. inversion_cstep_as Hes Hjs Hws; subst.
          { by apply fill_estep_false in Hes. }
          inversion_jstep_as Heq; subst.
          * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
@@ -261,10 +261,12 @@ Section wp_ret.
            iDestruct "Hσ1" as "(H1&H3)".
            iFrame. iMod "Hclose" as "_".
            iModIntro. iSplitL.
-           { simpl. destruct e2. simpl in *. simplify_eq. admit.
-           (* by iApply "H'". *) }
+           { simpl. destruct e2. simpl in *. simplify_eq.
+             apply kcall_map in H7=>//. destruct_ands.
+             by iApply "H'". }
            by rewrite big_sepL_nil.
          * apply cont_inj in Heq=>//; auto. by destruct_ands.
+         * apply fill_wstep_false in Hws=>//.
       + destruct_ands.
         iDestruct "H'" as (??????) "[% [H1 H2]]".
         destruct_ands. cont_uninj'.
@@ -278,24 +280,25 @@ Section wp_ret.
           eexists _, (_::Kcall k::ks), (State s_heap s_text), [].
           constructor. eapply JScall=>//. }
         iNext; iIntros (e2 σ2 efs Hcs). simpl in *.
-        inversion_cstep_as Hes Hjs.
+        inversion_cstep_as Hes Hjs Hws.
          { by apply fill_estep_false in Hes. }
-         inversion_jstep_as Heq; subst.
-         * fill_enf_neq.
-         * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
-           inversion Heq. simplify_eq.
-           apply map_inj in Heq; last by inversion 1.
-           simpl in *. subst. simplify_eq.
-           iDestruct "Hσ1" as "(?&?)".
-           iFrame. iMod "Hclose" as "_".
-           iModIntro. iSplitL; last by rewrite big_sepL_nil.
-           destruct e2. simpl in *. simplify_eq.
-           iApply ("IH" $! _ _ (Kcall k::ks) with "[-]")=>//.
-           iApply wpr_step_mono. iFrame.
-           iClear "H1". iAlways.
-           iIntros (?) "H1".
-           iApply ("IH" with "[-]")=>//.
-  Admitted.
+         { inversion_jstep_as Heq; subst.
+           * fill_enf_neq.
+           * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
+             inversion Heq. simplify_eq.
+             apply map_inj in Heq; last by inversion 1.
+             simpl in *. subst. simplify_eq.
+             iDestruct "Hσ1" as "(?&?)".
+             iFrame. iMod "Hclose" as "_".
+             iModIntro. iSplitL; last by rewrite big_sepL_nil.
+             destruct e2. simpl in *. simplify_eq.
+             iApply ("IH" $! _ _ (Kcall k::ks) with "[-]")=>//.
+             iApply wpr_step_mono. iFrame.
+             iClear "H1". iAlways.
+             iIntros (?) "H1".
+             iApply ("IH" with "[-]")=>//. }
+         { apply fill_wstep_false in Hws=>//. }
+  Qed.
 
   Lemma wpr_head E eh Φ Φret:
     is_jmp eh = false → enf eh → (∀ ks, WP (eh, ks) @ E {{ Φ }}) ⊢ wpr E eh Φ Φret.
