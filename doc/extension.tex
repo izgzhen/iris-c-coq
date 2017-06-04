@@ -54,8 +54,8 @@ And this definition supports the following inference rules:
 
 \infer[wp-call-r]
 {f \tmapsto \Funct(\tau, ps, e) *
- \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \wpre{k(v); s}[\mask]{\pred}} }
-{\wpre{k(\ecall{\tau}{f}{ls}); s}[\mask]{\pred}}
+ \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \wpre{k(v); KS}[\mask]{\pred}} }
+{\wpre{k(\ecall{\tau}{f}{ls}); KS}[\mask]{\pred}}
 
 \end{mathpar}
 

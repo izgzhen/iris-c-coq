@@ -90,7 +90,7 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
  \wpre{l \la v}[\mask]{\pred}}
 
 \infer[wp-ret]
-{}{\wpre{k'(v); ks}[\mask]{\pred} \proves \wpre{k(\erete{v}); k'::ks}[\mask]{\pred}}
+{}{\wpre{k'(v); KS}[\mask]{\pred} \proves \wpre{k(\erete{v}); \kcall{k'}::KS}[\mask]{\pred}}
 
 \infer[wp-bind]
 {\isjmp(e) = \FALSE}
@@ -120,15 +120,6 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 {\tychk{v}{\tau}}
 { (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\ealloc{\tau}{v}}[\mask]{\pred}}
 
-
-\infer[wp-while-true]
-{}{\later \wpre{s; \ewhile{c}{c}{s}}[\mask]{\pred}
-   \proves \wpre{\ewhile{c}{\vtrue}{s}}[\mask]{\pred}}
-
-\infer[wp-while-false]
-{}{\later \pred(\void)
-   \proves \wpre{\ewhile{c}{\vfalse}{s}}[\mask]{\pred}}
-
 \infer[wp-if-true]
 {}{\later \wpre{e_1}[\mask]{\pred}
    \proves \wpre{\eif{\vtrue}{e_1}{e_2}}[\mask]{\pred}}
@@ -136,12 +127,6 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 \infer[wp-if-false]
 {}{\later \wpre{e_2}[\mask]{\pred}
    \proves \wpre{\eif{\vfalse}{e_1}{e_2}}[\mask]{\pred}}
-
-\infer[wp-while-inv]
-{ {\begin{inbox}
-      \qquad\qquad\qquad \isjmp(s) = \FALSE \qquad \isjmp(c) = \FALSE \\ \All \pred. (I * (\All v. (v = \vfalse * Q(\void)) \vee (v = \vtrue * I)) \wand \pred(v)) \wand \wpre{c}{\pred} \\ \qquad\qquad\qquad\qquad \All \pred. (I * (I \wand \pred(\void))) \wand \wpre{s}{\pred}
- \end{inbox}} }
-{I \proves \wpre{\ewhile{c}{c}{s}}{Q}}
 
 \infer[wp-fst]
 {}
@@ -153,8 +138,8 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 
 \infer[wp-call]
 {}
-{ f \tmapsto \Funct(\tau, ps, e) * \later (\wpre{e[ps/ls]; k::ks}[\mask]{\pred})
-  \proves \wpre{k(\ecall{\tau}{f}{ls}); ks}[\mask]{\pred}}
+{ f \tmapsto \Funct(\tau, ps, e) * \later (\wpre{e[ps/ls]; \kcall{k}::KS}[\mask]{\pred})
+  \proves \wpre{k(\ecall{\tau}{f}{ls}); KS}[\mask]{\pred}}
 
 \infer[wp-cas-fail]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad v_1 \neq v}
@@ -172,6 +157,18 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 \infer[wp-fork]
 {}{f \tmapsto \Funct(\tau, ps, e) * \later \pred(\void) * \later (\wpre{e[ps/vs]; \emptyset}{\Ret\any.\TRUE})
    \proves \wpre{\efork{\tau}{f}{vs}; ks}[\mask]{\pred}}
+
+\infer[wp-while]
+{}{ \later \wpre{\eif{c}{e;\econtinue}{\ebreak}; \kwhile{c}{e}{k}::KS}[\mask]{\pred}
+    \proves \wpre{ k(\ewhile{c}{e}; KS }[\mask]{\pred} }
+
+\infer[wp-break]
+{}{ \wpre{k'(\void); KS}[\mask]{\pred}
+    \proves \wpre{k(\ebreak); \kwhile{c}{e}{k'}::KS}[\mask]{\pred} }
+
+\infer[wp-continue]
+{}{ \wpre{k'(\ewhile{c}{e}); KS}[\mask]{\pred}
+    \proves \wpre{k(\econtinue); \kwhile{c}{e}{k'}::KS}[\mask]{\pred} }
 
 \end{mathpar}
 \caption{WP rules specific to \irisc{}}

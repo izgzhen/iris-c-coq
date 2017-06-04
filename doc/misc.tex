@@ -54,118 +54,24 @@ such $e$ is \emph{well-formed}.
 
 \subsection{Axioms about Evaluation Context based Semantics}
 
-In the following lemmas, we assume all involved $e$ to be \emph{well-formed}.
-
-\begin{lemma}
-$\All e: \Expr, k: \Cont . \isenf(e) \Ra \unfill(k(e)) = (k, e)$
+\begin{lemma}[estep is well-formed]
+\[
+\All e, \sigma, e', \sigma', \Gamma, es.
+  \estep{\Gamma}{e}{\sigma}{e'}{\sigma'}{es} \Ra \textdom{wellformed}(e)
+\]
 \end{lemma}
 \begin{proof}
-
-Let's prove inductively w.r.t $k$. When $k$ is empty,
-since $e$ is in normal form, so unfill it will only return the same thing.
-And inductively, since fill and unfill should cancel out, the final conclusion is proved trivially as well.
-
+TODO
 \end{proof}
 
-\begin{lemma}
-  $\All e, e_h, k. \unfill(e) = (k, e_h) \Ra \isenf(e_h) \land e = k(e_h)$
+\begin{lemma}[cstep is well-formed]
+\[
+\All e, s, \sigma, e', s', \sigma', \Gamma, es.
+  \cstepf{e}{s, \sigma}{e'}{s', \sigma'}{es} \Ra \textdom{wellformed}(e)
+\]
 \end{lemma}
 \begin{proof}
-    First, $e$ can't be a value, so we just need to consider $e$ in each legal case, which basically
-    mean that either $e$ is normal form itself, or $e = K(e')$ and $\Exists k', k = K::k' \land \unfill(e') = (k', e_h)$.
-    \begin{enumerate}
-        \item In the first case, $k$ is forced to be $\emptyset$ and $e_h = e$, so this case is proved
-        \item In the second case, we can inductively know that $e_h$ is normal form and $e' = k'(e_h)$,
-              so $e = K(k'(e_h)) = (K::k')(e_h) = k(e_h)$, so this case is proved as well
-    \end{enumerate}
-\end{proof}
-
-
-\begin{lemma}
-Induction scheme I for $\Expr$:
-\begin{align*}
-\All P: \Expr \ra \Prop.
-  &(\All e. \isenf(e) \Ra P(e)) \Ra \\
-  &(\All e, k: \Cont . \toval(e) = \bot \Ra P(e) \Ra P(k(e))) \Ra\\
-  &(\All e. \toval(e) = \bot \Ra P(e))
-\end{align*}
-\end{lemma}
-\begin{proof}
-We want to \emph{inductively} prove that for any non-value, \emph{well-formed} $e$, $P(e)$ holds.
-Note that $P$ here can be any proposition.
-
-The base case is when $e$ is in normal form, which corresponds to the first condition;
-The inductive case is that for any well-formed $e'$ that is not in normal form,
-it must be of the form $k(e)$ for some $k, e$. With each proved given sufficient inductive
-assumption, we know that any well-formed $e$ must satisfy $P$.
-\end{proof}
-
-\begin{lemma}
-  Induction scheme for $\Cont$:
-  \begin{align*}
-    \All P: \Cont \ra \Prop.
-      &(P(\emptyset)) \Ra \\
-      &(\All k. (\All. k', |k'| < |k| \Ra P(k')) \Ra P(k)) \Ra \\
-      &(\All k. P(k))
-  \end{align*}
-\end{lemma}
-\begin{proof}
-    Intuitively, this is about property of natural number as the length of $k$.
-    When we know $P(\emptyset)$, we know $\All K_1. P(K_1::[])$, then we know
-    $\All K_2. \All K_1. P(K_2::K_1::[])$ .... Until for arbitrarily big, finite $n$,
-    $\All K_n, K_{n - 1}, ..., K_1. P(K_n::K_{n-1}::...::K_1::[])$, or for any finite
-    $k$, $P(k)$ holds.
-\end{proof}
-
-\begin{lemma}
-Induction scheme II for $\Expr$:
-\begin{align*}
-\All P: \Expr \ra \Prop.
-  &(\All e. \isenf(e) \Ra P(e)) \Ra \\
-  &(\All e, k: \Cont . \isenf(e) \Ra (\All k'. |k'| < |k| \Ra P (k'(e))) \Ra P(k(e))) \Ra\\
-  &(\All e. \toval(e) = \bot \Ra P(e))
-\end{align*}
-\end{lemma}
-\begin{proof}
-    First, the $e$ in the final goal is implicitly well-formed, which means that $e = K(e_h)$
-    for some $K, e_h$. So we prove inductively on the length of such $K$, in a similar way to
-    the last lemma, and reach our final conclusion.
-\end{proof}
-
-\begin{lemma}
-  Partial injectivity of fill:
-  \[
-  \infer{
-    \toval(e) = \bot \quad
-    \isenf(e_h) \quad
-    k(e) = k'(e_h)}
-  {\Exists k''. k' = k \append k'' \and e = k''(e_h)}
-  \]
-\end{lemma}
-  \begin{proof}
-  \begin{enumerate}
-    Since $e$ is well-formed and not a value, so it can be unfilled such that $e = k''(e_h')$,
-    then by \texttt{cont\_inj}, $e_h = e_h'$ and $k' = k \append k''$, which proves our claim
-  \end{enumerate}
-\end{proof}
-
-\begin{lemma}
-  Local step has a focus:
-  \[
-  \infer{\estep{\Sigma}{e_1}{h_1}{e_2}{h_2}}
-  {\Exists e_1', e_2', k. \isenf(e_1') \land e_1 = k(e_1') \land e_2 = k(e_2') \land \estep{\Sigma}{e_1'}{h_1}{e_2'}{h_2}}
-  \]
-\end{lemma}
-\begin{proof}
-    By inversing the assumption, we know there are two possibilities:
-    \begin{enumerate}
-    \item If $e_1$ is already in normal form, then we just need to let $e_1' = e_1, e_2' = e_2$, and $k = \emptyset$.
-    \item We know that there are some $k'', e_1'', e_2''$, where $|k''| > 0$, such that $e_1 = k''(e_1''), e_2 = k''(e_2'')$,
-          and $\estep{\Sigma}{e_1''}{h_1}{e_2''}{h_2}$. Since by the metric of depth $||_d$, $|e_1''|_d < |e_1|_d$,
-          so we can derive inductively that there exists $e_1', e_2', k'$ that
-          \[\isenf(e_1') \land e_1'' = k'(e_1') \land e_2'' = k'(e_2') \land \estep{\Sigma}{e_1'}{h_1}{e_2'}{h_2}\]
-          Now let $k = k '' \append k'$, and use the same $e_1', e_2'$, we can prove the original existential goal.
-    \end{enumerate}
+TODO
 \end{proof}
 
 \subsection{Other Facts}

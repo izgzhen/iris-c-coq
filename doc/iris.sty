@@ -426,7 +426,9 @@
 \newcommand{\eaddrof}[1]{\& {#1}}
 \newcommand{\esnd}[1]{{#1}.2}
 \newcommand{\eif}[3]{\texttt{if}({#1})\,\{{#2}\}\,\texttt{else}\,\{{#3}\}}
-\newcommand{\ewhile}[3]{\texttt{while}_{#1}({#2})\,\{{#3}\}}
+\newcommand{\ewhile}[2]{\texttt{while}({#1})\,\{{#2}\}}
+\newcommand{\ebreak}{\texttt{break}}
+\newcommand{\econtinue}{\texttt{continue}}
 \newcommand{\ewhilenoc}[2]{\texttt{while}\,({#1})\,\{{#2}\}}
 \newcommand{\erete}[1]{\texttt{return}\,{#1}}
 \newcommand{\ealloc}[2]{\texttt{alloc}_{#1}(#2)}
@@ -447,7 +449,9 @@
 \newcommand{\ctx}{K}
 \newcommand{\ectx}{\ensuremath{\textmon{Ectx}}}
 \newcommand{\sctx}{\ensuremath{\textmon{Sctx}}}
-\newcommand{\allctx}{\ensuremath{\textmon{Ctx}}}
+\newcommand{\kwhile}[3]{K_{while}({#1}, {#2}, {#3})}
+\newcommand{\kcall}[1]{K_{call}({#1})}
+\newcommand{\Ctx}{\ensuremath{\textmon{Ctx}}}
 \newcommand{\Cont}{\ensuremath{\textmon{Cont}}}
 \newcommand{\SpecCode}{\ensuremath{\textmon{SpecCode}}}
 \newcommand{\SpecState}{\ensuremath{\textmon{SpecState}}}
@@ -463,11 +467,12 @@
 \newcommand{\tychk}[2]{\vdash_{\text{typeof}} {#1} : {#2}\,}
 \newcommand{\tyinf}[2]{\vdash_{\text{tyinf}} {#1} : {#2}}
 
-\newcommand{\estepf}[6]{({#2}, {#3}) \leadsto_{local}^{#1} ({#4}, {#5}, {#6})}
+\newcommand{\estepf}[6]{({#2}, {#3}) \leadsto_{local}^{#1} ({#4}, {#5}, ({#6}))}
 \newcommand{\estep}[5]{({#2}, {#3}) \leadsto_{local}^{#1} ({#4}, {#5})}
 \newcommand{\jstep}[5]{({#2}, {#3}) \leadsto_{jump}^{#1} ({#4}, {#5})}
+\newcommand{\wstep}[4]{({#1}, {#2}) \leadsto_{while} ({#3}, {#4})}
 \newcommand{\cstep}[4]{({#1}, {#2}) \leadsto ({#3}, {#4})}
-\newcommand{\cstepf}[5]{({#1}, {#2}) \leadsto ({#3}, {#4}, {#5})}
+\newcommand{\cstepf}[5]{({#1}, {#2}) \leadsto ({#3}, {#4}, ({#5}))}
 \newcommand{\cstepN}[5]{({#1}, {#2}) \leadsto^{#5}_c ({#3}, {#4})}
 \newcommand{\sstep}[4]{({#1}, {#2}) \leadsto_{spec} ({#3}, {#4})}
 \newcommand{\sstepstar}[4]{({#1}, {#2}) \leadsto^{*}_{spec} ({#3}, {#4})}
