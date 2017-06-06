@@ -267,11 +267,17 @@ Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : optio
   | Eaddrof e => Eaddrof <$> resolve_rhs ev x vx tx e
   | Efst e => Efst <$> resolve_rhs ev x vx tx e
   | Esnd e => Esnd <$> resolve_rhs ev x vx tx e
-  | Ecall t f args => Ecall t f <$> lift_list_option (map (resolve_rhs ev x vx tx) args)
-  | Efork t f args => Efork t f <$> lift_list_option (map (resolve_rhs ev x vx tx) args)
+  | Ecall t f args => Ecall t f <$>
+                            lift_list_option
+                            (map (resolve_rhs ev x vx tx) args)
+  | Efork t f args => Efork t f <$>
+                            lift_list_option
+                            (map (resolve_rhs ev x vx tx) args)
   | Eassign e1 e2 => Eassign e1 <$> resolve_rhs ev x vx tx e2
   | Eif e s1 s2 =>
-    match resolve_rhs ev x vx tx e, resolve_rhs ev x vx tx s1, resolve_rhs ev x vx tx s2 with
+    match resolve_rhs ev x vx tx e,
+          resolve_rhs ev x vx tx s1,
+          resolve_rhs ev x vx tx s2 with
     | Some e', Some s1', Some s2' => Some $ Eif e' s1' s2'
     | _, _, _ => None
     end
@@ -287,7 +293,9 @@ Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : optio
     | _, _ => None
     end
   | ECAS t e1 e2 e3 =>
-    match resolve_rhs ev x vx tx e1, resolve_rhs ev x vx tx e2, resolve_rhs ev x vx tx e3 with
+    match resolve_rhs ev x vx tx e1,
+          resolve_rhs ev x vx tx e2,
+          resolve_rhs ev x vx tx e3 with
     | Some e1', Some e2', Some e3' => Some (ECAS t e1' e2' e3')
     | _, _, _ => None
     end
@@ -300,7 +308,8 @@ Fixpoint resolve_rhs (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : optio
          end
   end.
 
-Fixpoint resolve_lhs_inner (ev: env) (x: ident) (vx: val) (tx: type) (e: expr) : option expr :=
+Fixpoint resolve_lhs_inner (ev: env) (x: ident)
+                           (vx: val) (tx: type) (e: expr) : option expr :=
   match e with
   | Evalue (Vptr l) => Some e
     | Ederef_typed _ e' => Some e
@@ -438,9 +447,10 @@ Qed.
 
 Fixpoint let_params (vs: list val) (params: decls) e : option expr :=
   match vs, params with
-    | v::vs', (x, tx)::ps' => Elet tx x (Ealloc tx (Evalue v)) <$> let_params vs' ps' e
-    | [], [] => Some e
-    | _, _ => None
+  | v::vs', (x, tx)::ps' => Elet tx x (Ealloc tx (Evalue v))
+                                 <$> let_params vs' ps' e
+  | [], [] => Some e
+  | _, _ => None
   end.
 
 Inductive estep : text → expr → heap → expr → heap → list expr → Prop :=
@@ -502,7 +512,10 @@ Inductive estep : text → expr → heap → expr → heap → list expr → Pro
       is_jmp e = false →
       estep Γ e σ e' σ' efs →
       estep Γ (fill_ectxs e (k::kes)) σ (fill_ectxs e' (k::kes)) σ' efs.
-(* !!!!!!!!!!!: NEVER add new semantic rules after ESbind', which would break everything *)
+(* !!!!!!!!!!!:
+   NEVER add new semantic rules after ESbind',
+   which would break everything
+*)
 
 Lemma ESbind:
     ∀ kes e e' σ σ' Γ efs,
@@ -538,86 +551,6 @@ Definition is_loc e :=
   match to_val e with
     | Some (Vptr _) => true
     | _ => false
-  end.
-
-Fixpoint unfill_expr (e: expr) (ks: cont) : option (cont * expr) :=
-  match e with
-    | Evalue _ => None
-    | Evar _ => None
-    | Ewhile _ _ => None
-    | Ebreak => None
-    | Econtinue => None
-    | Ebinop op e1 e2 =>
-      match e1, e2 with
-        | Evalue v1, Evalue v2 => Some (ks, e)
-        | Evalue v1, _ => unfill_expr e2 (EKbinopl op v1 :: ks)
-        | _, _ => unfill_expr e1 (EKbinopr op e2 :: ks)
-      end
-    | Ederef_typed t e =>
-      match e with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e (EKderef_typed t :: ks)
-      end
-    | Eaddrof e =>
-      match e with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e (EKaddrof :: ks)
-      end
-    | Efst e =>
-      match e with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e (EKfst :: ks)
-      end
-    | Esnd e =>
-      match e with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e (EKsnd :: ks)
-      end
-    (* | Ecall : ident → list expr → expr *) (* which is complex ... *)
-    | Ealloc t e =>
-      match e with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e (EKalloc t :: ks)
-      end
-    | Eassign e1 e2 =>
-      match e1, e2 with
-        | Evalue v1, Evalue v2 => Some (ks, e)
-        | Evalue (Vptr l), _ => unfill_expr e2 (EKassignl l :: ks)
-        | _, _ => unfill_expr e1 (EKassignr e2 :: ks)
-      end
-    | Eif e1 e2 e3 =>
-      match e1 with
-        | Evalue _ => Some (ks, e)
-        | _ => unfill_expr e1 (EKif e2 e3 :: ks)
-      end
-    | Erete e1 =>
-      match e1 with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e1 (EKrete :: ks)
-      end
-    | Eseq e1 e2 =>
-      match e with
-        | Evalue v => Some (ks, e)
-        | _ => unfill_expr e1 (EKseq e2 :: ks)
-      end
-    | Ecall t f es =>
-      if forallb is_val es
-        then Some (ks, e)
-        else None (* Unsound *)
-    | ECAS t e1 e2 e3 =>
-      match e1, e2, e3 with
-      | Evalue (Vptr l), Evalue v2, Evalue v3 => Some (ks, e)
-      | Evalue (Vptr l), Evalue v2, _ => unfill_expr e3 (EKCASr t l v2 :: ks)
-      | Evalue (Vptr l), _, _ => unfill_expr e2 (EKCASm t l e3 :: ks)
-      | _, _, _ => unfill_expr e1 (EKCASl t e2 e3 :: ks)
-      end
-    | Elet t x ex ebody =>
-      match ex with
-        | Evalue _ => Some (ks, e)
-        | _ => unfill_expr ex (EKlet t x ebody :: ks)
-      end
-    | Efork _ _ _ => None
-    | Ederef _ => None
   end.
 
 Inductive lnf: expr → Prop :=

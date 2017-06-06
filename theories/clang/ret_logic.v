@@ -1,22 +1,6 @@
 From iris_c.clang Require Export logic.
 From iris_c.lib Require Import pair.
 
-Axiom cont_uninj':
-  ∀ e eh K, unfill_expr e [] = Some (K, eh) → enf eh ∧ e = fill_ectxs eh K.
-
-Arguments cont_uninj' {_ _ _} _.
-
-Axiom cont_uninj:
-  ∀ kes e, enf e → unfill_expr (fill_ectxs e kes) [] = Some (kes, e).
-
-Lemma unfill_app e eh K K':
-  unfill_expr e [] = Some (K, eh) →
-  unfill_expr (fill_ectxs e K') [] = Some (K' ++ K, eh).
-Proof.
-  intros H. move: (cont_uninj' H) => [? ?].
-  subst. rewrite fill_app. by apply cont_uninj.
-Qed.
-
 Section wp_ret.
   Context `{clangG Σ}.
 
@@ -27,7 +11,7 @@ Section wp_ret.
   (∃ v, ⌜to_val e1 = Some v⌝ ∧ Φ v) ∨
   (* local case *)
   (⌜to_val e1 = None ⌝ ∧ ∃ eh K,
-     ⌜ unfill_expr e1 [] = Some (K, eh) ⌝ ∧
+     ⌜ e1 = fill_ectxs eh K ∧ enf eh ⌝ ∧
      ((∀ ks, ⌜ is_jmp eh = false ⌝ ∗ WP (eh, ks) @ E {{ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret }}) ∨
       (∃ v, ⌜ eh = Erete (Evalue v) ⌝ ∗ ▷ Φret v) ∨
       (∃ f vs e e' params retty,
@@ -50,17 +34,17 @@ Section wp_ret.
   Proof. rewrite wpr_eq. apply (fixpoint_unfold wpr_pre). Qed.
 
   Lemma wpr_helper E P R Q e eh K ks:
-    unfill_expr e [] = Some (K, eh) →
+    e = fill_ectxs eh K ∧ enf eh →
     (∀ v, P v -∗ R -∗ Q v) ∗
     ▷ R ∗
     WP (eh, ks) @ E {{ P }}
     ⊢ WP (eh, ks) @ E {{ Q }}.
   Proof.
-    iIntros (?) "[? [HR ?]]".
+    iIntros ((?&?)) "[? [HR ?]]".
     assert (to_val eh = None) as ?.
-    { move : (cont_uninj' H0) => [? ?].
-      by apply enf_not_val. }
-    iDestruct (wp_frame_step_l' _ (eh : language.expr clang_lang, ks) with "[-~]") as "?"=>//.
+    { by apply enf_not_val. }
+    iDestruct (wp_frame_step_l' _ (eh : language.expr clang_lang, ks)
+               with "[-~]") as "?"=>//.
     { iFrame "HR". iFrame. }
     iApply (wp_strong_mono E E)=>//.
     iFrame. iIntros (?) "[? ?]".
@@ -68,7 +52,8 @@ Section wp_ret.
   Qed.
 
   Lemma wpr_step_mono E eh (Φ1 Φ2: val → iProp Σ):
-    (□ (∀ v, Φ1 v -∗ Φ2 v) ∗ (wpr E eh (λ _ : val, False) Φ1)%I ⊢ wpr E eh (λ _ : val, False) Φ2).
+    (□ (∀ v, Φ1 v -∗ Φ2 v) ∗ (wpr E eh (λ _ : val, False) Φ1)%I
+    ⊢ wpr E eh (λ _ : val, False) Φ2).
   Proof.
     iLöb as "IH" forall (Φ1 Φ2 eh). rewrite !wpr_unfold /wpr_pre.
     iIntros "[#H12 [H | [% H]]]".
@@ -108,8 +93,10 @@ Section wp_ret.
     - iDestruct "H" as (eh K) "(% & [ H | [H | H]])".
       + iRight. iSplit=>//; first by iPureIntro; apply fill_ectxs_not_val.
         iExists eh, (kes ++ K).
-        iSplit; first by iPureIntro; apply unfill_app.
-        iLeft. iIntros (ks). iDestruct ("H" $! ks) as "[% H]". iSplitL ""; first done.
+        iSplit.
+        { iPureIntro. destruct_ands. split=>//. apply fill_app. }
+        iLeft. iIntros (ks). iDestruct ("H" $! ks) as "[% H]".
+        iSplitL ""; first done.
         iApply wpr_helper=>//.
         iFrame "IH". iFrame.
         iIntros (?) "H1 H2".
@@ -117,13 +104,15 @@ Section wp_ret.
       + iDestruct "H" as (v) "[% H]". iRight.
         iSplit=>//; first by iPureIntro; apply fill_ectxs_not_val.
         iExists eh, (kes ++ K).
-        iSplit; first by iPureIntro; apply unfill_app.
+        iSplit.
+        { iPureIntro. destruct_ands. split=>//. apply fill_app. }
         iRight. iLeft. iExists v. by iSplitL "".
       + iDestruct "H" as (??????) "[% [? ?]]". destruct_ands.
         iRight.
         iSplit=>//; first by iPureIntro; apply fill_ectxs_not_val.
         iExists _, (kes ++ K).
-        iSplit; first by iPureIntro; apply unfill_app.
+        iSplit.
+        { iPureIntro. destruct_ands. split=>//. apply fill_app. }
         iRight. iRight. iExists _, _, _, _, _, _.
         iSplitL ""=>//.
         iFrame. iApply wpr_step_mono.
@@ -132,7 +121,8 @@ Section wp_ret.
   Qed.
 
   Lemma wpr_seq E e1 e2 Φ Φret:
-    wpr E e1 (λ v, wpr E (Eseq (Evalue v) e2) Φ Φret) Φret ⊢ wpr E (Eseq e1 e2) Φ Φret.
+    wpr E e1 (λ v, wpr E (Eseq (Evalue v) e2) Φ Φret) Φret
+    ⊢ wpr E (Eseq e1 e2) Φ Φret.
   Proof. iIntros "Hseq". iApply (wpr_bind [EKseq e2])=>//. Qed.
 
   Lemma wpr_ret v E Φ Φret:
@@ -142,7 +132,7 @@ Section wp_ret.
     rewrite wpr_unfold /wpr_pre.
     iRight. iSplit=>//. iExists (Erete (Evalue v)), [].
     iSplit.
-    - iPureIntro. split=>//.
+    - iPureIntro. split=>//. auto.
     - iRight. iLeft. iExists v. iSplitL ""=>//. eauto.
   Qed.
 
@@ -157,9 +147,9 @@ Section wp_ret.
     iRight.
     iSplit.
     { iPureIntro. split=>//. }
-    iExists (Ecall retty f _), [].
+    iExists (Ecall retty f (map Evalue vs)), [].
     iSplit.
-    { iPureIntro. simpl. by rewrite forall_is_val. }
+    { iPureIntro. simpl. split=>//. auto. }
     iRight. iRight. iExists _, _, _, _, _, _. iFrame.
     iSplitL "".
     { iPureIntro. split=>//. }
@@ -174,13 +164,6 @@ Section wp_ret.
     by iDestruct (lookup_text with "[~ ~2]") as "%"; first iFrame.
   Qed.
 
-  Tactic Notation "cont_uninj'" :=
-    match goal with
-      | [ H : unfill_expr _ _ = Some _ |- _ ] =>
-        let H' := fresh "H'" in
-        move: (cont_uninj' H) => H'; clear H; destruct_ands
-    end.
-
   Tactic Notation "enf_not_val" :=
     match goal with
       | [ H: enf _ |- _ ] =>
@@ -190,10 +173,13 @@ Section wp_ret.
 
   Tactic Notation "not_jmp_preserves" ident(Hes) :=
     match goal with
-      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep ?E _ _ _ _ _ _ |- _ ] =>
-        move: (not_jmp_preserves [] _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
-      | [ Hjn: is_jmp ?E = false , Hn: to_val ?E = None, Hc: cstep (fill_ectxs ?E ?K) _ _ _ _ _ _ |- _ ] =>
-        move: (not_jmp_preserves _ _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
+    | [ Hjn: is_jmp ?E = false ,
+        Hn: to_val ?E = None, Hc: cstep ?E _ _ _ _ _ _ |- _ ] =>
+      move: (not_jmp_preserves [] _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
+    | [ Hjn: is_jmp ?E = false,
+        Hn: to_val ?E = None,
+        Hc: cstep (fill_ectxs ?E ?K) _ _ _ _ _ _ |- _ ] =>
+      move: (not_jmp_preserves _ _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
     end; subst.
 
   Lemma wp_call_r E ks vs params e e' f retty k Φ:
@@ -213,7 +199,7 @@ Section wp_ret.
     - iDestruct "H'" as (??) "[% [H' | [H' | H']]]".
       + iRight. destruct_ands. iSplit=>//.
         iIntros (σ1) "Hσ1".
-        cont_uninj'. iDestruct ("H'" $! (Kcall k::ks)) as "[% H']".
+        iDestruct ("H'" $! (Kcall k::ks)) as "[% H']".
         rewrite wp_unfold /wp_pre.
         iDestruct "H'" as "[H'|H']".
         * iDestruct "H'" as (?) "[% _]".
@@ -243,12 +229,9 @@ Section wp_ret.
           iModIntro. iApply ("IH" with "[-]")=>//.
       +  destruct_ands.
          iDestruct "H'" as (?) "[% H']". subst.
-         cont_uninj'. iRight.
-         iSplit=>//.
-         iIntros (σ1) "Hσ1".
+         iRight. iSplit=>//. iIntros (σ1) "Hσ1".
          iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
-         iModIntro.
-         iSplit.
+         iModIntro. iSplit.
          { iPureIntro. destruct σ1. simpl in *.
            eexists _, ks, (State s_heap s_text), _. simpl.
            apply CSjstep. subst. apply JSrete with (KS := []). done. }
@@ -269,7 +252,7 @@ Section wp_ret.
          * apply fill_wstep_false in Hws=>//.
       + destruct_ands.
         iDestruct "H'" as (??????) "[% [H1 H2]]".
-        destruct_ands. cont_uninj'.
+        destruct_ands.
         iRight. iSplit=>//.
         iIntros (σ1) "Hσ1".
         iMod (fupd_intro_mask' E ∅) as "Hclose"; first set_solver.
@@ -308,7 +291,6 @@ Section wp_ret.
     iRight. iSplit=>//.
     { iPureIntro. by apply enf_not_val. }
     iExists eh, []. iSplit=>//.
-    { iPureIntro. by eapply (cont_uninj []). }
     iLeft. iIntros (ks). iDestruct ("~" $! ks) as "?". iSplitL ""=>//.
     iApply (wp_strong_mono E E)=>//. iFrame.
     iIntros (?) "HΦ".
