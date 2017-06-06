@@ -834,7 +834,8 @@ Arguments wellformed_estep {_ _ _ _ _ _} _.
 
 Lemma focus_estep_inv {e1 σ1 e2 σ2 G efs}:
   estep G e1 σ1 e2 σ2 efs →
-  ∃ e1' e2' K, enf e1' ∧ e1 = fill_ectxs e1' K ∧ estep G e1' σ1 e2' σ2 efs ∧ e2 = fill_ectxs e2' K.
+  ∃ e1' e2' K, enf e1' ∧ e1 = fill_ectxs e1' K ∧
+               estep G e1' σ1 e2' σ2 efs ∧ e2 = fill_ectxs e2' K.
 Proof.
   intros H. move: (wellformed_estep H) => [K [eh1 [? H']]].
   subst. exists eh1.
@@ -1020,27 +1021,14 @@ Proof.
   intros Hjn P. assert (enf e) as Henf; first by apply jnf_enf.
   apply (size_ind P).
   unfold P. intros ks Hind e' Hes.
-  inversion Hjn; subst.
-  - inversion Hes; subst.
-    + apply cont_inj in H0=>//.
-      { by destruct_ands. }
-      { by apply wnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply wnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply wnf_enf. }
-  - inversion Hes; subst.
-    + apply cont_inj in H0=>//.
-      { by destruct_ands. }
-      { by apply wnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply wnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply wnf_enf. }
+  inversion Hjn; subst;
+    inversion Hes; subst;
+      match goal with
+      | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _] =>
+        apply cont_inj in H=>//
+      end;
+      (by destruct_ands ||
+       by apply wnf_enf).
 Qed.
 
 Lemma fill_wstep_false {e kes e' σ σ'}:
@@ -1058,28 +1046,14 @@ Proof.
   intros Hwn P. assert (enf e) as Henf; first by apply wnf_enf.
   apply (size_ind P).
   unfold P. intros ks Hind e' t Hes.
-  inversion Hwn; subst.
-  - inversion Hes; subst.
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply jnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply jnf_enf. }
-  - inversion Hes; subst.
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply jnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply jnf_enf. }
-  - inversion Hes; subst.
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply jnf_enf. }
-    + apply cont_inj in H=>//.
-      { by destruct_ands. }
-      { by apply jnf_enf. }
+  inversion Hwn; subst;
+    inversion Hes; subst;
+      match goal with
+      | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _] =>
+        apply cont_inj in H=>//
+      end;
+      (by destruct_ands ||
+       by apply jnf_enf).
 Qed.
 
 Lemma wfill_jstep_false {e kes e' σ σ' t}:
@@ -1104,7 +1078,7 @@ Qed.
 
 Lemma wfill_estep_false {e kes e' σ σ' G efs}:
   wnf e → estep G (fill_ectxs e kes) σ e' σ' efs → False.
-Proof. intros H. move: (wfill_estep_false' e σ σ' H kes e' G efs) => /= H'. done. Qed.
+Proof. intros H. by move: (wfill_estep_false' e σ σ' H kes e' G efs) => /= H'. Qed.
 
 Bind Scope val_scope with val.
 Delimit Scope val_scope with V.
@@ -1113,13 +1087,20 @@ Delimit Scope expr_scope with E.
 
 Definition local_state := stack.
 
-Inductive cstep: expr → local_state → state → expr → local_state → state → list expr → Prop :=
+Inductive cstep:
+  expr → local_state → state → expr → local_state → state → list expr → Prop :=
 | CSestep:
-    ∀ s t e h e' h' efs, estep t e h e' h' efs → cstep e s (State h t) e' s (State h' t) efs
+    ∀ s t e h e' h' efs,
+      estep t e h e' h' efs →
+      cstep e s (State h t) e' s (State h' t) efs
 | CSjstep:
-    ∀ e e' h t s s' , jstep t e s e' s' → cstep e s (State h t) e' s' (State h t) []
+    ∀ e e' h t s s',
+      jstep t e s e' s' →
+      cstep e s (State h t) e' s' (State h t) []
 | CSwstep:
-    ∀ σ e s e' s', wstep e s e' s' → cstep e s σ e' s' σ [].
+    ∀ σ e s e' s',
+      wstep e s e' s' →
+      cstep e s σ e' s' σ [].
 
 Axiom wellformed_cstep: ∀ e1 l1 σ1 e2 l2 σ2 efs,
   cstep e1 l1 σ1 e2 l2 σ2 efs → wellformed e1.
@@ -1130,40 +1111,29 @@ Ltac inversion_estep :=
 
 Global Hint Constructors estep jstep cstep.
 
-Lemma is_jmp_ret k' v: is_jmp (fill_ectxs (Erete (Evalue v)) k') = true.
-Proof.
-  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
-  rewrite existsb_app. simpl. rewrite IHk'. simpl.
+Ltac is_jmp_false k :=
+  let k' := fresh "k'" in
+  let ks' := fresh "ks'" in
+  let IHks' := fresh "IHks'" in
+  induction k as [|k' ks' IHks']=>//;
+  simpl; induction k'; simpl; try (rewrite IHks'); auto;
+  rewrite existsb_app; simpl; rewrite IHks'; simpl;
   by apply orb_true_r.
-Qed.
+
+Lemma is_jmp_ret k v: is_jmp (fill_ectxs (Erete (Evalue v)) k) = true.
+Proof. is_jmp_false k. Qed.
 
 Lemma is_jmp_call k' t f es: is_jmp (fill_ectxs (Ecall t f es) k') = true.
-Proof.
-  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
-  rewrite existsb_app. simpl. rewrite IHk'. simpl.
-  by apply orb_true_r.
-Qed.
+Proof. is_jmp_false k'. Qed.
 
 Lemma is_jmp_while k' c e: is_jmp (fill_ectxs (Ewhile c e) k') = true.
-Proof.
-  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
-  rewrite existsb_app. simpl. rewrite IHk'. simpl.
-  by apply orb_true_r.
-Qed.
+Proof. is_jmp_false k'. Qed.
 
 Lemma is_jmp_break k': is_jmp (fill_ectxs Ebreak k') = true.
-Proof.
-  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
-  rewrite existsb_app. simpl. rewrite IHk'. simpl.
-  by apply orb_true_r.
-Qed.
+Proof. is_jmp_false k'. Qed.
 
 Lemma is_jmp_continue k': is_jmp (fill_ectxs Econtinue k') = true.
-Proof.
-  induction k'=>//. simpl; induction a; simpl; try (rewrite IHk'); auto.
-  rewrite existsb_app. simpl. rewrite IHk'. simpl.
-  by apply orb_true_r.
-Qed.
+Proof. is_jmp_false k'. Qed.
 
 Lemma is_jmp_jstep_false {e e' σ} k {ks ks'}:
   to_val e = None →
@@ -1359,7 +1329,8 @@ Proof.
   induction t;
     intros v v' p Htv Htv';
     inversion Htv; inversion Htv'=>//; subst;
-    intros Hv1 Hv2; subst; destruct p; simpl in Hv1, Hv2; try by (destruct_ands; inversion_eq).
+      intros Hv1 Hv2; subst; destruct p; simpl in Hv1, Hv2;
+        try by (destruct_ands; inversion_eq).
   - rewrite Byte.repr_unsigned in Hv2, Hv1.
     destruct_ands.
     inversion_eq.
