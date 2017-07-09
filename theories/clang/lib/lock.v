@@ -56,10 +56,10 @@ Section spin_lock.
   Lemma newlock_spec (R: iProp Σ) Φ k ks:
     "newlock" T↦ Function (Tptr tybool) [] newlock ∗
     R ∗ (∀ γ lk, is_lock γ lk R -∗ WP (fill_ectxs lk k, ks) {{ Φ }})
-    ⊢ WP (fill_ectxs (Ecall (Tptr tybool) "newlock" []) k, ks) {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall (Tptr tybool) "newlock" Vvoid) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & HR & HΦ)".
-    iApply (wp_call k []); last iFrame; first done.
+    iApply (wp_call k Vvoid); last iFrame; first done.
     iNext. rewrite /newlock /=.
     wp_alloc l as "Hl". iApply (wp_ret []).
     iFrame. iApply fupd_wp.
@@ -73,10 +73,10 @@ Section spin_lock.
   Lemma acquire_spec k lk {γ R Φ ks}:
     "acquire" T↦ (Function Tvoid [("x", tylock)] acquire) ∗
     is_lock γ lk R ∗ (locked γ -∗ R -∗ WP (fill_ectxs void k, ks) {{ Φ }})
-    ⊢ WP (fill_ectxs (Ecall Tvoid "acquire" [Evalue lk]) k, ks) {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall Tvoid "acquire" (Evalue (Vpair lk Vvoid))) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & #Hlk & HΦ)".
-    iApply (wp_call k [lk]); last iFrame; first done.
+    iApply (wp_call k (Vpair lk Vvoid)); last iFrame; first done.
     iNext. iDestruct (is_lock_tylock with "Hlk") as "%".
     wp_alloc lkx as "Hlkx". wp_let.
     iLöb as "IH".
@@ -108,11 +108,11 @@ Section spin_lock.
   Lemma release_spec k lk {γ R Φ ks}:
     "release" T↦ Function Tvoid [("x", tylock)] release ∗
     is_lock γ lk R ∗ locked γ ∗ R ∗ WP (fill_ectxs void k, ks) {{ Φ }}
-    ⊢ WP (fill_ectxs (Ecall Tvoid "release" [Evalue lk]) k, ks) {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall Tvoid "release" (Evalue (Vpair lk Vvoid))) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & #Hlk & Hlked & HR & HΦ)".
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
-    iApply (wp_call k [Vptr l]); last iFrame; auto.
+    iApply (wp_call k (Vpair l Vvoid)); last iFrame; auto.
     iIntros "!>". wp_alloc lkx as "Hlkx". wp_let. wp_bind (_ <- _)%E.
     wp_load. wp_atomic.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.

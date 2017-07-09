@@ -430,6 +430,13 @@ Section rules.
     simplify_eq. subst. iApply wp_value=>//.
   Qed.
 
+  Lemma wp_pair E ks v1 v2 Φ:
+      Φ (Vpair v1 v2) ⊢ WP (Epair (Evalue v1) (Evalue v2), ks) @ E {{ Φ }}.
+  Proof.
+    iIntros "HΦ". wp_solve_pure.
+    simplify_eq. subst. iApply wp_value=>//.
+  Qed.
+
   Lemma wp_fst v1 v2 Φ ks:
     ▷ Φ v1
     ⊢ WP (Efst (Evalue (Vpair v1 v2)), ks) {{ Φ }}.
@@ -570,11 +577,11 @@ Section rules.
     by iDestruct (own_valid_2 with "HΓ Hf")
       as %[Hl %text_singleton_included]%auth_valid_discrete_2.
   Qed.
- 
-  Lemma wp_fork E t f vs params e e' Φ ks:
-    let_params vs params e = Some e' →
+
+  Lemma wp_fork E t f v params e e' Φ ks:
+    let_params v params e = Some e' →
     f T↦ Function t params e ∗ ▷ Φ Vvoid ∗ ▷ (WP (e', []) {{ _, True }})
-    ⊢ WP (Efork t f (map Evalue vs), ks) @ E {{ Φ }}.
+    ⊢ WP (Efork t f (Evalue v), ks) @ E {{ Φ }}.
   Proof.
     iIntros (?) "(#Hf & HΦ & He)".
     iApply wp_lift_step=>//.
@@ -590,8 +597,6 @@ Section rules.
       inversion Hes=>//; subst.
       + iFrame. iSplitR "He".
         { iApply wp_value=>//. }
-        assert (vs0 = vs).
-        { eapply map_inj=>//. simpl. by inversion 1. }
         simplify_eq. by rewrite big_sepL_singleton.
       + exfalso. escape_false.
     - absurd_jstep Hjs.
@@ -677,11 +682,11 @@ Section rules.
         by rewrite big_sepL_nil. }
   Qed.
 
-  Lemma wp_call {E ks} k vs params e e' f retty Φ:
-    let_params vs params e = Some e' →
+  Lemma wp_call {E ks} k v params e e' f retty Φ:
+    let_params v params e = Some e' →
     f T↦ Function retty params e ∗
     ▷ WP (e', Kcall k::ks) @ E {{ Φ }}
-    ⊢ WP (fill_ectxs (Ecall retty f (map Evalue vs)) k, ks) @ E {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall retty f (Evalue v)) k, ks) @ E {{ Φ }}.
   Proof.
     iIntros (Hls) "[#Hf HΦ]".
     iApply wp_lift_step=>//.
@@ -701,8 +706,6 @@ Section rules.
       + apply cont_inj in Heq=>//; auto.
         destruct Heq as [Heq ?]. inversion Heq. subst.
         iFrame. destruct e2. simpl in *. subst.
-        assert (vs0 = vs) as ?.
-        { eapply map_inj=>//. simpl. by inversion 1. }
         subst. clear Heq. simplify_eq.
         iSplitL; first by iApply "HΦ".
         by rewrite big_sepL_nil. }

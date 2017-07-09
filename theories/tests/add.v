@@ -40,10 +40,10 @@ Section example.
     own_scode (SCrel (f_rel vx)) ∗
     (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗
           WP (fill_ectxs (Evalue v) k, ks) {{ _, Φ }})
-    ⊢ WP (fill_ectxs (Ecall Tint32 f [Evalue vx]) k, ks) {{ _, Φ }}.
+    ⊢ WP (fill_ectxs (Ecall Tint32 f (Evalue (Vpair vx Vvoid))) k, ks) {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hsc & HΦ)".
-    iApply (wp_call _ [Vint32 vx] [("x", Tint32)] f_body)=>//.
+    iApply (wp_call _ (Vpair (Vint32 vx) Vvoid) [("x", Tint32)] f_body)=>//.
     iFrame. iIntros "!>".
     wp_alloc px as "Hpx". wp_let. iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.

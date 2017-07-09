@@ -9,7 +9,7 @@ Section vmm.
     x <- 0 ;;
     while: ( !x@Tint32 :<: n ) (
       y <- Ealloc (Tprod Tint8 Tvoid) (Vpair vfalse Vvoid) ;;
-      Ecall Tvoid (insert_pt pt) [!x@Tint32 ; Evalue (Vptr y)]
+      Ecall Tvoid (insert_pt pt) (Epair (!x@Tint32) (Evalue (Vpair (Vptr y) Vvoid)))
     ).
 
   Fixpoint allocated (m: gmap int32 addr) (n: nat) : iProp Σ :=

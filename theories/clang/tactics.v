@@ -28,19 +28,21 @@ Ltac reshape_expr e tac :=
   | _ => tac (reverse K) e
   | Ebinop ?op (Evalue ?v1) ?e2 => go (EKbinopl op v1 :: K) e2
   | Ebinop ?op ?e1 ?e2 => go (EKbinopr op e2 :: K) e1
+  | Epair (Evalue ?v1) ?e2 => go (EKpairl v1 :: K) e2
+  | Epair ?e1 ?e2 => go (EKpairr e2 :: K) e1
   | Efst ?e => go (EKfst :: K) e
   | Esnd ?e => go (EKsnd :: K) e
   | Ederef_typed ?t ?e => go (EKderef_typed t :: K) e
   | Eassign (Evalue (Vptr ?l)) ?e =>
-    go (EKassignl l :: K) e
+    go (EKassignl (Vptr l) :: K) e
   | Eassign ?e1 ?e2 =>
     go (EKassignr e2 :: K) e1
   | Erete ?e =>
     go (EKrete :: K) e
   | ECAS ?t (Evalue (Vptr ?l)) (Evalue ?v1) ?e2 =>
-    go (EKCASr t l v1 :: K) e2
+    go (EKCASr t (Vptr l) v1 :: K) e2
   | ECAS ?t (Evalue (Vptr ?l)) ?e1 ?e2 =>
-    go (EKCASm t l e2 :: K) e1
+    go (EKCASm t (Vptr l) e2 :: K) e1
   | ECAS ?t ?e0 ?e1 ?e2 =>
     go (EKCASl t e1 e2 :: K) e0
   | Elet ?t ?x ?ex ?ebody =>
@@ -48,7 +50,7 @@ Ltac reshape_expr e tac :=
   | Eif ?e ?e1 ?e2 => go (EKif e1 e2 :: K) e
   | Ealloc ?t ?e => go (EKalloc t :: K) e
   | Eseq ?e1 ?e2 => go (EKseq e2 :: K) e1
-  | Ecall ?t ?f [?e1] => go (EKcall t f [] []) e1
+  | Ecall ?t ?f ?e1 => go (EKcall t f) e1
   end in go (@nil exprctx) e.
 
 Tactic Notation "wp_unfill" open_constr(efoc) :=
@@ -157,8 +159,8 @@ Tactic Notation "wp_alloc" ident(l) "as" constr(H) :=
   lazymatch goal with
   | |- _ ⊢ wp ?E (?e, ?K) ?Q =>
     first
-      [reshape_expr e ltac:(fun K e' =>
-         match eval hnf in e' with Ealloc _ _ => wp_bind_core K end)
+      [reshape_expr e ltac:(fun Kes e' =>
+         match eval hnf in e' with Ealloc _ _ => wp_bind_core Kes end)
       |fail 1 "wp_alloc: cannot find 'Alloc' in" e];
     eapply tac_wp_alloc with (j:=H);
       [ wp_done || fail "wp_alloc: not typeof"
@@ -196,7 +198,18 @@ Tactic Notation "wp_op" :=
     | Ebinop _ _ _ => wp_bind_core Kes; iApply wp_op=>//
     end) || fail "wp_op: cannot find Ebinop in" e
   | _ => fail "wp_op: not a 'wp'"
-end.
+  end.
+
+Tactic Notation "wp_pair" :=
+  iStartProof;
+  repeat (iApply wp_seq; first by simpl);
+  lazymatch goal with
+  | |- _ ⊢ wp ?E (?e, ?K) ?P => reshape_expr e ltac:(fun Kes e' =>
+    lazymatch eval hnf in e' with
+    | Epair _ _ => wp_bind_core Kes; iApply wp_pair=>//
+    end) || fail "wp_op: cannot find Epair in" e
+  | _ => fail "wp_op: not a 'wp'"
+  end.
 
 Tactic Notation "wp_fst" :=
   iStartProof;
@@ -247,7 +260,7 @@ Ltac wp_step :=
    | |- _ ⊢ wp _ (Erete _, _) _ => wp_ret
    | |- _ ⊢ ▷ _ => iNext
    | |- _ ⊢ wp _ (Elet _ _ _ _, _) _ => wp_let
-   | _ => wp_snd || wp_fst || wp_load || wp_op
+   | _ => wp_snd || wp_fst || wp_load || wp_op || wp_pair
   end.
 
 Ltac wp_run := repeat wp_step.

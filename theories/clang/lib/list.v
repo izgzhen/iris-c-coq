@@ -205,7 +205,8 @@ Section proof.
       iDestruct (lseg_unsnoc with "~2") as "[H|[% Hp]]".
       + iDestruct "H" as (???) "[Hl [Hp %]]". destruct_ands.
         iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
-        wp_alloc lp' as "Hlp'"=>//. wp_assign.
+        wp_alloc lp' as "Hlp'"=>//.
+        wp_assign.
         iApply ("HΦ" with "~").
         iDestruct (mapsto_typeof with "Hp1") as "%".
         iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp"; first by iSplitL "Hp1".
@@ -269,23 +270,24 @@ Section proof.
       "rev" T↦ Function Tvoid ps rev_list ∗
       isList lx xs Tint32 ∗ isList ly ys Tint32 ∗
       (∀ ly', isList ly' (rev xs ++ ys) Tint32 -∗ WP (fill_ectxs ly' k, ks) {{ Φ }})
-      ⊢ WP (fill_ectxs (Ecall Tvoid "rev" [Evalue lx ; Evalue ly]) k, ks) {{ Φ }}.
+      ⊢ WP (fill_ectxs (Ecall Tvoid "rev"
+                              (Evalue (Vpair lx (Vpair ly Vvoid))))
+                              k, ks) {{ Φ }}.
    Proof.
-    iIntros (???). iIntros "(Hf & Hlx & Hly & HΦ)".
-    iApply (wp_call _ [lx; ly]); last iFrame; first by simpl.
-    iNext.
-    iDestruct (isList_ptr with "Hly") as "%".
-    iDestruct (isList_ptr' with "Hlx") as "%".
-    wp_alloc px as "Hpx". wp_let.
-    wp_alloc py as "Hpy". wp_let.
-    wp_alloc pt as "Hpt". wp_let. wp_unfill (Ewhile _ _).
-    move: (rev_spec' "rev" (reverse [EKseq (return: ! py @ (Tptr Tvoid))])
-                     (Kcall k::ks) Φ px py pt xs lx ly ys) => Hspec.
-    iApply Hspec.
-    iFrame.
-    iSplitR "Hpt"; last by iExists _.
-    iIntros (?) "[? ?]".
-    wp_skip. wp_load. wp_ret. by iApply "HΦ".
-  Qed.
-
+     iIntros (???). iIntros "(Hf & Hlx & Hly & HΦ)".
+     iApply (wp_call _ (Vpair lx (Vpair ly Vvoid))); last iFrame; first by simpl.
+     iNext.
+     iDestruct (isList_ptr with "Hly") as "%".
+     iDestruct (isList_ptr' with "Hlx") as "%".
+     wp_alloc px as "Hpx". wp_let.
+     wp_alloc py as "Hpy". wp_let.
+     wp_alloc pt as "Hpt". wp_let. wp_unfill (Ewhile _ _).
+     move: (rev_spec' "rev" (reverse [EKseq (return: ! py @ (Tptr Tvoid))])
+                      (Kcall k::ks) Φ px py pt xs lx ly ys) => Hspec.
+     iApply Hspec.
+     iFrame.
+     iSplitR "Hpt"; last by iExists _.
+     iIntros (?) "[? ?]".
+     wp_skip. wp_load. wp_ret. by iApply "HΦ".
+   Qed.
 End proof.

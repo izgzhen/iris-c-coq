@@ -14,9 +14,9 @@ Section wp_ret.
      ⌜ e1 = fill_ectxs eh K ∧ enf eh ⌝ ∧
      ((∀ ks, ⌜ is_jmp eh = false ⌝ ∗ WP (eh, ks) @ E {{ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret }}) ∨
       (∃ v, ⌜ eh = Erete (Evalue v) ⌝ ∗ ▷ Φret v) ∨
-      (∃ f vs e e' params retty,
-         ⌜ eh = Ecall retty f (map Evalue vs) ∧
-           let_params vs params e = Some e' ⌝ ∗
+      (∃ f v e e' params retty,
+         ⌜ eh = Ecall retty f (Evalue v) ∧
+           let_params v params e = Some e' ⌝ ∗
          f T↦ Function retty params e ∗
          (▷ wpr E e' (λ _, False)%I (λ v, wpr E (fill_ectxs (Evalue v) K) Φ Φret))))
   ))%I.
@@ -136,18 +136,18 @@ Section wp_ret.
     - iRight. iLeft. iExists v. iSplitL ""=>//. eauto.
   Qed.
 
-  Lemma wpr_call E vs params e e' f retty Φ Φret:
-    let_params vs params e = Some e' →
+  Lemma wpr_call E v params e e' f retty Φ Φret:
+    let_params v params e = Some e' →
     f T↦ Function retty params e ∗
     ▷ wpr E e' (fun _ => False%I) Φ
-    ⊢ wpr E (Ecall retty f (map Evalue vs)) Φ Φret.
+    ⊢ wpr E (Ecall retty f (Evalue v)) Φ Φret.
   Proof.
     iIntros (?) "[? ?]".
     iApply wpr_unfold. rewrite /wpr_pre.
     iRight.
     iSplit.
     { iPureIntro. split=>//. }
-    iExists (Ecall retty f (map Evalue vs)), [].
+    iExists (Ecall retty f (Evalue v)), [].
     iSplit.
     { iPureIntro. simpl. split=>//. auto. }
     iRight. iRight. iExists _, _, _, _, _, _. iFrame.
@@ -182,11 +182,11 @@ Section wp_ret.
       move: (not_jmp_preserves _ _ _ _ _ _ _ _ Hn Hjn Hc) => /= [? [? Hes]]
     end; subst.
 
-  Lemma wp_call_r E ks vs params e e' f retty k Φ:
-    let_params vs params e = Some e' →
+  Lemma wp_call_r E ks v params e e' f retty k Φ:
+    let_params v params e = Some e' →
     f T↦ Function retty params e ∗
     ▷ wpr E e' (fun _ => False%I) (λ v, WP (fill_ectxs (Evalue v) k, ks) @ E {{ Φ }})
-    ⊢ WP (fill_ectxs (Ecall retty f (map Evalue vs)) k, ks) @ E {{ Φ }}.
+    ⊢ WP (fill_ectxs (Ecall retty f (Evalue v)) k, ks) @ E {{ Φ }}.
   Proof.
     iIntros (?) "(?&?)".
     iApply (wp_call k)=>//.
@@ -269,7 +269,6 @@ Section wp_ret.
            * fill_enf_neq.
            * apply cont_inj in Heq=>//; auto. destruct Heq as [Heq ?].
              inversion Heq. simplify_eq.
-             apply map_inj in Heq; last by inversion 1.
              simpl in *. subst. simplify_eq.
              iDestruct "Hσ1" as "(?&?)".
              iFrame. iMod "Hclose" as "_".
