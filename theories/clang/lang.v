@@ -20,8 +20,6 @@ Inductive bop :=
 
 Definition decls := list (ident * type).
 
-Definition tid := nat.
-
 Inductive expr :=
 | Evalue (v: val)
 | Evar (x: string)
@@ -591,9 +589,6 @@ Inductive enf: expr → Prop :=
 
 Global Hint Constructors lnf enf.
 
-Definition UF (e: expr) (eh: expr) (k: cont) : Prop :=
-  fill_ectxs eh k = e.
-
 Lemma enf_not_val e: enf e → to_val e = None.
 Proof. induction e; crush. inversion H; inversion H0. Qed.
 
@@ -605,27 +600,6 @@ Proof. inversion 1=>//. Qed.
 
 Lemma jnf_not_val e: jnf e → is_val e = false.
 Proof. inversion 1=>//. Qed.
-
-Lemma vs_map: ∀ vs vs' a args,
-  map Evalue vs = map Evalue vs' ++ a :: args → is_val a = true.
-Proof.
-  induction vs.
-  - simpl. intros. destruct vs'=>//.
-  - simpl. intros.
-    destruct vs'.
-    + simpl in *. by simplify_eq.
-    + simpl in *. simplify_eq. by eapply IHvs.
-Qed.
-
-Lemma vs_map2: ∀ vs vs' e e' es es',
-  to_val e = None → to_val e' = None →
-  map Evalue vs ++ e :: es = map Evalue vs' ++ e' :: es' →
-  vs = vs' ∧ e = e' ∧ es = es'.
-Proof.
-  induction vs; intros; destruct vs'; simpl in *; simplify_eq=>//.
-  eapply IHvs in H2=>//.
-  by destruct_ands.
-Qed.
 
 Lemma fill_uninj_val e ks v1:
   fill_ectxs e ks = Evalue v1 → e = Evalue v1 ∧ ks = [].
@@ -830,7 +804,7 @@ Tactic Notation "escape_false" :=
 
 Lemma is_val_exists e:
   is_val e = true -> ∃ v, e = Evalue v.
-Admitted.
+Proof. intros. destruct e=>//; eauto. Qed.
 
 Ltac destruct_is_val :=
   repeat (match goal with
@@ -851,9 +825,22 @@ Ltac wf_enf :=
     exists [], e; split=>//; auto
   end.
 
+Ltac not_val_wf_uni E :=
+  match goal with
+  | [ IHe: to_val ?e = None → wellformed ?e |- _ ] =>
+    destruct (is_val e) eqn:?; destruct_is_val;
+    [ wf_enf
+    | match goal with
+       | [ IHe : to_val (fill_ectxs ?x ?k) = None →
+                 wellformed (fill_ectxs ?x ?k) |- _ ] =>
+         exists (E :: k), x; split=>//
+      end ]
+  end.
+
+(* TODO: Less boilerplates *)
 Lemma not_val_wf: ∀ e, to_val e = None -> wellformed e.
 Proof.
-  induction e=>//.
+  induction e=>//; intros.
   - intros. exists [], (Evar x). split; auto.
   - intros. destruct (is_val e1) eqn:?; destruct_is_val.
     + wf_enf.
@@ -879,21 +866,11 @@ Proof.
     + destruct_is_val.
       exists (EKbinopr op e2 :: x), x0.
       split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKderef :: x), x0. split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKderef_typed t :: x), x0. split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKaddrof :: x), x0. split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKfst :: x), x0. split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKsnd :: x), x0. split=>//.
+  - not_val_wf_uni EKderef.
+  - not_val_wf_uni (EKderef_typed t).
+  - not_val_wf_uni EKaddrof.
+  - not_val_wf_uni EKfst.
+  - not_val_wf_uni EKsnd.
   - intros.
     destruct (is_val e1) eqn:Heq1.
     + destruct (is_val e2) eqn:Heq2; destruct_is_val.
@@ -903,12 +880,8 @@ Proof.
     + destruct_is_val.
       exists (EKpairl e2 :: x), x0.
       split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKcall t fid :: x), x0. split=>//.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKalloc t :: x), x0. split=>//.
+  - not_val_wf_uni (EKcall t fid).
+  - not_val_wf_uni (EKalloc t).
   - intros. destruct (is_val e1) eqn:?; destruct_is_val.
     + destruct (is_val e2) eqn:?; destruct_is_val.
       * wf_enf.
@@ -918,17 +891,13 @@ Proof.
     + wf_enf.
     + exists (EKif e2 e3 :: x), x0. split=>//.
   - intros. wf_enf.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKrete :: x), x0. split=>//.
-  - intros. destruct (is_val e1) eqn:?; destruct_is_val.
+  - not_val_wf_uni EKrete.
+  - destruct (is_val e1) eqn:?; destruct_is_val.
     + wf_enf.
     + exists (EKseq e2 :: x), x0. split=>//.
   - intros. wf_enf.
   - intros. wf_enf.
-  - intros. destruct (is_val e) eqn:?; destruct_is_val.
-    + wf_enf.
-    + exists (EKfork t fid :: x), x0. split=>//.
+  - not_val_wf_uni (EKfork t fid).
 Qed.
 
 Lemma wellformed_estep: ∀ e1 σ1 e2 σ2 G efs,
@@ -1369,7 +1338,8 @@ Lemma instantiate_let_preserves_not_jmp x xv xt e e':
   instantiate_let x xv xt e = Some e' →
   is_jmp e = false →
   is_jmp e' = false.
-Admitted. (* Apparent but hard for now. Documented *)
+Proof.
+Admitted.
 
 Lemma estep_preserves_not_jmp' σ1 σ2:
   let P e1 :=
