@@ -21,24 +21,24 @@ Section proof.
     else: ( return: void ).
 
   Lemma rec_example (n: nat) k ks Φ:
-    "f" T↦ Function Tvoid [("x", Tint32)] f ∗
-    "g" T↦ Function Tvoid [("x", Tint32)] g ∗ Φ void
+    "f" T↦ Function Tvoid [("x", Tint8)] f ∗
+    "g" T↦ Function Tvoid [("x", Tint8)] g ∗ Φ void
     ⊢ WP (fill_ectxs (Ecall Tvoid "f"
-                            (Evalue (Vpair (Vint32 n) Vvoid))) k, ks) {{ Φ }}.
+                            (Evalue (Vpair (Vint8 n) Vvoid))) k, ks) {{ Φ }}.
   Proof.
     iIntros "[#? [#? HΦ]]".
     iLöb as "IH" forall (n k ks Φ).
     destruct n eqn:?; subst.
     - admit. (* simple base case *)
-    - iApply (wp_call _ (Vpair (Vint32 (S n0)) Vvoid)); last iFrame "#"; first done.
-      iNext. wp_alloc ln as "Hln".
-      wp_let. wp_load. wp_op.
-      { instantiate (1:=vtrue). admit. }
-      wp_step. iNext. wp_load. wp_op.
-      replace (Z.pos (Pos.of_succ_nat n0) - 1%Z)%int with (Int.repr n0); last admit.
-      wp_assign.
-      iApply (wp_bind [EKseq _; EKcall _ _])=>//.
-      admit.
+    - (* iApply (wp_call _ (Vpair (Vint8 (S n0)) Vvoid)); last iFrame "#"; first done. *)
+      (* iNext. wp_alloc ln as "Hln". *)
+      (* wp_let. wp_load. wp_op. *)
+      (* { instantiate (1:=vtrue). admit. } *)
+      (* wp_step. iNext. wp_load. wp_op. *)
+      (* replace (Z.pos (Pos.of_succ_nat n0) - 1%Z)%int with (Int.repr n0); last admit. *)
+      (* wp_assign. *)
+      (* iApply (wp_bind [EKseq _; EKcall _ _])=>//. *)
+      (* admit. *)
       (* wp_load. iApply wp_value=>//. *)
       (* wp_unfill (Ecall _ _ _). *)
       (* iApply (wp_call [EKseq (return: void)] [Vint32 n0]); *)

@@ -15,8 +15,6 @@ theories/clang/logic.v
 theories/clang/adequacy.v
 theories/clang/tactics.v
 theories/clang/notations.v
-theories/clang/ret_logic.v
-theories/clang/ret_tactics.v
 theories/clang/lib/list.v
 theories/clang/lib/spec.v
 theories/clang/lib/refine.v
@@ -28,7 +26,6 @@ theories/clang/lib/lock.v
 theories/clang/lib/array.v
 theories/tests/add.v
 theories/tests/swap.v
-theories/tests/ret.v
 theories/tests/task.v
 theories/tests/spawn.v
 theories/tests/higher_order.v

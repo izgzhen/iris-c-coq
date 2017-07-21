@@ -45,8 +45,6 @@ Ltac reshape_expr e tac :=
     go (EKCASm t (Vptr l) e2 :: K) e1
   | ECAS ?t ?e0 ?e1 ?e2 =>
     go (EKCASl t e1 e2 :: K) e0
-  | Elet ?t ?x ?ex ?ebody =>
-    go (EKlet t x ebody :: K) ex
   | Eif ?e ?e1 ?e2 => go (EKif e1 e2 :: K) e
   | Ealloc ?t ?e => go (EKalloc t :: K) e
   | Eseq ?e1 ?e2 => go (EKseq e2 :: K) e1
@@ -233,6 +231,17 @@ Tactic Notation "wp_snd" :=
   | _ => fail "wp_op: not a 'wp'"
 end.
 
+Tactic Notation "wp_var" :=
+  iStartProof;
+  repeat (iApply wp_seq; first by simpl);
+  lazymatch goal with
+  | |- _ ⊢ wp ?E (?e, ?K) ?P => reshape_expr e ltac:(fun Kes e' =>
+    lazymatch eval hnf in e' with
+    | Evar _ => wp_bind_core Kes; iApply wp_var=>//
+    end) || fail "wp_op: cannot find Esnd in" e
+  | _ => fail "wp_op: not a 'wp'"
+end.
+
 Tactic Notation "wp_alloc" ident(l) :=
   let H := iFresh in wp_alloc l as H.
 
@@ -246,8 +255,6 @@ Tactic Notation "wp_cas_suc" :=
 
 Tactic Notation "wp_ret" := iApply (wp_ret []).
 
-Tactic Notation "wp_let" := iApply wp_let=>//; iNext.
-
 Tactic Notation "wp_atomic" :=
   iApply wp_atomic; first by apply atomic_enf.
 
@@ -258,15 +265,12 @@ Ltac wp_step :=
    | |- _ ⊢ wp _ (Eif (Evalue vfalse) _ _, _) _ => iApply wp_if_false
    | |- _ ⊢ wp _ (Eif (Evalue vtrue) _ _, _) _ => iApply wp_if_true
    | |- _ ⊢ wp _ (Erete _, _) _ => wp_ret
+   | |- _ ⊢ wp _ (Evar _, _) _ => wp_var
    | |- _ ⊢ ▷ _ => iNext
-   | |- _ ⊢ wp _ (Elet _ _ _ _, _) _ => wp_let
    | _ => wp_snd || wp_fst || wp_load || wp_op || wp_pair
   end.
 
 Ltac wp_run := repeat wp_step.
-
-Ltac unfold_f_inst :=
-  rewrite /instantiate_let /resolve_rhs; repeat gmap_simplify.
 
 Ltac extract_types :=
   repeat (iMatchHyp

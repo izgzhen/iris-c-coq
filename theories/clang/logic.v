@@ -436,8 +436,24 @@ Section rules.
     simplify_eq. subst. iApply wp_value=>//.
   Qed.
 
+  Lemma wp_var E ks Ω x v t Φ:
+    sget x Ω = Some (t, v) →
+    Φ v ⊢ WP (Evar x, (ks, Ω)) @ E {{ Φ }}.
+  Proof.
+    iIntros (?) "HΦ".
+    iApply wp_lift_pure_step.
+    - intros. exists (Evalue v), (ks, Ω), σ1, []. simpl.
+      destruct σ1. apply CSestep. eapply ESvar. done.
+    - intros ???????Hcs; atomic_step Hcs=>//.
+    - iNext;
+      let Hcs := fresh "Hcs" in
+      iIntros (??????Hcs);
+      atomic_step Hcs; iSplitL; last by rewrite big_sepL_nil.
+      simplify_eq. subst. iApply wp_value=>//.
+  Qed.
+
   Lemma wp_pair E ks v1 v2 Φ:
-      Φ (Vpair v1 v2) ⊢ WP (Epair (Evalue v1) (Evalue v2), ks) @ E {{ Φ }}.
+    Φ (Vpair v1 v2) ⊢ WP (Epair (Evalue v1) (Evalue v2), ks) @ E {{ Φ }}.
   Proof.
     iIntros "HΦ". wp_solve_pure.
     simplify_eq. subst. iApply wp_value=>//.
@@ -668,7 +684,7 @@ Section rules.
         by rewrite big_sepL_nil. }
   Qed.
   
-  Lemma wp_call {E ks} k v params e f retty Φ Ω Ω':
+  Lemma wp_call {E ks} Ω Ω' k v params e f retty Φ:
     let_params v params = Some Ω →
     f T↦ Function retty params e ∗
     ▷ WP (e, (Kcall k Ω'::ks, Ω)) @ E {{ Φ }}

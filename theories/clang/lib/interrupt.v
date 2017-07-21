@@ -48,7 +48,7 @@ Section definitions.
       f T↦ Function Tvoid [] e ∗
       (∀ N: namespace,
          ⌜ ∀ E, N ⊥ E ⌝ -∗ INVS_range prio ptot -∗
-         WP (e, []) @ ⊤∖↑N {{ v, INVS_range prio ptot}})
+         WP (e, ([], semp)) @ ⊤∖↑N {{ v, INVS_range prio ptot}})
       ⊢ WP (create_task f prio, ks) @ E {{ Φ }};
     sti_spec prio γ γp Φ ks:
       int_ctx γ γp ∗ hpri γp prio ∗ INVS_up prio ∗ closed γ ∗ (hpri γp prio -∗ Φ Vvoid)

@@ -29,7 +29,7 @@ Section array.
   Qed.
 
   (* e should be a Tptr to some tyarray t n, which gives us some flexibility *)
-  Definition index (t: type) (p: addr) (ei: expr) : expr := p + (Int.repr (sizeof t) * ei).
+  Definition index (t: type) (p: addr) (ei: expr) : expr := p + (Byte.repr (sizeof t) * ei).
 
   Fixpoint slice q t b o (i l: nat) vs : iProp Σ :=
     (match l, vs with
@@ -167,13 +167,13 @@ Section array.
   Lemma index_spec q t p (i n: nat) vs Φ ks:
     i < n → mul_safe (sizeof_type t) i →
     p ↦{q} varray vs @ tyarray t n ∗ (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
-    ⊢ WP (!(index t p i)@t, ks) {{ Φ }}.
+    ⊢ WP (!(index t p (Vint8 (Byte.repr i)))@t, ks) {{ Φ }}.
   Proof.
     iIntros (??) "[Hp HΦ]". destruct p.
     iDestruct (array_slice' with "Hp") as "Hs".
     destruct i.
-    - unfold index. wp_op. rewrite_int.
-      wp_op. rewrite_int.
+    - unfold index. wp_op. rewrite_byte.
+      wp_op. rewrite_byte.
       destruct n.
       { inversion H0. }
       destruct vs=>//; first by iDestruct "Hs" as "%".
@@ -184,7 +184,7 @@ Section array.
       simpl. iDestruct (array_slice with "~") as "?".
       by rewrite_nat.
     - unfold index. wp_op.
-      wp_op. rewrite /offset_by_int32. rewrite H1.
+      wp_op. rewrite /offset_by_byte. rewrite H1.
       iDestruct (len_slice with "Hs") as "%".
       iDestruct (split_slice' _ _ b o (S i) n vs with "[Hs]") as "[? ?]"=>//.
       simpl. destruct (n - S i) eqn:?.

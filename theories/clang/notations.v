@@ -2,7 +2,7 @@ From iris_c.clang Require Import lang.
 Set Default Proof Using "Type".
 
 Coercion Vint8 : int8 >-> val.
-Coercion Vint32 : int32 >-> val.
+(* Coercion Vint32 : int32 >-> val. *)
 Coercion Vptr : addr >-> val.
 Coercion Evalue : val >-> expr.
 Coercion Evar : string >-> expr.
@@ -36,7 +36,7 @@ Notation "'while:' ( e ) ( s ) " := (Ewhile e%E s%E)
 Notation "s1 ;; s2" := (Eseq s1%E s2%E)
   (at level 100, s2 at level 200, format "s1  ;;  s2") : expr_scope.
 Notation "'return:' e" := (Erete e%E) (at level 80): expr_scope.
-Notation "'let:' x ::: t := e1 'in' e2" := (Elet t x e1%E e2%E)
-  (at level 102, x, t at level 1, e1, e2 at level 200) : expr_scope.
-Notation "'let:' x ::: t 'in' e2" := (Edecl t x e2%E)
-  (at level 102, x, t at level 1, e2 at level 200) : expr_scope.
+(* Notation "'let:' x ::: t := e1 'in' e2" := (Elet t x e1%E e2%E) *)
+(*   (at level 102, x, t at level 1, e1, e2 at level 200) : expr_scope. *)
+(* Notation "'let:' x ::: t 'in' e2" := (Edecl t x e2%E) *)
+(*   (at level 102, x, t at level 1, e2 at level 200) : expr_scope. *)
