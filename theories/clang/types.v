@@ -4,7 +4,7 @@ Inductive type : Set :=
 | Tnull
 | Tvoid
 | Tint8
-| Tint32
+(* | Tint32 *)
 | Tptr (t: type)
 | Tprod (t1 t2: type).
 
@@ -17,7 +17,7 @@ Fixpoint type_infer_v (v: val) : type :=
     | Vnull => Tnull
     | Vvoid => Tvoid
     | Vint8 _ => Tint8
-    | Vint32 _ => Tint32
+    (* | Vint32 _ => Tint32 *)
     | Vptr _ => Tptr Tvoid (* XXX *)
     | Vpair v1 v2 => Tprod (type_infer_v v1) (type_infer_v v2)
   end.
@@ -26,7 +26,7 @@ Inductive typeof: val → type → Prop :=
 | typeof_null: typeof Vnull Tnull
 | typeof_void: typeof Vvoid Tvoid
 | typeof_int8: ∀ i, typeof (Vint8 i) Tint8
-| typeof_int32: ∀ i, typeof (Vint32 i) Tint32
+(* | typeof_int32: ∀ i, typeof (Vint32 i) Tint32 *)
 | typeof_prod:
     ∀ v1 v2 t1 t2,
       typeof v1 t1 → typeof v2 t2 → typeof (Vpair v1 v2) (Tprod t1 t2)
@@ -41,8 +41,8 @@ Lemma void_typeof v: typeof v Tvoid → v = Vvoid.
 Proof. induction v; inversion 1=>//. Qed.
 Lemma int8_typeof v: typeof v Tint8 → (∃ i, v = Vint8 i).
 Proof. induction v; inversion 1=>//. eauto. Qed.
-Lemma int32_typeof v: typeof v Tint32 → (∃ i, v = Vint32 i).
-Proof. induction v; inversion 1=>//. eauto. Qed.
+(* Lemma int32_typeof v: typeof v Tint32 → (∃ i, v = Vint32 i). *)
+(* Proof. induction v; inversion 1=>//. eauto. Qed. *)
 
 Lemma typeof_any_ptr l t1 t2:
   typeof l (Tptr t1) → typeof l (Tptr t2).
@@ -54,7 +54,7 @@ Instance sizeof_type: Sizeof type :=
     | Tnull => 4 %nat
     | Tvoid => 0 % nat
     | Tint8 => 1 % nat
-    | Tint32 => 4 % nat
+    (* | Tint32 => 4 % nat *)
     | Tptr _ => 4 % nat
     | Tprod t1 t2 => go t1 + go t2
   end.

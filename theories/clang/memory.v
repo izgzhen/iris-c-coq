@@ -36,7 +36,7 @@ Inductive val : Set :=
 | Vvoid
 | Vnull
 | Vint8 (i: int8)
-| Vint32 (i: int32)
+(* | Vint32 (i: int32) *)
 | Vptr (p: addr)
 | Vpair (v1 v2: val).
 
@@ -51,7 +51,7 @@ Instance sizeof_val: Sizeof val :=
     | Vnull => 4 %nat
     | Vvoid => 0 % nat
     | Vint8 _ => 1 % nat
-    | Vint32 _ => 4 % nat
+    (* | Vint32 _ => 4 % nat *)
     | Vptr _ => 4 % nat
     | Vpair v1 v2 => (go v1 + go v2)%nat
   end.
@@ -135,7 +135,7 @@ Definition proj_pointer (vl: list byteval) : option val :=
 
 Fixpoint encode_val (v: val) : list byteval :=
   match v with
-    | Vint32 n => inj_bytes (encode_int 4%nat (Int.unsigned n))
+    (* | Vint32 n => inj_bytes (encode_int 4%nat (Int.unsigned n)) *)
     | Vint8 n => inj_bytes (encode_int 1%nat (Byte.unsigned n))
     | Vptr p => inj_pointer 4%nat p
     | Vnull => list_repeat 4 BVnull
