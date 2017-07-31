@@ -4,21 +4,28 @@ Section example.
   Context `{clangG Σ}.
 
   Definition swap (t: type) : expr :=
-    let: "x" ::: t in
-    "x" <- "a1" ;;
-    "a1" <- "a2" ;;
-    "a2" <- "x".
+    "x" <- !"a1"@t ;;
+    "a1" <- !"a2"@t ;;
+    "a2" <- !"x"@t.
 
-  (* Instantiate the variables *)
-  Definition swap' t  (l1 l2: addr) :=
-    instantiate_let "a1" l1 t (swap t) ≫= instantiate_let "a2" l2 t.
+  Definition senv t vx v1 v2 : env :=
+    sset "x" (Tptr t, vx)
+         (sset "a1" (Tptr t, v1)
+               (sset "a2" (Tptr t, v2) semp)).
   
-  Lemma swap_spec' t swap_e l1 l2 v1 v2 ks:
-    swap' t l1 l2 = Some swap_e →
-    {{{ l1 ↦ v1 @ t ∗ l2 ↦ v2 @ t }}} (swap_e, ks) {{{ RET void ; l1 ↦ v2 @ t ∗ l2 ↦ v1 @ t }}}.
+  Lemma swap_spec t l1 l2 lx v1 v2 ks:
+    {{{ l1 ↦ v1 @ t ∗ l2 ↦ v2 @ t ∗ lx ↦ - @ t }}}
+      (swap t, (ks, senv t lx l1 l2))
+    {{{ RET void ; l1 ↦ v2 @ t ∗ l2 ↦ v1 @ t ∗ lx ↦ - @ t }}}.
   Proof.
-    iIntros (H0 ?) "[??] HΦ". inversion H0. extract_types.
-    wp_alloc lx as "Hlx". wp_run. iApply ("HΦ" with "[-]"). iFrame.
+    iIntros (?) "[?[??]] HΦ". iDestruct "~2" as (?) "?".
+    extract_types.
+    unfold swap.
+    wp_var. wp_var. wp_run.
+    wp_var. wp_var. wp_run.
+    wp_var. wp_var. wp_run.
+    iApply ("HΦ" with "[-]"). iFrame.
+    by iExists _.
   Qed.
 
 End example.

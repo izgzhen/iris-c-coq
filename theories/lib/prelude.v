@@ -45,23 +45,6 @@ Proof.
     apply Finj in H1. apply IHl1 in H2. by subst.
 Qed.
 
-Global Instance int32_eq_dec: EqDecision int32 := Int.eq_dec.
-
-Definition int32_encode (i: int32) : positive := encode (Int.unsigned i).
-Definition int32_decode (p: positive) : option int32 :=
-  match decode p with
-    | Some z => Some (Int.repr z)
-    | None => None
-  end.
-
-Lemma int32_decode_encode i: int32_decode (int32_encode i) = Some i.
-Proof. unfold int32_encode, int32_decode. rewrite decode_encode.
-       f_equal. apply Int.repr_unsigned.
-Qed.
-
-Global Instance int32_countable: Countable int32 :=
-  Build_Countable _ _ int32_encode int32_decode int32_decode_encode.
-
 Close Scope Z_scope.
 
 Lemma leb_trans (x y z: nat):

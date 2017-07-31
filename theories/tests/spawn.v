@@ -8,11 +8,11 @@ Section test.
   Variable lx : addr.
   Variable l : val.
 
-  Definition R: iProp Σ := (∃ vx: int32, lx ↦ vx @ Tint32)%I.
+  Definition R: iProp Σ := (∃ vx: int8, lx ↦ vx @ Tint8)%I.
   
   Definition add: expr :=
     Ecall Tvoid "acquire" (Evalue (Vpair l Vvoid)) ;;
-    lx <- !lx@Tint32 + 1;;
+    lx <- !lx@Tint8 + 1;;
     Ecall Tvoid "release" (Evalue (Vpair l Vvoid)).
 
   Lemma add_safe ks:
@@ -36,8 +36,8 @@ Section test.
      by encoding some receipt tokens *)
 
   Definition spawn: expr :=
-    Efork Tvoid "add" Vvoid ;;
-    Efork Tvoid "add" Vvoid.
+    Efork Tvoid "add" ;;
+    Efork Tvoid "add".
 
   Lemma spawn_spec ks:
     is_lock N γ l R ∗
@@ -48,10 +48,10 @@ Section test.
   Proof.
     iIntros "(#Hlk & #? & #? & #?)".
     unfold spawn. iApply wp_seq=>//.
-    iApply (wp_fork _ _ _ Vvoid); last iFrame "#"; first done.
-    iNext. iSplitL "".
-    - wp_skip. iApply (wp_fork _ _ _ Vvoid); last iFrame "#"; first done.
-      iNext. iSplit=>//. iApply add_safe. iFrame "#".
+    iApply (wp_fork _ _ _). iFrame "#".
+    iSplitL ""; iNext.
+    - wp_skip. iApply (wp_fork _ _ _); iFrame "#".
+      iSplit=>//; iNext=>//. iApply add_safe. iFrame "#".
     - iApply add_safe. iFrame "#".
   Qed.
 

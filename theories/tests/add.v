@@ -22,10 +22,10 @@ Section example.
 
   Definition f_body : expr :=
     cli i ;;
-    py <- !py@Tint8 + "x" ;;
+    py <- !py@Tint8 + !"x"@Tint8 ;;
     "x" <- !py@Tint8 ;;
     sti i ;;
-    return: "x".
+    return: !"x"@Tint8.
 
   Definition f_rel (vx: int8) (s: spec_state) (r: option val) (s': spec_state) :=
     ∃ vy:int8, s !! "Y" = Some (Vint8 vy) ∧
@@ -35,28 +35,46 @@ Section example.
   Definition int_ctx := @interrupt.int_ctx _ _ invs 1 i.
 
   Lemma f_spec γ γp f vx Φ k ks:
-    f T↦ Function Tint8 [("x", Tint8)] f_body ∗
+    f T↦ Function Tint8 [("x", Tptr Tint8)] f_body ∗
     int_ctx γ γp ∗ inv N spec_inv ∗ hpri invs γp 1 ∗
     own_scode (SCrel (f_rel vx)) ∗
     (∀ v, own_scode (SCdone (Some v)) -∗ hpri invs γp 1 -∗
           WP (fill_ectxs (Evalue v) k, ks) {{ _, Φ }})
-    ⊢ WP (fill_ectxs (Ecall Tint8 f (Evalue (Vpair vx Vvoid))) k, ks) {{ _, Φ }}.
+    ⊢ WP (fill_ectxs (Ecall Tint8 f
+                            (Epair (Ealloc Tint8 vx) void)) k, ks) {{ _, Φ }}.
   Proof.
     iIntros "(? & #? & #? & Hp & Hsc & HΦ)".
-    iApply (wp_call _ (Vpair (Vint8 vx) Vvoid) [("x", Tint8)] f_body)=>//.
+    rewrite (fill_app (Ealloc Tint8 vx)
+                      [EKcall Tint8 f; EKpairl void ] k).
+    iApply wp_bind=>//.
+    wp_alloc x as "Hx".
+    iApply wp_value=>//.
+    rewrite -(fill_app x [EKcall Tint8 f; EKpairl void ] k).
+    simpl.
+    rewrite (fill_app (Epair x void)
+                      [EKcall Tint8 f] k).
+    iApply wp_bind=>//.
+    iApply wp_pair.
+    rewrite -(fill_app (Vpair x void) [EKcall Tint8 f] k).
+    simpl.
+    destruct ks.
+    iApply (wp_call (sset "x" (Tptr Tint8, Vptr x) semp)
+                    e _ (Vpair (Vptr x) Vvoid) [("x", Tptr Tint8)] f_body)=>//.
     iFrame. iIntros "!>".
-    wp_alloc px as "Hpx". wp_let. iApply wp_seq=>//.
+    iApply wp_seq=>//.
     iApply cli_spec. iFrame "#". iFrame.
     iIntros "HI Hp Hcl".
     iDestruct "HI" as (vy) "[Hy HY]". iApply fupd_wp.
     (* Open invariant *)
     iInv N as ">Hspec" "Hclose".
-    iMod (spec_update {[ "Y" := Vint8 vy ]} {[ "Y" := Vint8 (Int.add vx vy) ]} with "[Hspec HY Hsc]")
+    iMod (spec_update {[ "Y" := Vint8 vy ]} {[ "Y" := Vint8 (Byte.add vx vy) ]}
+          with "[Hspec HY Hsc]")
       as "(Hspec & Hss' & Hsc' & ?)"; [ | iFrame; by iApply mapsto_singleton | ].
     { apply spec_step_rel'. unfold f_rel. eexists _. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-    wp_run. iFrame. iApply ("HΦ" with "[-Hp]")=>//. by rewrite Int.add_commut.
+    wp_run. wp_var. wp_run. wp_var. wp_run. wp_var. wp_run.
+    iApply ("HΦ" with "[-Hp]")=>//. by rewrite Byte.add_commut.
   Qed.
 
 End example.

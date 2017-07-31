@@ -10,6 +10,7 @@ Class lockG Σ := LockG { lock_tokG :> inG Σ (exclR unitC) }.
 Definition lockΣ : gFunctors := #[GFunctor (exclR unitC)].
 
 Section spin_lock.
+  Context `{!clangG Σ, !lockG Σ} (N: namespace).
 
   Definition acquire : expr :=
     while: (ECAS tybool "x" vfalse vtrue == vfalse ) ( void ) ;;
@@ -19,10 +20,8 @@ Section spin_lock.
     return: Ealloc tybool vfalse.
 
   Definition release : expr :=
-    !?"x" <- vfalse ;;
+    "x" <- vfalse ;;
     return: void.
-
-  Context `{!clangG Σ, !lockG Σ} (N: namespace).
 
   Definition lock_inv (γ : gname) (l : addr) (R : iProp Σ) : iProp Σ :=
     (∃ b : bool, l ↦ b_to_v b @ tybool ∗
@@ -59,7 +58,8 @@ Section spin_lock.
     ⊢ WP (fill_ectxs (Ecall (Tptr tybool) "newlock" Vvoid) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & HR & HΦ)".
-    iApply (wp_call k Vvoid); last iFrame; first done.
+    destruct ks.
+    iApply (wp_call semp e k Vvoid [])=>//. iFrame.
     iNext. rewrite /newlock /=.
     wp_alloc l as "Hl". iApply (wp_ret []).
     iFrame. iApply fupd_wp.
@@ -76,27 +76,27 @@ Section spin_lock.
     ⊢ WP (fill_ectxs (Ecall Tvoid "acquire" (Evalue (Vpair lk Vvoid))) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & #Hlk & HΦ)".
-    iApply (wp_call k (Vpair lk Vvoid)); last iFrame; first done.
-    iNext. iDestruct (is_lock_tylock with "Hlk") as "%".
-    wp_alloc lkx as "Hlkx". wp_let.
+    destruct ks.
+    iApply (wp_call (sset "x" (tylock, lk) semp) e
+                    k (Vpair lk Vvoid)); last iFrame; first done.
+    iNext. iDestruct (is_lock_tylock with "Hlk") as "%". unfold acquire.
     iLöb as "IH".
     wp_unfill (Ewhile _ _).
     iApply wp_while. iNext.
-    iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
-    wp_load.
+    iDestruct "Hlk" as (l) "[% ?]". destruct_ands. wp_var.
     wp_bind (ECAS _ _ _ _).
     wp_atomic.
     iInv N as ([]) "[>Hl HR]" "Hclose"; iModIntro; simpl.
     - wp_cas_fail.
       iIntros "Hl".
-      iMod ("Hclose" with "[-Hlkx HΦ]").
+      iMod ("Hclose" with "[-HΦ]").
       { iNext. iExists true. iFrame. }
       iModIntro. do 4 wp_step.
       iApply (@wp_continue _ _ _ _ _ _ []). simpl.
-      iApply ("IH" with "HΦ Hlkx").
+      iApply ("IH" with "HΦ").
     - wp_cas_suc.
       iIntros "Hl'".
-      iMod ("Hclose" with "[-HΦ Hlkx HR]").
+      iMod ("Hclose" with "[-HΦ HR]").
       { iNext. iExists true. iFrame. }
       iModIntro. wp_run.
       iApply (@wp_break _ _ _ _ []).
@@ -111,10 +111,12 @@ Section spin_lock.
     ⊢ WP (fill_ectxs (Ecall Tvoid "release" (Evalue (Vpair lk Vvoid))) k, ks) {{ Φ }}.
   Proof.
     iIntros "(Hf & #Hlk & Hlked & HR & HΦ)".
+    destruct ks.
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
-    iApply (wp_call k (Vpair l Vvoid)); last iFrame; auto.
-    iIntros "!>". wp_alloc lkx as "Hlkx". wp_let. wp_bind (_ <- _)%E.
-    wp_load. wp_atomic.
+    iApply (wp_call (sset "x" (tylock, Vptr l) semp)
+                    e k (Vpair l Vvoid)); last iFrame; auto.
+    iIntros "!>". unfold release. wp_bind (_ <- _)%E.
+    wp_var. wp_atomic.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.
     - simpl. iApply wp_assign; last iFrame; try by constructor.
       iIntros "!> Hl". iMod ("Hclose" with "[-HΦ]")=>//.

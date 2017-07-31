@@ -7,7 +7,6 @@ From iris_c.lib Require Import gmap_solve int.
 Section proof.
   Context `{clangG Σ}.
 
-  (* de brujin with autosubst? *)
   Definition tcell (t: type): type := Tprod t (Tptr Tvoid).
 
   Fixpoint isList (l: val) (xs: list val) (t: type) :=
@@ -281,34 +280,74 @@ Section proof.
   Qed.
 
   Definition ps :=
-    [ ("x", Tlist); ("y", Tlist); ("t", Tlist) ].
+    [ ("x", Tptr Tlist); ("y", Tptr Tlist); ("t", Tptr Tlist) ].
 
-(*   Lemma rev_spec k ks Φ xs: *)
-(*     ∀ lx ly ys, *)
-(*       "rev" T↦ Function Tvoid ps rev_list ∗ *)
-(*       isList lx xs Tint8 ∗ isList ly ys Tint8 ∗ *)
-(*       (∀ ly', isList ly' (rev xs ++ ys) Tint8 -∗ WP (fill_ectxs ly' k, ks) {{ Φ }}) *)
-(*       ⊢ WP (fill_ectxs (Ecall Tvoid "rev" *)
-(*                               (Epair (Ealloc Tlist (Evalue lx)) *)
-(*                                      (Epair (Ealloc Tlist (Evalue ly)) *)
-(*                                             (Evalue Vvoid)))) *)
-(*                               k, ks) {{ Φ }}. *)
-(*    Proof. *)
-(*      iIntros (???). iIntros "(Hf & Hlx & Hly & HΦ)". *)
-(*      destruct ks. *)
-(*      iApply (wp_call rev_env e (Vpair lx (Vpair ly Vvoid))); last iFrame; first by simpl. *)
-(*      iNext. *)
-(*      iDestruct (isList_ptr with "Hly") as "%". *)
-(*      iDestruct (isList_ptr' with "Hlx") as "%". *)
-(*      wp_alloc px as "Hpx". wp_let. *)
-(*      wp_alloc py as "Hpy". wp_let. *)
-(*      wp_alloc pt as "Hpt". wp_let. wp_unfill (Ewhile _ _). *)
-(*      move: (rev_spec' "rev" (reverse [EKseq (return: ! py @ (Tptr Tvoid))]) *)
-(*                       (Kcall k::ks) Φ px py pt xs lx ly ys) => Hspec. *)
-(*      iApply Hspec. *)
-(*      iFrame. *)
-(*      iSplitR "Hpt"; last by iExists _. *)
-(*      iIntros (?) "[? ?]". *)
-(*      wp_skip. wp_load. wp_ret. by iApply "HΦ". *)
-(*    Qed. *)
-(* End proof. *)
+  Lemma rev_spec pt k ks Φ xs:
+    ∀ lx ly ys,
+      "rev" T↦ Function Tvoid ps rev_list ∗
+      isList lx xs Tint8 ∗ isList ly ys Tint8 ∗
+      pt ↦ - @ Tlist ∗
+      (∀ ly', isList ly' (rev xs ++ ys) Tint8 -∗ WP (fill_ectxs ly' k, ks) {{ Φ }})
+      ⊢ WP (fill_ectxs (Ecall Tvoid "rev"
+                              (Epair (Ealloc Tlist (Evalue lx))
+                                     (Epair (Ealloc Tlist (Evalue ly))
+                                            (Vpair pt void))))
+                              k, ks) {{ Φ }}.
+   Proof.
+     iIntros (???). iIntros "(Hf & Hlx & Hly & Hpt & HΦ)".
+     destruct ks.
+     iDestruct (wp_bind (k ++ [ EKcall Tvoid "rev" 
+                                ; EKpairl (Epair (Ealloc Tlist ly) (Vpair pt void))])
+                        _ (Ealloc Tlist lx))
+       as "H"=>//.
+     assert (fill_ectxs (Ealloc Tlist lx)
+                        (k ++ [ EKcall Tvoid "rev";
+                                EKpairl (Epair (Ealloc Tlist ly) (Vpair pt void))]) =
+             fill_ectxs (fill_ectxs (Ealloc Tlist lx)
+                              [ EKcall Tvoid "rev";
+                                EKpairl (Epair (Ealloc Tlist ly) (Vpair pt void))]) k).
+     { symmetry. eapply fill_app. }
+     rewrite H0.
+     simpl. iApply "H".
+     iDestruct (isList_ptr' with "Hlx") as "%".
+     iDestruct (isList_ptr' with "Hly") as "%".
+     wp_alloc x as "Hx". iApply wp_value=>//.
+     rewrite -(fill_app x [EKcall Tvoid "rev";
+                       EKpairl (Epair (Ealloc Tlist ly) (Vpair pt void))] k).
+     simpl.
+     rewrite (fill_app (Ealloc Tlist ly)
+                       [EKcall Tvoid "rev"; EKpairr x; EKpairl (Vpair pt void) ] k).
+     iApply wp_bind=>//.
+     wp_alloc y as "Hy".
+     iApply wp_value=>//.
+     rewrite -(fill_app y [ EKcall Tvoid "rev";
+                            EKpairr x;
+                            EKpairl (Vpair pt void) ] k).
+     simpl.
+     rewrite (fill_app (Epair y (Vpair pt void))
+                       [EKcall Tvoid "rev"; EKpairr x] k).
+     iApply wp_bind=>//.
+     iApply wp_pair.
+     rewrite -(fill_app (Vpair y (Vpair pt void))
+                        [EKcall Tvoid "rev"; EKpairr x] k).
+     simpl.
+     rewrite (fill_app (Epair x (Vpair y (Vpair pt void)))
+                       [EKcall Tvoid "rev"] k).
+     iApply wp_bind=>//. iApply wp_pair.
+     rewrite -(fill_app (Vpair x (Vpair y (Vpair pt void)))
+                        [EKcall Tvoid "rev"] k).
+     simpl.
+     iApply (wp_call (rev_env x y pt) e _
+                     (Vpair x (Vpair y (Vpair pt Vvoid))) ps)=>//.
+     iFrame. iNext.
+     move: (rev_spec' "rev" [EKseq (return: ! "y" @ Tlist)]
+                      (Kcall k e :: s) Φ x y pt xs lx ly ys) => Hspec.
+     simpl in *.
+     iDestruct (Hspec with "[-]") as "Hspec".
+     { iFrame. iIntros (?).
+       iIntros "[Hy Hl]".
+       wp_run. wp_var. wp_run. iApply "HΦ".
+       done. }
+     done.
+   Qed.
+End proof.
