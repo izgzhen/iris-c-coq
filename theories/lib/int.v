@@ -11,6 +11,15 @@ Definition mul_safe := op_safe Byte.mul.
 
 Coercion Byte.repr : Z >-> int8.
 
+Instance int_eq_dec : EqDecision int.
+Proof. apply Int.eq_dec. Defined.
+Instance byte_eq_dec : EqDecision byte.
+Proof. apply Byte.eq_dec. Defined.
+Instance int8_eq_dec : EqDecision int8.
+Proof. apply Byte.eq_dec. Defined.
+Instance int8_countable : Countable int8.
+Admitted.
+
 Bind Scope int_scope with int.
 Delimit Scope int_scope with int.
 
