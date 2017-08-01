@@ -25,8 +25,7 @@ Inductive expr :=
 | Evar (x: string)
 | ECAS (t: type) (e1 e2 e3: expr)
 | Ebinop (op: bop) (e1: expr) (e2: expr)
-| Ederef (e: expr)
-| Ederef_typed (t: type) (e: expr)
+| Ederef (t: type) (e: expr)
 | Eaddrof (e: expr)
 | Efst (e: expr)
 | Esnd (e: expr)
@@ -59,8 +58,7 @@ Inductive exprctx :=
 | EKCASr (t: type) (l0: val) (v1: val)
 | EKpairl (e2: expr)
 | EKpairr (v1: val)
-| EKderef
-| EKderef_typed (t: type)
+| EKderef (t: type)
 | EKaddrof
 | EKfst
 | EKsnd
@@ -83,8 +81,7 @@ Definition fill_expr (e : expr) (Ke : exprctx) : expr :=
     | EKCASr t l0 v1 => ECAS t (Evalue l0) (Evalue v1) e
     | EKpairl e2 => Epair e e2
     | EKpairr v1 => Epair (Evalue v1) e
-    | EKderef => Ederef e
-    | EKderef_typed t => Ederef_typed t e
+    | EKderef t => Ederef t e
     | EKaddrof => Eaddrof e
     | EKfst => Efst e
     | EKsnd => Esnd e
@@ -211,8 +208,7 @@ Fixpoint is_jmp (e: expr) :=
     | Ebreak => true
     | Econtinue => true
     | Ebinop _ e1 e2 => is_jmp e1 || is_jmp e2
-    | Ederef e => is_jmp e
-    | Ederef_typed _ e => is_jmp e
+    | Ederef _ e => is_jmp e
     | Eaddrof e => is_jmp e
     | Efst e => is_jmp e
     | Esnd e => is_jmp e
@@ -301,7 +297,7 @@ Inductive estep : text → env → expr → heap → expr → heap → list expr
     ∀ σ l v t Γ Ω,
       typeof v t →
       readbytes l (encode_val v) σ →
-      estep Γ Ω (Ederef_typed t (Evalue (Vptr l))) σ
+      estep Γ Ω (Ederef t (Evalue (Vptr l))) σ
             (Evalue v) σ []
 | ESfst:
     ∀ v1 v2 σ Γ Ω,
@@ -391,8 +387,7 @@ Definition is_loc e :=
 Inductive lnf: expr → Prop :=
   | LNFvar: ∀ x, lnf (Evar x)
   | LNFbinop: ∀ op v1 v2, lnf (Ebinop op (Evalue v1) (Evalue v2))
-  | LNFderef: ∀ v, lnf (Ederef (Evalue v))
-  | LNFderef_typed: ∀ t v, lnf (Ederef_typed t (Evalue v))
+  | LNFderef: ∀ t v, lnf (Ederef t (Evalue v))
   | LNFaddrof: ∀ v, lnf (Eaddrof (Evalue v))
   | LNFfst: ∀ v, lnf (Efst (Evalue v))
   | LNFsnd: ∀ v, lnf (Esnd (Evalue v))
@@ -425,11 +420,7 @@ Proof. inversion 1=>//. Qed.
 
 Lemma fill_uninj_val e ks v1:
   fill_ectxs e ks = Evalue v1 → e = Evalue v1 ∧ ks = [].
-Proof.
-  destruct ks=>//.
-  simpl. intros.
-  destruct e0=>//.
-Qed.
+Proof. destruct ks as [|?e']=>//. destruct e'=>//. Qed.
 
 Ltac solve_val_fill NF :=
   simpl in *; simplify_eq;
@@ -464,7 +455,7 @@ Proof.
   intros. simpl in *. apply weak_cont_inj' in H1=>//.
   by apply fill_ectxs_not_val, enf_not_val.
 Qed.
-  
+
 Lemma cont_inj: ∀ kes kes' e e',
   enf e → enf e' →
   fill_ectxs e kes = fill_ectxs e' kes' → e = e' ∧ kes = kes'.
@@ -680,8 +671,7 @@ Proof.
     + destruct_is_val.
       exists (EKbinopr op e2 :: x), x0.
       split=>//.
-  - not_val_wf_uni EKderef.
-  - not_val_wf_uni (EKderef_typed t).
+  - not_val_wf_uni (EKderef t).
   - not_val_wf_uni EKaddrof.
   - not_val_wf_uni EKfst.
   - not_val_wf_uni EKsnd.
@@ -789,10 +779,10 @@ Lemma not_val_ind'':
                      P (fill_ectxs e ks'))%nat → P (fill_ectxs e ks)) →
     (∀ e, wellformed e → P e).
 Proof.
-  intros.
-  destruct H1 as [? [? [? ?]]].
+  intros ???Hind??H'.
+  destruct H' as [? [? [? ?]]].
   subst. apply (size_ind (fun x => P (fill_ectxs x0 x))).
-  intros. apply H0=>//.
+  intros. apply Hind=>//.
 Qed.
 
 Lemma fill_estep_inv':
@@ -825,8 +815,8 @@ Lemma fill_estep_inv {e ks a a1 a2 G efs Ω}:
   estep G Ω (fill_ectxs e ks) a a1 a2 efs →
   ∃ e', estep G Ω e a e' a2 efs ∧ a1 = fill_ectxs e' ks.
 Proof.
-  move: fill_estep_inv' => /= H. intros.
-  move:(wellformed_estep H2)=>?.
+  move: fill_estep_inv' => /= H. intros ???Hes.
+  move:(wellformed_estep Hes)=>?.
   apply H=>//.
   by eapply fill_wellformed.
 Qed.
@@ -941,8 +931,7 @@ Proof.
       | [ H : fill_ectxs _ _ = fill_ectxs _ _ |- _] =>
         apply cont_inj in H=>//
       end;
-      (by destruct_ands ||
-       by apply jnf_enf).
+      (by destruct_ands || by apply jnf_enf).
 Qed.
 
 Lemma wfill_jstep_false {e kes e' σ σ' t Ω Ω'}:
@@ -1009,20 +998,13 @@ Ltac is_jmp_false k :=
   rewrite existsb_app; simpl; rewrite IHks'; simpl;
   by apply orb_true_r.
 
-Lemma is_jmp_ret k v: is_jmp (fill_ectxs (Erete (Evalue v)) k) = true.
-Proof. is_jmp_false k. Qed.
-
-Lemma is_jmp_call k' t f es: is_jmp (fill_ectxs (Ecall t f es) k') = true.
-Proof. is_jmp_false k'. Qed.
-
-Lemma is_jmp_while k' c e: is_jmp (fill_ectxs (Ewhile c e) k') = true.
-Proof. is_jmp_false k'. Qed.
-
-Lemma is_jmp_break k': is_jmp (fill_ectxs Ebreak k') = true.
-Proof. is_jmp_false k'. Qed.
-
-Lemma is_jmp_continue k': is_jmp (fill_ectxs Econtinue k') = true.
-Proof. is_jmp_false k'. Qed.
+Ltac is_jmp_false_fill :=
+  match goal with
+    | [ H : is_jmp (fill_ectxs ?e ?k) = false |- _ ] =>
+      let Hcontra := fresh "Hcontra" in
+      assert (is_jmp (fill_ectxs e k) = true) as Hcontra;
+        [ clear; is_jmp_false k | by rewrite Hcontra in H ]
+  end.
 
 Lemma is_jmp_jstep_false {e e' σ} k {ks ks' Ω Ω'}:
   to_val e = None →
@@ -1036,9 +1018,7 @@ Proof.
       symmetry in H;
       apply unfill_segment in H=>//;
       destruct H as [? [? ?]]; subst
-    end; auto.
-  - by rewrite is_jmp_ret in Hnj.
-  - by rewrite is_jmp_call in Hnj.
+    end; auto; is_jmp_false_fill.
 Qed.
 
 Lemma is_jmp_wstep_false {e e'} k {ks ks'}:
@@ -1053,10 +1033,7 @@ Proof.
       symmetry in H;
       apply unfill_segment in H=>//;
       destruct H as [? [? ?]]; subst
-    end; auto.
-  - by rewrite is_jmp_while in Hnj.
-  - by rewrite is_jmp_break in Hnj.
-  - by rewrite is_jmp_continue in Hnj.
+    end; auto; is_jmp_false_fill.
 Qed.
 
 Ltac inversion_jstep_as Heq :=
@@ -1136,15 +1113,10 @@ Proof.
     exists e2'. split; [| split ]; auto.
   - inversion_jstep_as Heq;
     eapply cont_incl in Heq=>//;
-    try destruct Heq as (?&?); subst; auto.
-    + by rewrite is_jmp_ret in Hnj.
-    + by rewrite is_jmp_call in Hnj.
+    try destruct Heq as (?&?); subst; auto; is_jmp_false_fill.
   - inversion_wstep_as Heq;
     eapply cont_incl in Heq=>//;
-    try destruct Heq as (?&?); subst; auto.
-    + by rewrite is_jmp_while in Hnj.
-    + by rewrite is_jmp_break in Hnj.
-    + by rewrite is_jmp_continue in Hnj.
+    try destruct Heq as (?&?); subst; auto; is_jmp_false_fill.
 Qed.
 
 Lemma estep_preserves_not_jmp' σ1 σ2:
@@ -1268,7 +1240,7 @@ Ltac atomic_step H :=
 Definition clang_atomic (e: expr) :=
   match e with
   | ECAS t e1 e2 e3 => bool_decide (is_loc e1 ∧ is_val e2 ∧ is_val e3)
-  | Ederef_typed t e => bool_decide (is_loc e)
+  | Ederef t e => bool_decide (is_loc e)
   | Ealloc t e => bool_decide (is_val e)
   | Eassign e1 e2 => bool_decide (is_loc e1 ∧ is_val e2)
   | _ => false
@@ -1333,3 +1305,6 @@ Fixpoint default_val (t: type) :=
 Lemma default_val_types (t: type) :
   typeof (default_val t) t.
 Proof. induction t; crush. Qed.
+
+Global Instance equiv_type_function: Equiv function := (=).
+Global Instance equiv_type_stack: Equiv stack := (=).

@@ -32,7 +32,7 @@ Ltac reshape_expr e tac :=
   | Epair ?e1 ?e2 => go (EKpairr e2 :: K) e1
   | Efst ?e => go (EKfst :: K) e
   | Esnd ?e => go (EKsnd :: K) e
-  | Ederef_typed ?t ?e => go (EKderef_typed t :: K) e
+  | Ederef ?t ?e => go (EKderef t :: K) e
   | Eassign (Evalue (Vptr ?l)) ?e =>
     go (EKassignl (Vptr l) :: K) e
   | Eassign ?e1 ?e2 =>
@@ -115,7 +115,7 @@ Lemma tac_wp_load Δ Δ' E i l q v t Φ ks:
   IntoLaterNEnvs 1 Δ Δ' →
   envs_lookup i Δ' = Some (false, l ↦{q} v @ t)%I →
   (Δ' ⊢ Φ v) →
-  Δ ⊢ WP (Ederef_typed t (Evalue (Vptr l)), ks) @ E {{ Φ }}.
+  Δ ⊢ WP (Ederef t (Evalue (Vptr l)), ks) @ E {{ Φ }}.
 Proof.
   intros. eapply wand_apply with (P:=(▷ l ↦{q} v @ t)%I)
                                  (Q:=(▷ (l ↦{q} v @ t -∗ Φ v))%I).
@@ -177,7 +177,7 @@ Tactic Notation "wp_load" :=
   | |- _ ⊢ wp ?E (?e, ?K) ?P =>
     first
       [reshape_expr e ltac:(fun Kes e' =>
-         match eval hnf in e' with Ederef_typed _ (Evalue _) => wp_bind_core Kes end)
+         match eval hnf in e' with Ederef _ (Evalue _) => wp_bind_core Kes end)
       |fail 1 "wp_load: cannot find 'Ederef_typed' in" e];
     eapply tac_wp_load;
       [apply _
@@ -267,7 +267,7 @@ Ltac wp_step :=
    | |- _ ⊢ wp _ (Erete _, _) _ => wp_ret
    | |- _ ⊢ wp _ (Evar _, _) _ => wp_var
    | |- _ ⊢ ▷ _ => iNext
-   | _ => wp_snd || wp_fst || wp_load || wp_op || wp_pair
+   | _ => wp_snd || wp_fst || wp_load || wp_op || wp_pair || wp_var
   end.
 
 Ltac wp_run := repeat wp_step.

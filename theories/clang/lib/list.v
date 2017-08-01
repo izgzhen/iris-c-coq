@@ -66,18 +66,18 @@ Section proof.
     induction xs as [|x xs' IHxs'].
     - iIntros (l) "[? [% HΦ]]".
       rewrite /traverse_list. subst.
-      iApply (@wp_while _ _ [] _ _ _ []).
+      iApply (wp_while [] []).
       repeat wp_step.
-      iApply (@wp_break _ _ [] _ []).
+      iApply (wp_break [] []).
       simpl. iApply wp_value=>//.
       by iApply "HΦ".
     - iIntros (l) "[Hlx [Hl HΦ]]".
       simpl. iDestruct "Hl" as (p l') "[% [Hp Hl']]".
       destruct_ands.
       rewrite /traverse_list.
-      iApply (@wp_while _ _ [] _ _ _ []).
+      iApply (wp_while [] []).
       do 10 wp_step.
-      iApply (@wp_continue _ _ _ [] _ _ []).
+      iApply (wp_continue [] []).
       iApply IHxs'. iFrame. iIntros "?".
       iApply "HΦ". iExists _, _. by iFrame.
   Qed.
@@ -137,33 +137,33 @@ Section proof.
       iExists _, _. iFrame. iSplit=>//.
   Qed.
 
+  Definition enq_env pt pt': env :=
+    (sset "lt'" (Tlist, Vptr pt')
+          (sset "lt" (Tptr Tlist, Vptr pt)
+                semp)).
+
   Lemma enq_spec' lx (p: addr) Φ x xs k: ∀ xs2 xs1 pt pt' (p': addr) l',
     typeof l' Tlist → typeof p Tlist →
     lx ↦ p @ Tlist ∗ pt ↦ p' @ Tlist ∗ pt' ↦ l' @ Tlist ∗
     isListSeg p p' l' x xs1 Tint8 ∗ isList l' xs2 Tint8 ∗ ⌜ xs = xs1 ++ xs2 ⌝ ∗
     (∀ p': addr, lx ↦ p @ Tlist -∗ pt ↦ p' @ Tlist -∗
                  isListSeg p p' null x xs Tint8 -∗
-                 pt' ↦ null @ Tlist -∗ WP (fill_ectxs void k, ([], (sset "lt'" (Tlist, Vptr pt')
-                                (sset "lt" (Tptr Tlist, Vptr pt)
-                                      semp)))) {{ Φ }})
+                 pt' ↦ null @ Tlist -∗
+                 WP (fill_ectxs void k, ([], enq_env pt pt')) {{ Φ }})
     ⊢ WP (fill_ectxs (while: (! "lt'" @ Tlist != null) (
             "lt" <- ! "lt'" @ Tlist ;; "lt'" <- snd ! ! "lt'" @ Tlist @ (tcell Tint8)
-          )) k, ([], (sset "lt'" (Tlist, Vptr pt')
-                                (sset "lt" (Tptr Tlist, Vptr pt)
-                                      semp)))) {{ Φ }}.
+          )) k, ([], enq_env pt pt')) {{ Φ }}.
   Proof.
     induction xs2 as [|x' xs2' IHxs'];
       iIntros (???????) "(Hlx&Hpt&Hpt'&Hxs1&Hxs2&%&HΦ)".
     - iDestruct "Hxs2" as "%". subst.
-      iApply wp_while. iNext. wp_var. wp_run.
+      iApply wp_while. iNext. wp_run.
       rewrite (right_id_L _ (++)).
-      iApply (@wp_break _ _ _ _ []). simpl.
+      iApply (wp_break _ []). simpl.
       by iSpecialize ("HΦ" $! p' with "Hlx Hpt Hxs1 Hpt'").
     - simpl. iDestruct "Hxs2" as (p'' l'') "[% [? ?]]". destruct_ands.
-      iApply wp_while. iNext. wp_var.
-      do 4 wp_step. wp_var. wp_var. do 2 wp_step.
-      wp_var. wp_var. do 5 wp_step.
-      iApply (@wp_continue _ _ _ _ _ _ []).
+      iApply wp_while. iNext.
+      wp_run. iApply (wp_continue _ []).
       iApply (IHxs' (xs1 ++ [x'])); last iFrame; auto.
       iSplitL.
       { iApply lseg_snoc=>//. iFrame. }
@@ -187,28 +187,24 @@ Section proof.
     lt' ↦ null @ Tlist ∗ lt ↦ null @ Tlist ∗
     lx ↦ l @ Tlist ∗ isList l xs Tint8 ∗
     (∀ l', (lx ↦ l' @ Tlist) -∗ (isList l' (xs ++ [v]) Tint8) -∗ Φ void)
-    ⊢ WP (enq_list lx v, ([],
-                          (sset "lt'" (Tlist, Vptr lt')
-                                (sset "lt" (Tptr Tlist, Vptr lt)
-                                      semp)))) {{ v, Φ v }}.
+    ⊢ WP (enq_list lx v, ([], enq_env lt lt')) {{ v, Φ v }}.
   Proof.
     intros ?. rewrite /enq_list. subst.
     iIntros (l) "(Ht' & Ht & Hlx & Hl & HΦ)".
     iDestruct (mapsto_typeof with "Hlx") as "%". wp_var.
     destruct xs as [|x xs'] eqn:?; subst; simpl.
-    - iDestruct "Hl" as "%". subst. wp_run. wp_var.
-      wp_run. wp_alloc x as "Hx"=>//.
+    - iDestruct "Hl" as "%". subst. wp_run.
+      wp_alloc x as "Hx"=>//.
       wp_assign. iApply ("HΦ" with "[-Hx]")=>//.
       iExists _, _. iFrame. iSplit=>//.
     - simpl. iDestruct "Hl" as (p l') "[% [? ?]]".
-      destruct_ands. wp_run. wp_var. wp_run. wp_var. wp_var. wp_run.
+      destruct_ands. wp_run.
       wp_unfill (Ewhile _ _).
       iApply (enq_spec' lx p _ x _ _ _ [] lt lt' p l'); last iFrame; auto.
       iSplitL "~"=>//.
       { simpl. iExists _. iSplit=>//. }
       iSplit=>//. iIntros (?) "? ? ? ?". destruct a. simpl.
-      wp_run. wp_var. wp_run.
-      rewrite_byte. replace (Z.to_nat 1) with 1%nat=>//.
+      wp_run. rewrite_byte. replace (Z.to_nat 1) with 1%nat=>//.
       iDestruct (lseg_unsnoc with "~2") as "[H|[% Hp]]".
       + iDestruct "H" as (???) "[Hl [Hp %]]". destruct_ands.
         iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
@@ -254,8 +250,8 @@ Section proof.
     induction xs as [|x xs' IHxs']; intros ??? ; subst.
     - iIntros "(Hlx & Hly & Hpx & Hpy & Hpt & HΦ)".
       iDestruct "Hlx" as "%". subst. 
-      iApply wp_while. iNext. wp_var.
-      wp_run. iApply (@wp_break _ _ _ _ []).
+      iApply wp_while. iNext.
+      wp_run. iApply (wp_break _ []).
       iApply ("HΦ" with "[-]")=>//. iFrame.
     - iIntros "(Hlx & Hly & Hpx & Hpy & Hpt & HΦ)".
       iDestruct "Hlx" as (p l') "(% & Hp & Hl')".
@@ -263,13 +259,10 @@ Section proof.
       iDestruct "Hpt" as (?) "Hpt".
       destruct p as [pb po].
       iDestruct (isList_ptr with "Hly") as "%".
-      iApply wp_while. iNext. wp_var. wp_run. wp_var. wp_var.
-      wp_run. wp_var. wp_run.
+      iApply wp_while. iNext. wp_run.
       rewrite_byte. replace (Z.to_nat 1) with 1%nat; last done.
       iDestruct (mapstoval_split with "Hp") as "[Hp1 Hp2]". simpl.
-      wp_var. wp_load. wp_assign. wp_var. wp_var. wp_load. wp_assign.
-      wp_var. wp_var. wp_load. wp_assign.
-      iApply (@wp_continue _ _ _ _ _ _ []).
+      wp_run. iApply (wp_continue _ []).
       iApply (IHxs' l' (Vptr (pb, po)) (x::ys)).
       iFrame. iDestruct (mapstoval_join with "[Hp1 Hp2]") as "Hp".
       { iSplitL "Hp1"; by simpl. }
@@ -337,17 +330,15 @@ Section proof.
      rewrite -(fill_app (Vpair x (Vpair y (Vpair pt void)))
                         [EKcall Tvoid "rev"] k).
      simpl.
-     iApply (wp_call (rev_env x y pt) e _
+     iApply (wp_call (rev_env x y pt) e
                      (Vpair x (Vpair y (Vpair pt Vvoid))) ps)=>//.
      iFrame. iNext.
      move: (rev_spec' "rev" [EKseq (return: ! "y" @ Tlist)]
                       (Kcall k e :: s) Φ x y pt xs lx ly ys) => Hspec.
      simpl in *.
-     iDestruct (Hspec with "[-]") as "Hspec".
+     iDestruct (Hspec with "[-]") as "Hspec"=>//.
      { iFrame. iIntros (?).
        iIntros "[Hy Hl]".
-       wp_run. wp_var. wp_run. iApply "HΦ".
-       done. }
-     done.
+       wp_run. by iApply "HΦ". }
    Qed.
 End proof.

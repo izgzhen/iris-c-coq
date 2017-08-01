@@ -9,9 +9,6 @@ From iris.proofmode Require Export tactics.
 Set Default Proof Using "Type".
 Import uPred.
 
-Instance equiv_type_function: Equiv function := (=).
-Instance equiv_type_stack: Equiv stack := (=).
-
 Definition textG := authR (gmapUR ident (agreeR (discreteC function))).
 
 Class clangG Σ := ClangG {
@@ -124,7 +121,8 @@ Section rules.
     (∀ σ1, state_interp σ1 ={E,∅}=∗
       ⌜ reducible (e1.1) (e1.2) σ1⌝ ∗
       ▷ ∀ e2 σ2 efs, ⌜cstep (e1.1) (e1.2) σ1 (e2.1) (e2.2) σ2 efs⌝ ={∅,E}=∗
-        state_interp σ2 ∗ WP e2 @ E {{ Φ }} ∗ [∗ list] ef ∈ efs, WP (ef, ([], semp)) {{ _, True }})
+                     state_interp σ2 ∗ WP e2 @ E {{ Φ }} ∗
+                     [∗ list] ef ∈ efs, WP (ef, ([], semp)) {{ _, True }})
     ⊢ WP e1 @ E {{ Φ }}.
   Proof. iIntros (?) "H". rewrite wp_unfold /wp_pre; auto. Qed.
 
@@ -132,7 +130,8 @@ Section rules.
     (∀ σ1, reducible e1 l1 σ1) →
     (∀ σ1 σ2 cur2 l1 l2 efs, cstep e1 l1 σ1 cur2 l2 σ2 efs → σ1 = σ2 ∧ l1 = l2) →
     (▷ ∀ e2 l2 σ1 σ2 efs, ⌜ cstep e1 l1 σ1 e2 l2 σ2 efs ⌝ →
-                          WP (e2, l2) @ E {{ Φ }} ∗ [∗ list] ef ∈ efs, WP (ef, ([], semp)) {{ _, True }})
+                          WP (e2, l2) @ E {{ Φ }} ∗
+                          [∗ list] ef ∈ efs, WP (ef, ([], semp)) {{ _, True }})
       ⊢ WP (e1, l1) @ E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hs) "H".
@@ -227,7 +226,8 @@ Section rules.
       ⌜reducible s1 l1 σ1⌝ ∗
       ▷ ∀ s2 l2 σ2 efs, ⌜cstep s1 l1 σ1 s2 l2 σ2 efs⌝ ={E}=∗
         state_interp σ2 ∗
-        default False (to_val s2) Φ  ∗ [∗ list] ef ∈ efs, WP (ef, ([], semp)) {{ _, True }})
+        default False (to_val s2) Φ ∗
+        [∗ list] ef ∈ efs, WP (ef, ([], semp)) {{ _, True }})
     ⊢ WP (s1, l1) @ E {{ Φ }}.
   Proof.
     iIntros (?) "H". iApply (wp_lift_step E _ (s1, l1))=>//; iIntros (σ1) "Hσ1".
@@ -344,7 +344,7 @@ Section rules.
 
   Lemma wp_load {E} ks Φ p v t q:
     ▷ p ↦{q} v @ t ∗ ▷ (p ↦{q} v @ t -∗ Φ v)
-    ⊢ WP (Ederef_typed t (Evalue (Vptr p)), ks) @ E {{ Φ }}.
+    ⊢ WP (Ederef t (Evalue (Vptr p)), ks) @ E {{ Φ }}.
   Proof.
     iIntros "[Hl HΦ]".
     iApply wp_lift_atomic_step=>//.
@@ -362,7 +362,7 @@ Section rules.
   Qed.
 
   Lemma wp_cas_fail Φ E ks l t q v' v1 v2 :
-    v' ≠ v1 → typeof v1 t → typeof v2 t → (* too strong, should mimick wp_assign *)
+    v' ≠ v1 → typeof v1 t → typeof v2 t →
     ▷ l ↦{q} v' @ t ∗ ▷ (l ↦{q} v' @ t -∗ Φ vfalse)
     ⊢ WP (ECAS t (Evalue (Vptr l)) (Evalue v1) (Evalue v2), ks) @ E {{ Φ }}.
   Proof.
@@ -388,7 +388,7 @@ Section rules.
   Qed.
 
   Lemma wp_cas_suc Φ E ks l t v v2 :
-    typeof v t → typeof v2 t → (* too strong, should mimick wp_assign *)
+    typeof v t → typeof v2 t →
     ▷ l ↦ v @ t ∗ ▷ (l ↦ v2 @ t -∗ Φ vtrue)
     ⊢ WP (ECAS t (Evalue (Vptr l)) (Evalue v) (Evalue v2), ks) @ E {{ Φ }}.
   Proof.
@@ -408,7 +408,7 @@ Section rules.
         rewrite (same_type_encode_inj h' t v vl l) in H18=>//.
       + simpl in *. iFrame.
         iMod (gen_heap_update_bytes _ (encode_val v)
-                                         _ (encode_val v2)
+                                    _ (encode_val v2)
                    with "Hσ Hl") as "[H ?]".
         { rewrite -(typeof_preserves_size v t)=>//.
           rewrite -(typeof_preserves_size v2 t)=>//. }
@@ -605,7 +605,7 @@ Section rules.
     - absurd_jstep Hws.
   Qed.
 
-  Lemma wp_while {ks E} c e k Φ Ω:
+  Lemma wp_while ks {E c e} k Φ Ω:
     ▷ WP (Eif c (Eseq e Econtinue) Ebreak, (Kwhile c e k::ks, Ω)) @ E {{ Φ }}
     ⊢ WP (fill_ectxs (Ewhile c e) k, (ks, Ω)) @ E {{ Φ }}.
   Proof.
@@ -630,7 +630,7 @@ Section rules.
       + fill_enf_neq. }
   Qed.
 
-  Lemma wp_break {ks E} k k' c e Φ Ω:
+  Lemma wp_break ks {E} k k' c e Φ Ω:
     WP (fill_ectxs (Evalue Vvoid) k', (ks, Ω)) @ E {{ Φ }}
        ⊢ WP (fill_ectxs Ebreak k, (Kwhile c e k'::ks, Ω)) @ E {{ Φ }}.
   Proof.
@@ -657,7 +657,7 @@ Section rules.
       + fill_enf_neq. }
   Qed.
 
-  Lemma wp_continue {E ks} c e k k' Φ Ω:
+  Lemma wp_continue {E} ks {c e} k k' Φ Ω:
     WP (fill_ectxs (Ewhile c e) k', (ks, Ω)) @ E {{ Φ }}
     ⊢ WP (fill_ectxs Econtinue k, (Kwhile c e k'::ks, Ω)) @ E {{ Φ }}.
   Proof.
@@ -683,8 +683,8 @@ Section rules.
         destruct_ands. iFrame.
         by rewrite big_sepL_nil. }
   Qed.
-  
-  Lemma wp_call {E ks} Ω Ω' k v params e f retty Φ:
+
+  Lemma wp_call {E ks} Ω Ω' {k} v params e f retty Φ:
     let_params v params = Some Ω →
     f T↦ Function retty params e ∗
     ▷ WP (e, (Kcall k Ω'::ks, Ω)) @ E {{ Φ }}

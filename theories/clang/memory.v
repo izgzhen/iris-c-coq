@@ -136,7 +136,6 @@ Fixpoint encode_val (v: val) : list byteval :=
     | _ => list_repeat (sizeof v) BVundef
   end.
 
-
 Lemma size_of_encode_val v:
   length (encode_val v) = sizeof v.
 Proof. simpl. induction v=>//. simpl. rewrite app_length. omega. Qed.

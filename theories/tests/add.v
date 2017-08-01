@@ -73,8 +73,7 @@ Section example.
     { apply spec_step_rel'. unfold f_rel. eexists _. by gmap_simplify. }
     (* close invariant *)
     iMod ("Hclose" with "[Hspec]"); first eauto. iModIntro.
-    wp_run. wp_var. wp_run. wp_var. wp_run. wp_var. wp_run.
-    iApply ("HΦ" with "[-Hp]")=>//. by rewrite Byte.add_commut.
+    wp_run. iApply ("HΦ" with "[-Hp]")=>//. by rewrite Byte.add_commut.
   Qed.
 
 End example.

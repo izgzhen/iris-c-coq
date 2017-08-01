@@ -1,6 +1,5 @@
 From iris_c.clang Require Import logic tactics notations.
 From iris_c.lib Require Import int.
-(* Kinda funky -- but really extensible *)
 
 Section array.
   Context `{clangG Σ}.
@@ -28,13 +27,14 @@ Section array.
       simpl. f_equal. apply IHn'. inversion H'. simplify_eq. done.
   Qed.
 
-  (* e should be a Tptr to some tyarray t n, which gives us some flexibility *)
-  Definition index (t: type) (p: addr) (ei: expr) : expr := p + (Byte.repr (sizeof t) * ei).
+  Definition index (t: type) (p: addr) (ei: expr) : expr :=
+    p + (Byte.repr (sizeof t) * ei).
 
   Fixpoint slice q t b o (i l: nat) vs : iProp Σ :=
     (match l, vs with
        | O, [] => True
-       | S l', v::vs' => (b, o + sizeof t * i) ↦{q} v @ t ∗ slice q t b o(S i) l'  vs'
+       | S l', v::vs' => (b, o + sizeof t * i) ↦{q} v @ t ∗
+                         slice q t b o(S i) l'  vs'
        | _, _ => False%I
      end)%I.
 
@@ -57,22 +57,24 @@ Section array.
         destruct vs1=>//; simpl; first by iDestruct "Hs1" as "%".
         iDestruct "Hs1" as "[Hv Hl1']".
         iFrame. rewrite comm_assoc_s.
-        iAssert (⌜length vs1 = l1'⌝ ∗ slice q t b o (S i) (l1' + l2) (vs1 ++ vs2))%I with "[-]" as "[% ?]".
+        iAssert (⌜length vs1 = l1'⌝ ∗
+                 slice q t b o (S i) (l1' + l2) (vs1 ++ vs2))%I
+          with "[-]" as "[% ?]".
         { iApply IHl1'. iFrame. }
         iFrame. by subst.
       + iIntros "[% Hs]".
         simpl. destruct vs1=>//; simpl in *.
         simplify_eq.
         iDestruct "Hs" as "[? ?]". iFrame. rewrite comm_assoc_s.
-        iApply IHl1'.
-        iSplit=>//.
+        iApply IHl1'. iSplit=>//.
   Qed.
 
   Lemma split_slice_join q t b o l1 i i' l2 vs1 vs2:
     i + l1 = i' →
     slice q t b o i l1 vs1 ∗ slice q t b o i' l2 vs2 ⊢
     slice q t b o i (l1 + l2) (vs1 ++ vs2).
-  Proof. iIntros (?) "~". rewrite -H0. by iDestruct (split_slice with "~") as "[_ ?]". Qed.
+  Proof. iIntros (?) "~". rewrite -H0.
+         by iDestruct (split_slice with "~") as "[_ ?]". Qed.
 
   Lemma split_slice' q t b o k n vs:
     k < n → length vs = n →
@@ -135,7 +137,8 @@ Section array.
         simpl.
         iDestruct (mapstoval_split with "H") as "[H1 H2]".
         iFrame. simpl.
-        replace (o + sizeof_type t * i + sizeof_type t) with (o + sizeof_type t * S i).
+        replace (o + sizeof_type t * i + sizeof_type t)
+          with (o + sizeof_type t * S i).
         iDestruct (IHn' with "H2") as "?". done.
         { replace (S i) with (i + 1); last omega.
           rewrite -distri_one. omega. }
@@ -143,7 +146,8 @@ Section array.
         destruct vs=>//; first by iDestruct "Hs" as "%".
         simpl. iApply mapstoval_join. iDestruct "Hs" as "[? ?]".
         iFrame. simpl.
-        replace (o + sizeof_type t * i + sizeof_type t) with (o + sizeof_type t * S i).
+        replace (o + sizeof_type t * i + sizeof_type t)
+          with (o + sizeof_type t * S i).
         by iApply IHn'.
         { replace (S i) with (i + 1); last omega.
           rewrite -distri_one. omega. }
@@ -166,7 +170,8 @@ Section array.
   
   Lemma index_spec q t p (i n: nat) vs Φ ks:
     i < n → mul_safe (sizeof_type t) i →
-    p ↦{q} varray vs @ tyarray t n ∗ (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
+    p ↦{q} varray vs @ tyarray t n ∗
+    (∀ v, p ↦{q} varray vs @ tyarray t n -∗ ⌜ vs !! i = Some v⌝ -∗ Φ v)
     ⊢ WP (!(index t p (Vint8 (Byte.repr i)))@t, ks) {{ Φ }}.
   Proof.
     iIntros (??) "[Hp HΦ]". destruct p.
