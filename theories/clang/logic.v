@@ -178,7 +178,7 @@ Section rules.
       - apply cont_inj in Heq=>//; auto;
         destruct Heq as [Heq ?]; inversion Heq; subst.
         iFrame. apply kcall_map in H4=>//. destruct_ands.
-        iMod "Hclose". rewrite big_sepL_nil. by iFrame.
+        iMod "Hclose". by iFrame.
       - fill_enf_neq. }
     { destruct e2. simpl in *. apply fill_wstep_false in Hws=>//.  }
   Qed.
@@ -356,7 +356,7 @@ Section rules.
     { iPureIntro. solve_red. }
     iNext; iIntros (s2 l2 σ2 efs Hstep). iModIntro.
     atomic_step Hstep.
-    simpl. iFrame. iSplitL; last by rewrite big_sepL_nil.
+    simpl. iFrame. iSplitL=>//.
     rewrite (same_type_encode_inj h' t v v0 p)=>//.
     iApply ("HΦ" with "[-]") ; first by iSplit=>//.
   Qed.
@@ -412,7 +412,7 @@ Section rules.
                    with "Hσ Hl") as "[H ?]".
         { rewrite -(typeof_preserves_size v t)=>//.
           rewrite -(typeof_preserves_size v2 t)=>//. }
-        iFrame. iModIntro. iSplitL; last by rewrite big_sepL_nil.
+        iFrame. iModIntro. iSplitL=>//.
         iApply "HΦ". iSplit=>//.
       + escape_false.
     - absurd_jstep Hjs.
@@ -599,7 +599,7 @@ Section rules.
       inversion Hes=>//; subst.
       + iFrame. iSplitR "He".
         { iApply wp_value=>//. }
-        simplify_eq. by rewrite big_sepL_singleton.
+        simplify_eq. by iFrame.
       + exfalso. escape_false.
     - absurd_jstep Hjs.
     - absurd_jstep Hws.
@@ -625,7 +625,7 @@ Section rules.
       + apply cont_inj in Heq=>//; auto.
         destruct Heq as [Heq ?]. inversion Heq. subst.
         iFrame. destruct e2. simpl in *. subst.
-        iFrame. by rewrite big_sepL_nil.
+        by iFrame.
       + fill_enf_neq.
       + fill_enf_neq. }
   Qed.
@@ -652,8 +652,7 @@ Section rules.
         destruct Heq as [Heq ?]. inversion Heq.
         iFrame. destruct e2. simpl in *. subst.
         iFrame. apply kwhile_map in H2=>//.
-        destruct_ands. iFrame.
-        by rewrite big_sepL_nil.
+        destruct_ands. by iFrame.
       + fill_enf_neq. }
   Qed.
 
@@ -680,11 +679,10 @@ Section rules.
         destruct Heq as [Heq ?]. inversion Heq.
         iFrame. destruct e2. simpl in *. subst.
         iFrame. apply kwhile_map in H2=>//.
-        destruct_ands. iFrame.
-        by rewrite big_sepL_nil. }
+        destruct_ands. by iFrame. }
   Qed.
 
-  Lemma wp_call {E ks} Ω Ω' {k} v params e f retty Φ:
+  Lemma wp_call {E ks} Ω Ω' k v params e f retty Φ:
     let_params v params = Some Ω →
     f T↦ Function retty params e ∗
     ▷ WP (e, (Kcall k Ω'::ks, Ω)) @ E {{ Φ }}
@@ -708,8 +706,7 @@ Section rules.
         destruct Heq as [Heq ?]. inversion Heq. subst.
         iFrame. destruct e2. simpl in *. subst.
         subst. clear Heq. simplify_eq.
-        iSplitL; first by iApply "HΦ".
-        by rewrite big_sepL_nil. }
+        iSplitL; first by iApply "HΦ". done. }
     { apply fill_wstep_false in Hws=>//. }
   Qed.
 

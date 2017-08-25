@@ -11,9 +11,9 @@ Control-flow based language verification framework based on the Iris program log
 
 ## Dependencies
 
-1. Coq 8.6
+1. Coq 8.6.1
 2. ssreflect 1.6.1
-3. Iris 3.0
+3. Iris [a71965c4](https://gitlab.mpi-sws.org/FP/iris-coq/commit/a71965c47fced41c1150656ca2a92cab0e78e25a)
 
 [Recommended way to install dependencies](.travis.yml)
 

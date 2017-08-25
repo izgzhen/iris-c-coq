@@ -30,7 +30,7 @@ Section rules.
     rewrite /own_update.
     iDestruct (own_valid_2 with "Hs Hs'") as "%".
     iPureIntro. destruct H0 as [? ?]. simpl in H1.
-    by apply to_agree_comp_valid in H1.
+    by apply agree_op_inv, to_agree_inj in H1.
   Qed.
 
   Lemma own_pair_update c1 c2 c3:
@@ -45,7 +45,7 @@ Section rules.
     apply cmra_update_exclusive.
     split; simpl.
     - by rewrite frac_op'.
-    - by apply to_agree_comp_valid.
+    - by rewrite agree_idemp.
   Qed.
 
 End rules.

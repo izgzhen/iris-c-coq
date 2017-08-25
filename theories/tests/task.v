@@ -23,16 +23,12 @@ Section example.
     iApply create_task_spec.
     iFrame. iIntros (N). simpl.
     iIntros "% [H1 H0]".
-    iApply wp_atomic.
+    iApply (wp_atomic (⊤ ∖ ↑N) (⊤ ∖ ↑N ∖ ↑N')).
     { by apply atomic_enf. }
     assert (N ⊥ N').
     { apply H0. }
     iInv (N') as "?" "Hclose".
-    iModIntro.
-    iApply (wp_assign tybool tybool)=>//; last iFrame.
-    { constructor. } { constructor. }
-    iNext. iIntros "Hl". iMod ("Hclose" with "[]") as "?"=>//.
-    iNext. done.
+    iModIntro. iApply (@wp_assign _ _ _ _ vtrue vfalse tybool tybool)=>//; constructor.
   Qed.
 
 End example.

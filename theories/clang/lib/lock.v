@@ -59,7 +59,7 @@ Section spin_lock.
   Proof.
     iIntros "(Hf & HR & HΦ)".
     destruct ks.
-    iApply (wp_call semp e Vvoid [])=>//. iFrame.
+    iApply (wp_call semp e _ Vvoid [])=>//. iFrame.
     iNext. rewrite /newlock /=.
     wp_alloc l as "Hl". iApply (wp_ret []).
     iFrame. iApply fupd_wp.
@@ -77,7 +77,7 @@ Section spin_lock.
   Proof.
     iIntros "(Hf & #Hlk & HΦ)".
     destruct ks.
-    iApply (wp_call (sset "x" (tylock, lk) semp) e
+    iApply (wp_call (sset "x" (tylock, lk) semp) e _
                     (Vpair lk Vvoid)); last iFrame; first done.
     iNext. iDestruct (is_lock_tylock with "Hlk") as "%". unfold acquire.
     iLöb as "IH".
@@ -114,7 +114,7 @@ Section spin_lock.
     destruct ks.
     iDestruct "Hlk" as (l) "[% ?]". destruct_ands.
     iApply (wp_call (sset "x" (tylock, Vptr l) semp)
-                    e (Vpair l Vvoid)); last iFrame; auto.
+                    e _ (Vpair l Vvoid)); last iFrame; auto.
     iIntros "!>". unfold release. wp_bind (_ <- _)%E.
     wp_var. wp_atomic.
     iInv N as ([]) "[>Hl HR']" "Hclose"; iModIntro.

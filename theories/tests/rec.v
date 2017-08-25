@@ -55,8 +55,9 @@ Section proof.
       iApply wp_value=>//.
       replace ((Z.pos (Pos.of_succ_nat n0) - 1%Z)%int)
         with (Byte.repr n0).
-      iApply (wp_call (rec_env ln) (rec_env ln) [EKseq (return: void)]
-                      (Vpair ln void));
+      iApply (wp_call (rec_env ln) (rec_env ln)
+                         [EKseq (return: void)] (Vpair ln void)
+                         [("x", Tptr Tint8)]);
         last iFrame "#"; first done.
       iNext. unfold g. wp_var. wp_load.
       destruct n0 eqn:Heqn; subst.
@@ -64,7 +65,7 @@ Section proof.
       + simpl.
         wp_op=>//.
         { destruct Hn as [H1 H2]. simpl. apply H2. }
-        wp_step. iApply wp_seq=>//. iNext. wp_var. wp_var. wp_run.
+        wp_step. iApply wp_seq=>//. wp_run.
         wp_unfill (Ecall _ _ _)%E.
         rewrite (fill_app (Evar "x")
                           [EKcall Tvoid "f"; EKpairl void]).
@@ -83,7 +84,7 @@ Section proof.
         simpl. wp_run. simpl. wp_run.
         { by destruct Hn as [? ?]. }
         { by destruct Hn as [? ?]. }
-      + destruct Hn as [? ?]. done.
+      + by destruct Hn as [? ?].
   Qed.
 
 End proof.

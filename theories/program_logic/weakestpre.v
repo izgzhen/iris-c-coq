@@ -138,7 +138,7 @@ Proof.
   iIntros (?) "[HΦ H]". iLöb as "IH" forall (e). rewrite !wp_unfold /wp_pre.
   iDestruct "H" as "[Hv|[% H]]"; [iLeft|iRight].
   { iDestruct "Hv" as (v) "[% Hv]". iExists v; iSplit; first done.
-    iApply ("HΦ" with ">[-]"). by iApply (fupd_mask_mono E1 _). }
+    iApply ("HΦ" with "[> -]"). by iApply (fupd_mask_mono E1 _). }
   iSplit; [done|]; iIntros (σ1) "Hσ".
   iMod (fupd_intro_mask' E2 E1) as "Hclose"; first done.
   iMod ("H" $! σ1 with "Hσ") as "[$ H]".
@@ -263,8 +263,8 @@ Section proofmode_classes.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
-  Global Instance frame_wp E e R Φ Ψ :
-    (∀ v, Frame R (Φ v) (Ψ v)) → Frame R (WP e @ E {{ Φ }}) (WP e @ E {{ Ψ }}).
+  Global Instance frame_wp p E e R Φ Ψ :
+    (∀ v, Frame p R (Φ v) (Ψ v)) → Frame p R (WP e @ E {{ Φ }}) (WP e @ E {{ Ψ }}).
   Proof. rewrite /Frame=> HR. rewrite wp_frame_l. apply wp_mono, HR. Qed.
 
   Global Instance is_except_0_wp E e Φ : IsExcept0 (WP e @ E {{ Φ }}).

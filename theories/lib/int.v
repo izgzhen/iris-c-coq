@@ -1,7 +1,7 @@
 (* Enhanced Integers *)
 
 From iris_c.lib Require Export prelude Integers.
-Require Import iris.prelude.prelude.
+Require Import stdpp.prelude.
 From mathcomp Require Export ssreflect.
 
 Definition op_safe op opn (i j: nat) : Prop :=

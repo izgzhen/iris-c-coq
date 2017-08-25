@@ -1,5 +1,5 @@
-From iris.prelude Require Export prelude.
-From iris.algebra Require Import cmra dra cmra_tactics.
+Require Export stdpp.prelude.
+From iris.algebra Require Import cmra dra. (* cmra_tactics. *)
 From iris_c.lib Require Import prelude.
 
 Section algebra.
@@ -291,6 +291,6 @@ Section algebra.
   Qed.
 
   Canonical Structure refine_ucmra : ucmraT :=
-    (UCMRAT refine_cmra (cmra_ofe_mixin _) (cmra_mixin _) refine_unit).
+    UCMRAT refine_cmra refine_unit.
 
 End algebra.

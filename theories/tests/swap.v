@@ -20,10 +20,7 @@ Section example.
   Proof.
     iIntros (?) "[?[??]] HΦ". iDestruct "~2" as (?) "?".
     extract_types.
-    unfold swap.
-    wp_var. wp_var. wp_run.
-    wp_var. wp_var. wp_run.
-    wp_var. wp_var. wp_run.
+    unfold swap. wp_run.
     iApply ("HΦ" with "[-]"). iFrame.
     by iExists _.
   Qed.

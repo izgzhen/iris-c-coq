@@ -330,7 +330,7 @@ Section proof.
      rewrite -(fill_app (Vpair x (Vpair y (Vpair pt void)))
                         [EKcall Tvoid "rev"] k).
      simpl.
-     iApply (wp_call (rev_env x y pt) e
+     iApply (wp_call (rev_env x y pt) e _
                      (Vpair x (Vpair y (Vpair pt Vvoid))) ps)=>//.
      iFrame. iNext.
      move: (rev_spec' "rev" [EKseq (return: ! "y" @ Tlist)]

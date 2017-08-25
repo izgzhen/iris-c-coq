@@ -1,7 +1,7 @@
 (* Re-export of Iris and some general stuff *)
 
 From iris_c.lib Require Export CpdtTactics Integers.
-From iris.prelude Require Export prelude countable strings.
+From stdpp Require Export prelude countable strings.
 From mathcomp Require Import ssreflect.
 Open Scope Z_scope.
 

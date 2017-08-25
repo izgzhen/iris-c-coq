@@ -46,7 +46,7 @@ Section array.
     induction l1 as [|l1' IHl1'].
     - intros. iSplit.
       + iIntros "[Hs1 Hs2]".
-        simpl. destruct vs1=>//; last by iDestruct "Hs1" as "%".
+        simpl. destruct vs1=>//.
         simpl. replace (i + 0) with i=>//. by iFrame.
       + iIntros "Hs".
         simpl. destruct vs1=>//.
@@ -54,7 +54,7 @@ Section array.
         * iDestruct "Hs" as "[% ?]". done.
     - intros. iSplit.
       + iIntros "[Hs1 Hs2]".
-        destruct vs1=>//; simpl; first by iDestruct "Hs1" as "%".
+        destruct vs1=>//; simpl.
         iDestruct "Hs1" as "[Hv Hl1']".
         iFrame. rewrite comm_assoc_s.
         iAssert (⌜length vs1 = l1'⌝ ∗
@@ -123,7 +123,6 @@ Section array.
     - iIntros (????).
       unfold slice'. simpl. destruct vs=>//; simpl.
       + iSplit; auto.
-        iIntros "_". rewrite /mapstoval. iSplit=>//.
       + iSplit; iIntros "H".
         * iDestruct (mapsto_typeof with "H") as "%".
           inversion H0.
@@ -142,8 +141,7 @@ Section array.
         iDestruct (IHn' with "H2") as "?". done.
         { replace (S i) with (i + 1); last omega.
           rewrite -distri_one. omega. }
-      + iIntros "Hs". simpl.
-        destruct vs=>//; first by iDestruct "Hs" as "%".
+      + iIntros "Hs". simpl. destruct vs=>//.
         simpl. iApply mapstoval_join. iDestruct "Hs" as "[? ?]".
         iFrame. simpl.
         replace (o + sizeof_type t * i + sizeof_type t)
@@ -179,10 +177,8 @@ Section array.
     destruct i.
     - unfold index. wp_op. rewrite_byte.
       wp_op. rewrite_byte.
-      destruct n.
-      { inversion H0. }
-      destruct vs=>//; first by iDestruct "Hs" as "%".
-      simpl.  iDestruct "Hs" as "[? ?]".
+      destruct n. { inversion H0. } destruct vs=>//.
+      simpl. iDestruct "Hs" as "[? ?]".
       rewrite_nat.  wp_load.
       iApply wp_value=>//. iApply ("HΦ" with "[-]")=>//.
       iApply mapstoval_join. iFrame.
