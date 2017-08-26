@@ -8,6 +8,8 @@
 *.bbl
 *.blg
 *.bcf
+*.fls
+*.fdb_latexmk
 *.run.xml
 _*_.tex
 auto/*.el

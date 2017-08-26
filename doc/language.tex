@@ -29,12 +29,12 @@ The language is a simplified version of C. It mainly consists of
        v \mid
        x \mid
        e \oplus e \mid
-       \ederef{e} \mid
        \edereft{\tau}{e} \mid
        \eaddrof{e} \mid
-       \efst{e} \mid
        \eCAS{\tau}{e}{e}{e} \mid
+       \efst{e} \mid
        \esnd{e} \mid
+       (e, e) \mid
        \\&
        e \la e \mid
        \eif{e}{e}{e} \mid
@@ -43,12 +43,10 @@ The language is a simplified version of C. It mainly consists of
        \econtinue \mid
        \\&
        \erete{e} \mid
-       \ecall{\tau}{f}{e_1, ..., e_n} \mid
+       \ecall{\tau}{f}{e_1, (..., e_n)} \mid
        e ;; e \mid
        \ealloc{\tau}{e} \mid
-       \\&
-       \elet{\tau}{x}{e}{e} \mid
-       \efork{\tau}{f}{e_1, ..., e_n}
+       \efork{\tau}{f}
 \\
 \end{align*}
 
@@ -58,15 +56,10 @@ We also have following definitions:
   \item block address $b \in \nat$
   \item offset $o \in \integer^{+}$
   \item Memory address $l: \Addr \eqdef \vaddr{b}{o}$
-  \item Program $\Sigma: \Text \eqdef [f \gmapsto \Funct]$ is a list of functions indexed by names
+  \item Program $\Gamma: \Text \eqdef [f \gmapsto \Funct]$ is a list of functions indexed by names
   \item Function $F: \Funct \eqdef (\tau_{ret} \times [x_1 : \tau_1, ...] \times e)$ consists of return type,
     parameter declarations and function body.
 \end{itemize}
-
-(NOTE) The relationship between $\ederef{e}$ and $\edereft{\tau}{e}$: The former one is only used in source,
-and the later one is used in the actual semantics and inference rules.
-By adding a pre-processing step which instantiates all source-only expression to substituted/typed ones,
-we can remove lexical and typing environment from the core program logic. The details are in \ref{par:tyev}.
 
 (NOTE) Compared with C, there are several notable differences:
 \begin{enumerate}
@@ -88,13 +81,14 @@ we define the \emph{evaluation context}:
 
 \begin{align*}
     \ctx : \ectx \eqdef{}&
-        \elet{\tau}{x}{\emptyctx}{e} \mid
         \emptyctx \oplus e \mid
         v \oplus \emptyctx \mid
         \edereft{\tau}{\emptyctx} \mid
         \eaddrof{\emptyctx} \mid
         \efst{\emptyctx} \mid
         \esnd{\emptyctx} \mid
+        (\emptyctx, e) \mid
+        (v, \emptyctx) \mid
         \\&
         \eCAS{\tau}{\emptyctx}{e}{e} \mid
         \eCAS{\tau}{l}{\emptyctx}{e} \mid
@@ -105,11 +99,9 @@ we define the \emph{evaluation context}:
         \eif{\emptyctx}{e}{e} \mid
         \\&
         \erete{\emptyctx} \mid
-        \ecall{\tau}{f}{v_1, ..., \emptyctx, e_1, ...} \mid
+        \ecall{\tau}{f}{\emptyctx} \mid
         \ealloc{\tau}{\emptyctx} \mid
-        \emptyctx ; e \mid
-        \\&
-        \efork{\tau}{f}{v_1, ..., \emptyctx, e_1, ...}
+        \emptyctx ; e
 \end{align*}
 
 \subsection{Semantics}\label{sec:semantics}
@@ -119,10 +111,13 @@ First define
 \begin{itemize}
 \item Byte-size value \[\bval : \byteval \eqdef \mundef \mid i \in [0, 2^8) \mid l_{\{0 \mid 1 \mid 2 \mid 3\}} \mid \vnull\]
 \item Heap $h: \Heap \eqdef [ l \gmapsto \bval ]$
+\item Text $\Gamma: \Text \eqdef [ f \gmapsto \Funct ]$
 \item Continuation $k: \Cont \eqdef [\ectx]$
-\item Context $K: \Ctx \eqdef \kwhile{c}{e}{k} \mid \kcall{k} $
+\item Context $K: \Ctx \eqdef \kwhile{c}{e}{k} \mid \kcall{k}{\epsilon}$
 \item Stack $s: \Stack \eqdef [\Ctx]$
+\item Environment: $ \epsilon : [x \gmapsto (\tau, v)]$
 \item Shared state \[\sigma: \State \eqdef (\text{heap}: \Heap, \text{text}: \Text)\]
+\item Local state \[\sigma_l: \LocalState \eqdef (\text{stack}: \Stack, \text{env}: \Env)\]
 \end{itemize}
 
 (NOTE) You may notice the difference between $\Val$ and $\byteval$, it is intended to create a layer of abstraction for
@@ -133,58 +128,59 @@ easier manipulation of spatial assertions and also for a clean, unified language
 We define the small-step semantics (see figure \ref{fig:semantics}) for three sub-semantics:
 
 \begin{itemize}
-    \item local reduction $\estepf{\Sigma}{e}{h}{e'}{h'}{t_1, t_2, ...}$
-          (when the set of forked-off threads $t_1, ...$ is empty, we abbreviate it as $\estep{\Sigma}{e}{h}{e'}{h'}$)
-    \item \emph{jump} reductions $\jstep{\Sigma}{e}{s}{e'}{s'}$
+    \item local reduction $\estepf{\Gamma}{\epsilon}{e}{h}{\epsilon'}{e'}{h'}{t_1, t_2, ...}$
+          (when the set of forked-off threads $t_1, ...$ is empty, we abbreviate it as
+          $\estep{\Gamma}{\epsilon}{e}{h}{\epsilon'}{e'}{h'}$)
+    \item \emph{jump} reductions $\jstep{\Gamma}{\epsilon}{e}{s}{\epsilon'}{e'}{s'}$
     \item \emph{while} reductions $\wstep{e}{s}{e'}{s'}$
+\end{itemize}
 
-Then we combine them together into $\cstepf{e}{s, \sigma}{e'}{s', \sigma'}{t_1, ...}$ point-wise.
+Then we combine them together into $\cstepf{\Gamma}{\epsilon}{e}{s, \sigma}{\epsilon}{e'}{s', \sigma'}{t_1, ...}$ point-wise.
 
 \begin{figure}[!ht]
 \begin{mathpar}\label{fig:semantics}
 
-\infer[es-binop]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{\Sigma}{v_1 \oplus v_2}{h}{v'}{h}}
+\infer[es-binop]{\llbracket oplus \rrbracket (v_1, v_2) = v'}{\estep{\Gamma}{\epsilon}{v_1 \oplus v_2}{h}{\epsilon}{v'}{h}}
 
-\infer[es-deref-typed]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\Sigma}{\edereft{\tau}{l}}{h}{v}{h}}
+\infer[es-deref-typed]{\tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v)}{\estep{\Gamma}{\epsilon}{\edereft{\tau}{l}}{h}{\epsilon}{v}{h}}
 
-\infer[es-fst]{}{\estep{\Sigma}{\efst{(v_1, v_2)}}{h}{v_1}{h}}
+\infer[es-fst]{}{\estep{\Gamma}{\epsilon}{\efst{(v_1, v_2)}}{h}{\epsilon}{v_1}{h}}
 
-\infer[es-snd]{}{\estep{\Sigma}{\esnd{(v_1, v_2)}}{h}{v_2}{h}}
+\infer[es-snd]{}{\estep{\Gamma}{\epsilon}{\esnd{(v_1, v_2)}}{h}{\epsilon}{v_2}{h}}
 
-\infer[es-assign]{}{\estep{\Sigma}{l \la v}{h}{\eskip}{h[ l \mapsto \encode(v) ]}}
+\infer[es-assign]{}{\estep{\Gamma}{\epsilon}{l \la v}{h}{\epsilon}{\eskip}{h[ l \mapsto \encode(v) ]}}
 
-\infer[es-seq]{}{\estep{\Sigma}{v ;; e}{h}{e}{h}}
+\infer[es-seq]{}{\estep{\Gamma}{\epsilon}{v ;; e}{h}{\epsilon}{e}{h}}
 
-\infer[es-alloc]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\Sigma}{\ealloc{\tau}{v}}{h}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
+\infer[es-alloc]{\tychk{v}{\tau} \quad \All o'. h(b, o') = \bot}{\estep{\Gamma}{\epsilon}{\ealloc{\tau}{v}}{h}{\epsilon}{\vaddr{b}{o}}{h[\vaddr{b}{o} \mapsto v]}}
 
-\infer[es-if-true]{}{\estep{\Sigma}{\eif{\vtrue}{e_1}{e_2}}{h}{e_1}{h}}
+\infer[es-if-true]{}{\estep{\Gamma}{\epsilon}{\eif{\vtrue}{e_1}{e_2}}{h}{\epsilon}{e_1}{h}}
 
-\infer[es-if-false]{}{\estep{\Sigma}{\eif{\vfalse}{e_1}{e_2}}{h}{e_2}{h}}
+\infer[es-if-false]{}{\estep{\Gamma}{\epsilon}{\eif{\vfalse}{e_1}{e_2}}{h}{\epsilon}{e_2}{h}}
 
-\infer[es-bind']{\isjmp(e) = \FALSE \quad \estep{\Sigma}{e}{h}{e'}{h'}}{\estep{\Sigma}{(k::ks)e}{h}{(k::ks)e'}{h'}}
+\infer[es-bind']{\isjmp(e) = \FALSE \quad \estep{\Gamma}{\epsilon}{e}{h}{\epsilon'}{e'}{h'}}{\estep{\Gamma}{\epsilon}{(k::ks)e}{h}{\epsilon'}{(k::ks)e'}{h'}}
 
 \infer[es-cas-fail]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad \tychk{v}{\tau} \quad h \vdash l \mapsto \encode(v) \quad v_1 \neq v}
-{\estep{\Sigma}{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vfalse}{h}}
+{\estep{\Gamma}{\epsilon}{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\epsilon}{\vfalse}{h}}
 
 \infer[es-cas-suc]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad h \vdash l \mapsto \encode(v_1)}
-{\estep{\Sigma}{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\vtrue}{h[ l \mapsto \encode(v_2) ]}}
-
-\infer[es-let]
-{}{\estep{\Sigma}{\elet{\tau}{x}{v}{e}}{h}{e[x/v:\tau]}{h}}
+{\estep{\Gamma}{\epsilon}{\eCAS{\tau}{l}{v_1}{v_2}}{h}{\epsilon}{\vtrue}{h[ l \mapsto \encode(v_2) ]}}
 
 \infer[es-fork]
-  {\Sigma(f) = \Funct(\tau, ps, e)}
-  {\estepf{\Sigma}{\efork{\tau}{f}{vs}}{h}{\void}{h}{\{e[ps/vs]}\}}
+  {\Gamma(f) = \Funct(\tau, [], e)}
+  {\estepf{\Gamma}
+          {\epsilon}{\efork{\tau}{f}}{h}
+          {\epsilon}{\void}{h}{\{e[ps/vs]\}}}
 
 \infer[js-rete]
   {\All K \in KS'. K \neq \kcall{\any}}
-  {\jstep{\Sigma}{k'(\erete{v})}{KS' \append \kcall{k} :: KS}{k(v)}{KS}}
+  {\jstep{\Gamma}{\epsilon}{k'(\erete{v})}{KS' \append \kcall{k} :: KS}{\epsilon}{k(v)}{KS}}
 
 \infer[js-call]
   {\Sigma(f) = \Funct(\tau, ps, e)}
-  {\jstep{\Sigma}{k(\ecall{\tau}{f}{vs})}{KS}{e[ps/vs]}{\kcall{k}::KS}}
+  {\jstep{\Gamma}{\epsilon}{k(\ecall{\tau}{f}{vs})}{KS}{\epsilon}{e[ps/vs]}{\kcall{k}::KS}}
 
 \infer[ws-while]
   {}
@@ -235,15 +231,7 @@ and TYPEOF-PTR means that a pointer can have \emph{any} pointer type.
 Formally, the lexical environment for a function body consists of two parts:
 parameter bindings (free variables) and local bindings (introduced by \texttt{let}).
 
-Every time we call a function, we will desugar the first part into the second part by recursively
-binding parameters to allocated argument values (as implemented in \texttt{let\_params} and typesetted as $e[ps/ls]$).
-
-Now we focus on what $e[x/v:\tau]$ means in the semantics of \texttt{let}-binding:
-Essentially, variable $x$ is replaced with its binding $v$, and type information is tagged to the untyped parts when in need.
-More specifically, we will replace variable with either its location (when in left-hand side)
-or the dereference of its location (when in right-hand side). We will produce a pointer arithmetic
-expression when processing the left-hand side expression, which in turn requires type inference $\tyinf{e}{\tau}$
-(since it is standard and trivial, we will leave out the details here).
-
-We won't document the algorithmic rules for rewriting expressions.
-You may refer to \texttt{resolve\_rhs}, \texttt{resolve\_lhs\_outer} and \texttt{resolve\_lhs\_inner} for details.
+We model the C semantics that these two types of bindings are essentially the same,
+except that we initialize the parameter bindings by passed in nested value pair
+(note that it is in the value domain, rather than a Coq-level list, which simplifies the verification),
+and initialize the local bindings by placeholder values.

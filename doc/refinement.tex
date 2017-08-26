@@ -98,17 +98,17 @@ First we define the simulation relationship between the $\Expr$ and $\SpecCode$:
 \infer{}{v \simulate \texttt{done}(v)}
 
 \infer
-    {\cstep{e}{\sigma}{e'}{\sigma'} \quad \sstepstar{\scode}{\sstate}{\scode'}{\sstate'}}
+    {\cstep{e}{\sigma}{\sigma_l}{e'}{\sigma'}{\sigma_l'} \quad \sstepstar{\scode}{\sstate}{\scode'}{\sstate'}}
     {e \simulate c}
 \end{mathpar}
 
-Our final soundness lemma, which is proved in Coq, is like below (the step indexing part is simplified away):
+Our final soundness lemma, which is proven in Coq, is like below (the step indexing part is simplified away):
 
 \begin{align*}
-\infer{\cstepN{e}{\sigma}{v}{\sigma'}{*}}
+\infer{\cstepN{e \append t_1}{\sigma}{(v, s_l) \append t_2}{\sigma'}{n}}
 {
     \text{world}(\sigma) * (\knowInv{\iname}{I_\refineM} * \Sstate(\sstate) * \Scode(\scode)) *
-    \wpre{e}{\Ret v. \Sstate(\sstate') * \Scode(\texttt{done}(v)) }  \proves
-    v \simulate c
+    \wpre{e}{\Ret v. \Sstate(\sstate') * \Scode(\texttt{done}(v)) } * \text{wptp}(t_1)  \proves
+    \later^{n+2} v \simulate c
 }
 \end{align*}

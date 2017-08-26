@@ -4,67 +4,6 @@
 Besides the core language and its logic,
 we built several extension on top of it in a compatible way.
 
-\subsection{WP-\texttt{ret}}\label{def:wpr}
-
-We extend the unary-exit WP into a binary-exit $\wprer{e}[\mask]{\pred}{\predret}$,
-by defining it as below:
-
-\begin{align*}
-  \textdom{wp}^{+} \eqdef{}& \MU \textdom{wp}^{+}. \Lam \mask, e, \pred, \predret. \\
-        & (\Exists v. \toval(e) = v \land \pred(v)) \lor {}\\
-        & (\toval(e) = \bot \,\land \Exists e_h, K. e = K(e_h) \land \Bigl({}\\
-        &\qquad (\All s. \isjmp(e_h) = \FALSE * \wpre{e_h; s}[\mask]{\Ret v. \wprer{K(v)}[\mask]{\pred}{\predret}}) \lor \\
-        &\qquad (\Exists v. e_h = \erete{v} * \later \predret(v)) \lor \\
-        &\qquad (\Exists f, ps, ls, F. \\
-                           & \qquad \qquad f \tmapsto \Funct(\any, ps, F) * \\
-                           & \qquad \qquad \later (\wprer{F[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v.
-                             \wprer{K(v)}[\mask]{\pred}{\predret}})) \\
-        &\Bigr) )\\
-\end{align*}
-
-And this definition supports the following inference rules:
-
-\begin{mathpar}
-\infer[wpr-value]{}{\pred(v) \proves \wprer{v}[\mask]{\pred}{\predret}}
-
-\infer[wpr-ret]{}{\predret(v) \proves \wprer{\erete{v}}[\mask]{\pred}{\predret}}
-
-\infer[wpr-bind]
-{}
-{\wprer\expr[\mask]{\Ret\var. \wprer{k(\var)}[\mask]{\pred}{\predret}}{\predret}
- \proves 
- \wprer{k(\expr)}[\mask]{\pred}{\predret}}
-
-\infer[wpr-seq]
-{}
-{\wprer{e_1}{\Ret\var. \wprer{\var ; e_2}[\mask]{\pred}{\predret}}{\predret}
- \proves 
- \wprer{e_1;; e_2}[\mask]{\pred}{\predret}}
-
-\infer[wpr-call]
-{}
-{ f \tmapsto \Funct(\tau, ps, e) * \later (\wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\pred})
-  \proves \wprer{k(\ecall{\tau}{f}{ls})}[\mask]{\pred}{\predret}}
-
-\infer[wpr-op]
-{\llbracket oplus \rrbracket (v_1, v_2) = v'}
-{\pred(v')
- \proves
- \wprer{v_1 \oplus v_2}[\mask]{\pred}{\predret}}
-
-\infer[wp-call-r]
-{f \tmapsto \Funct(\tau, ps, e) *
- \later \wprer{e[ps/ls]}[\mask]{\Ret\any.\FALSE}{\Ret v. \wpre{k(v); KS}[\mask]{\pred}} }
-{\wpre{k(\ecall{\tau}{f}{ls}); KS}[\mask]{\pred}}
-
-\end{mathpar}
-
-Note how WP-CALL, WP-RET, WP-SEQ, and WP-BIND are simplified in their new, corresponding versions,
-also the fact that we can recover local evaluation like WP-OP trivially
-(and we won't duplicate too much here).
-
-We also features a rule to compose two styles together freely: WP-CALL-R.
-
 \subsection{Array}
 
 Using the most primitive form of aggregated structure, product type, we can easily derive

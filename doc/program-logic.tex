@@ -19,7 +19,7 @@ f \tmapsto F \eqdef{}& \ownGhost{\Text}{\authfrag \mapsingleton{f}{\aginj F}}
 \paragraph{Defining weakest precondition.}
 
 The shared state interpreting predicate $S : \State \to \iProp$ for our \irisc{} language is defined below,
-with threads local state $s$ set to $\Stack$ (and initialized to $\emptyset$),
+with threads local state $s$ set to $\Stack \times \Env$ (and initialized to $(\emptyset, \emptyset)$),
 as required for instantiating the parametric WP defined for a general class of \texttt{language}.
 
 \[S(\sigma) \eqdef 
@@ -33,7 +33,7 @@ as required for instantiating the parametric WP defined for a general class of \
         & \Bigl(\toval(e) = \bot \,\land \\
         &\qquad \All \state. S(\state) \vsW[\mask][\emptyset] {}\\
         &\qquad \red(e, s, \state) * \later\All e', s', \state', \vec e.
-            \cstepf{e}{s, \state}{e'}{s', \state'}{\vec e} \vsW[\emptyset][\mask] {}\\
+            \cstepf{e}{s}{\state}{e'}{s'}{\state'}{\vec e} \vsW[\emptyset][\mask] {}\\
             &\qquad\qquad S(\state') * \textdom{wp}(\mask, (e', s'), \pred) *
             \Sep_{\expr'' \in \vec e} \textdom{wp}(\top, (\expr'', \mathrm{init}_s), \Lam \any. \TRUE)\Bigr) \\
 \end{align*}
@@ -44,7 +44,7 @@ Here are some conventions:
 \item If we leave away the mask $\mask$, we assume it to be $\top$.
 \item $\pred$ in post-condition might or might not take a value parameter, depending on the context.
 \item When we elide stack $s$ in WP-rules, like $\wpre{e}{\pred}$, then the rules holds for all such
-      WP with any same $s$. This is useful in making local WP rules looking less cluttered.
+      WP with any same $s$. This is useful in making local WP rules look less cluttered.
 \end{itemize}
 
 \paragraph{Laws of weakest precondition.}
@@ -54,12 +54,12 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 \label{fig:wp-general}
 \begin{mathpar}
 \infer[wp-value]
-{}{\pred(\val) \proves \wpre{\val}[\mask]{\pred}}
+{}{\pred(\val) \proves \wpre{\val, s}[\mask]{\pred}}
 
 \infer[wp-atomic]
 { \textlog{atomic}(e)}
-{ \pvs[\mask_1][\mask_2] \wpre{\expr}[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
-   \proves \wpre{\expr}[\mask_1]{\Ret\var.\prop} }
+{ \pvs[\mask_1][\mask_2] \wpre{\expr, s}[\mask_2]{\Ret\var. \pvs[\mask_2][\mask_1]\prop}
+   \proves \wpre{\expr, s}[\mask_1]{\Ret\var.\prop} }
 
 \infer[wp-strong-mono]
 {\mask_1 \subseteq \mask_2}
@@ -81,22 +81,22 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
 \begin{mathpar}
 
 \infer[wp-skip]
-{}{\later \wpre{e}[\mask]{\pred} \proves \wpre{\val; e}[\mask]{\pred}}
+{}{\later \wpre{e, s}[\mask]{\pred} \proves \wpre{\val; e, s}[\mask]{\pred}}
 
  \infer[wp-assign]
 {\tychk{v}{\tau'} \quad \assigncomp{\tau}{\tau'}}
 { \later l \mapsto - : \tau * \later (l \mapsto v : \tau \wand \pred)
  \proves
- \wpre{l \la v}[\mask]{\pred}}
+ \wpre{l \la v, s}[\mask]{\pred}}
 
 \infer[wp-ret]
-{}{\wpre{k'(v); KS}[\mask]{\pred} \proves \wpre{k(\erete{v}); \kcall{k'}::KS}[\mask]{\pred}}
+{}{\wpre{k'(v), (KS, \Omega_1)}[\mask]{\pred} \proves \wpre{k(\erete{v}), (\kcall{k'}{\Omega_1}::KS, \Omega_2)}[\mask]{\pred}}
 
 \infer[wp-bind]
 {\isjmp(e) = \FALSE}
-{\wpre\expr[\mask]{\Ret\var. \wpre{k(\var)}[\mask]{\pred}}
+{\wpre{\expr, s}[\mask]{\Ret\var. \wpre{k(\var), s}[\mask]{\pred}}
  \proves 
- \wpre{k(\expr)}[\mask]{\pred}}
+ \wpre{k(\expr), s}[\mask]{\pred}}
 
  \infer[wp-op]
 {\llbracket oplus \rrbracket (v_1, v_2) = v'}
@@ -110,68 +110,75 @@ The rules in figure \ref{fig:wp-general} and figure \ref{fig:wp-irisc} can all b
  \proves
  \wpre{\edereft{\tau}{l}}[\mask]{\pred}}
 
+
+\end{mathpar}
+\caption{WP rules specific to \irisc{}, part I}
+\end{figure}
+
+
+\begin{figure}[!ht]
+\label{fig:wp-irisc2}
+\begin{mathpar}
+
 \infer[wp-seq]
 {\isjmp(e_1) = \FALSE}
-{\wpre{e_1}[\mask]{v,\,\wpre{v;e_2}[\mask]{\pred}}
+{\wpre{e_1, s}[\mask]{v,\,\wpre{v;;e_2, s}[\mask]{\pred}}
  \proves
- \wpre{e_1 ;; e_2}[\mask]{\pred}}
+ \wpre{e_1 ;; e_2, s}[\mask]{\pred}}
 
 \infer[wp-alloc]
 {\tychk{v}{\tau}}
-{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\ealloc{\tau}{v}}[\mask]{\pred}}
+{ (\All l. l \mapsto v : \tau \wand \pred(l) ) \proves \wpre{\ealloc{\tau}{v}, s}[\mask]{\pred}}
 
 \infer[wp-if-true]
-{}{\later \wpre{e_1}[\mask]{\pred}
-   \proves \wpre{\eif{\vtrue}{e_1}{e_2}}[\mask]{\pred}}
+{}{\later \wpre{e_1, s}[\mask]{\pred}
+   \proves \wpre{\eif{\vtrue}{e_1}{e_2}, s}[\mask]{\pred}}
 
 \infer[wp-if-false]
-{}{\later \wpre{e_2}[\mask]{\pred}
-   \proves \wpre{\eif{\vfalse}{e_1}{e_2}}[\mask]{\pred}}
+{}{\later \wpre{e_2, s}[\mask]{\pred}
+   \proves \wpre{\eif{\vfalse}{e_1}{e_2}, s}[\mask]{\pred}}
 
 \infer[wp-fst]
 {}
-{\later \pred(v_1) \proves \wpre{\efst{(v_1, v_2)}}[\mask]{\pred}}
+{\later \pred(v_1) \proves \wpre{\efst{(v_1, v_2)}, s}[\mask]{\pred}}
 
 \infer[wp-snd]
 {}
-{\later \pred(v_2) \proves \wpre{\efst{(v_1, v_2)}}[\mask]{\pred}}
+{\later \pred(v_2) \proves \wpre{\efst{(v_1, v_2)}, s}[\mask]{\pred}}
 
 \infer[wp-call]
 {}
-{ f \tmapsto \Funct(\tau, ps, e) * \later (\wpre{e[ps/ls]; \kcall{k}::KS}[\mask]{\pred})
-  \proves \wpre{k(\ecall{\tau}{f}{ls}); KS}[\mask]{\pred}}
+{ f \tmapsto \Funct(\tau, ps, e) * \later (\wpre{e[ps/ls], (\kcall{k}{\Omega'}::KS, \Omega)}[\mask]{\pred})
+  \proves \wpre{k(\ecall{\tau}{f}{ls}), (KS, \Omega')}[\mask]{\pred}}
 
 \infer[wp-cas-fail]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau} \quad v_1 \neq v}
 {\later l \mapsto_q v : \tau * \later (l \mapsto_q v : \tau \wand \pred(\vfalse))
- \proves \wpre{\eCAS{\tau}{l}{v_1}{v_2}}[\mask]{\pred}}
+ \proves \wpre{\eCAS{\tau}{l}{v_1}{v_2}, s}[\mask]{\pred}}
 
 \infer[wp-cas-suc]
 {\tychk{v_1}{\tau} \quad \tychk{v_2}{\tau}}
 {\later l \mapsto_q v_1 : \tau * \later (l \mapsto_q v_2 : \tau \wand \pred(\vfalse))
- \proves \wpre{\eCAS{\tau}{l}{v_1}{v_2}}[\mask]{\pred}}
-
-\infer[wp-let]
-{}{\later \wpre{e[x/v:\tau]}[\mask]{\pred} \proves \wpre{\elet{\tau}{x}{v}{e}}[\mask]{\pred}}
+ \proves \wpre{\eCAS{\tau}{l}{v_1}{v_2}, s}[\mask]{\pred}}
 
 \infer[wp-fork]
-{}{f \tmapsto \Funct(\tau, ps, e) * \later \pred(\void) * \later (\wpre{e[ps/vs]; \emptyset}{\Ret\any.\TRUE})
-   \proves \wpre{\efork{\tau}{f}{vs}; ks}[\mask]{\pred}}
+{}{f \tmapsto \Funct(\tau, \emptyset, e) * \later \pred(\void) * \later (\wpre{e, (\emptyset, \emptyset)}{\Ret\any.\TRUE})
+   \proves \wpre{\efork{\tau}{f}{vs}, s}[\mask]{\pred}}
 
 \infer[wp-while]
-{}{ \later \wpre{\eif{c}{e;\econtinue}{\ebreak}; \kwhile{c}{e}{k}::KS}[\mask]{\pred}
-    \proves \wpre{ k(\ewhile{c}{e}; KS }[\mask]{\pred} }
+{}{ \later \wpre{\eif{c}{e;\econtinue}{\ebreak}, (\kwhile{c}{e}{k}::KS, \Omega)}[\mask]{\pred}
+    \proves \wpre{ k(\ewhile{c}{e}, (KS, \Omega)}[\mask]{\pred} }
 
 \infer[wp-break]
-{}{ \wpre{k'(\void); KS}[\mask]{\pred}
-    \proves \wpre{k(\ebreak); \kwhile{c}{e}{k'}::KS}[\mask]{\pred} }
+{}{ \wpre{k'(\void), (KS, \Omega)}[\mask]{\pred}
+    \proves \wpre{k(\ebreak), (\kwhile{c}{e}{k'}::KS, \Omega)}[\mask]{\pred} }
 
 \infer[wp-continue]
-{}{ \wpre{k'(\ewhile{c}{e}); KS}[\mask]{\pred}
-    \proves \wpre{k(\econtinue); \kwhile{c}{e}{k'}::KS}[\mask]{\pred} }
+{}{ \wpre{k'(\ewhile{c}{e}), (KS, \Omega)}[\mask]{\pred}
+    \proves \wpre{k(\econtinue), (\kwhile{c}{e}{k'}::KS, \Omega)}[\mask]{\pred} }
 
 \end{mathpar}
-\caption{WP rules specific to \irisc{}}
+\caption{WP rules specific to \irisc{}, part II}
 \end{figure}
 
 \subsection{Soundness}
