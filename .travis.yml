@@ -5,12 +5,13 @@ script:
   - opam repo add coq-released https://coq.inria.fr/opam/released
   - opam install coq.$COQ_VERSION coq-mathcomp-ssreflect.$SSREFLECT_VERSION ounit.2.0.0 uuidm.0.9.6 --yes --verbose
   - git clone https://gitlab.mpi-sws.org/robbertkrebbers/coq-stdpp ../coq-stdpp
+  - cd ../coq-stdpp; git checkout $STDPP_VERSION; cd ../iris-c-coq
   - make -C ../coq-stdpp
   - make -C ../coq-stdpp install
-  - git clone https://github.com/izgzhen/iris-coq ../iris-coq
+  - git clone https://gitlab.mpi-sws.org/FP/iris-coq.git ../iris-coq
   - cd ../iris-coq; git checkout $IRIS_VERSION; cd ../iris-c-coq
   - make -C ../iris-coq
-  - make -C ../iris-coq install
+  - cd ../iris-coq; make install; cd ../iris-c-coq
   - coq_makefile -f _CoqProject -o Makefile.coq
   - make -f Makefile.coq
 addons:
@@ -25,4 +26,5 @@ env:
   global:
     - COQ_VERSION=8.6.1
     - SSREFLECT_VERSION=1.6.1
-    - IRIS_VERSION=a71965c4
+    - IRIS_VERSION=de11579b84b8fc90b49afdbd7c1853bbccd5e584
+    - STDPP_VERSION=24aef2fea9481e65d1f6658005ddde25ae9a64ee
