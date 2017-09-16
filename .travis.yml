@@ -8,7 +8,7 @@ script:
   - make -C ../coq-stdpp
   - make -C ../coq-stdpp install
   - git clone https://github.com/izgzhen/iris-coq ../iris-coq
-  - cd iris-coq; git checkout $IRIS_VERSION; cd ..
+  - cd ../iris-coq; git checkout $IRIS_VERSION; cd ../iris-c-coq
   - make -C ../iris-coq
   - make -C ../iris-coq install
   - coq_makefile -f _CoqProject -o Makefile.coq
